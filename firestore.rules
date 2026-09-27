@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Products catalog: readable by customers and manageable by store owner
+    match /products/{productId} {
+      allow read, write: if true;
+    }
+
+    // Orders collection: placed by customers with Cash on Delivery, managed by store owner
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // Users and roles collection for Customer and Admin authentication
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Store settings and promotional banners
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    match /banners/{bannerId} {
+      allow read, write: if true;
+    }
+
+    // Connection probe
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

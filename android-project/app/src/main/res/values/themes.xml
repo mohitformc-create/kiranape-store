@@ -1,0 +1,12 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.Kiranape" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color (Chaurasia Kirana Green) -->
+        <item name="colorPrimary">@color/primary_green</item>
+        <item name="colorPrimaryVariant">@color/primary_green_dark</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <!-- Status bar color -->
+        <item name="android:statusBarColor">@color/primary_green_dark</item>
+        <item name="android:windowBackground">@color/background_neutral</item>
+    </style>
+</resources>

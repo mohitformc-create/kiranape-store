@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" class="overflow-x-hidden max-w-full w-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Chaurasia Kirana App - Fast Local Grocery Delivery</title>
+    <meta name="description" content="Fast and simple local grocery delivery app for Chaurasia Kirana Store with Cash on Delivery and store owner product management." />
+    <meta property="og:title" content="Chaurasia Kirana App - Fast Local Grocery Delivery" />
+    <meta property="og:description" content="Fast and simple local grocery delivery app for Chaurasia Kirana Store with Cash on Delivery and store owner product management." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- PWA & Mobile Meta Tags -->
+    <meta name="theme-color" content="#047857" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Kiranape" />
+    <meta name="application-name" content="Kiranape Express" />
+    <meta name="msapplication-TileColor" content="#047857" />
+
+    <!-- Web App Manifest & Icons -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/logo.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/logo.png" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="shortcut icon" href="/logo.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-stone-100 text-stone-900 antialiased font-sans selection:bg-emerald-500 selection:text-white overflow-x-hidden max-w-full w-full">
+    <div id="root" class="overflow-x-hidden max-w-full w-full min-h-screen"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('[PWA] Service Worker registered with scope:', registration.scope);
+            })
+            .catch((error) => {
+              console.warn('[PWA] Service Worker registration failed:', error);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
+

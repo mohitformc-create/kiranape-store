@@ -1,0 +1,11 @@
+{
+  "name": "Chaurasia Kirana App",
+  "description": "Fast and simple local grocery delivery app for Chaurasia Kirana Store with Cash on Delivery and store owner product management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

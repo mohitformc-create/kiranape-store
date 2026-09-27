@@ -1,0 +1,113 @@
+{
+  "id": "com.kiranape.app",
+  "name": "Kiranape Express",
+  "short_name": "Kiranape",
+  "description": "Kiranape Express - Shuddh Samaan, Bharosemand Delivery. Fast local grocery delivery with Cash on Delivery from Chaurasia Kirana & General Store in Waidhan, Singrauli.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "window-controls-overlay"
+  ],
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#047857",
+  "lang": "hi-IN",
+  "dir": "ltr",
+  "categories": [
+    "shopping",
+    "food",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Parchi Order (पर्ची ऑर्डर)",
+      "short_name": "Parchi",
+      "description": "Upload handwritten grocery list photo",
+      "url": "/?action=parchi",
+      "icons": [
+        {
+          "src": "/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Track Order (ऑर्डर ट्रैक करें)",
+      "short_name": "Track",
+      "description": "Check live grocery order status",
+      "url": "/?action=track",
+      "icons": [
+        {
+          "src": "/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Store Helpline (दुकान संपर्क)",
+      "short_name": "Helpline",
+      "description": "Call Chaurasia Kirana store support at 9424316081",
+      "url": "tel:9424316081",
+      "icons": [
+        {
+          "src": "/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.kiranape.app",
+      "id": "com.kiranape.app"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A grocery staple item in Chaurasia Kirana Store",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "originalPrice": { "type": "number" },
+        "discountPercent": { "type": "number" },
+        "finalPrice": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "isAvailable": { "type": "boolean" },
+        "description": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "category", "unit", "originalPrice", "finalPrice"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer Cash on Delivery order",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "items": { "type": "array" },
+        "itemsCount": { "type": "number" },
+        "subtotalOriginal": { "type": "number" },
+        "totalSavings": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "finalPayableAmount": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["orderId", "customerName", "phone", "address", "finalPayableAmount", "paymentMethod", "status"]
+    },
+    "StoreConfig": {
+      "title": "StoreConfig",
+      "description": "Store contact details, delivery parameters, and active banners",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "tagline": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "deliveryTime": { "type": "string" },
+        "minOrderForFreeDelivery": { "type": "number" },
+        "deliveryCharge": { "type": "number" },
+        "banners": { "type": "array" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "phone", "address", "minOrderForFreeDelivery", "deliveryCharge"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Promotional carousel banner in customer homepage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "badgeText": { "type": "string" },
+        "bgGradient": { "type": "string" },
+        "categoryTag": { "type": "string" },
+        "discountHighlight": { "type": "string" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "title", "subtitle"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of grocery products managed by store owner and viewed by customers"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of Cash on Delivery customer orders"
+    },
+    "/settings/{settingId}": {
+      "schema": "StoreConfig",
+      "description": "Dynamic store configuration and promotional banners"
+    },
+    "/banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Collection of promotional banners displayed on customer home screen"
+    }
+  }
+}

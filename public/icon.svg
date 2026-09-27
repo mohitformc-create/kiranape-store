@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient (Rich Emerald Green) -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#058339" />
+      <stop offset="60%" stop-color="#03692c" />
+      <stop offset="100%" stop-color="#024e20" />
+    </linearGradient>
+
+    <!-- Speed Streaks Yellow Gradient -->
+    <linearGradient id="speedYellow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffdc00" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Speed Streaks Lime Gradient -->
+    <linearGradient id="speedLime" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#84cc16" />
+      <stop offset="100%" stop-color="#4ade80" />
+    </linearGradient>
+
+    <!-- Fresh Leaf Gradient -->
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a3e635" />
+      <stop offset="100%" stop-color="#16a34a" />
+    </linearGradient>
+
+    <!-- Bread Gradient -->
+    <linearGradient id="breadGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter for 3D Pop -->
+    <filter id="cartShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Squircle App Background -->
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="url(#bgGradient)" />
+
+  <!-- Speed Motion Streaks (Left) -->
+  <g opacity="0.95">
+    <!-- Top Lime Streak -->
+    <rect x="74" y="142" width="108" height="20" rx="10" fill="url(#speedLime)" />
+    <!-- Yellow Long Streak -->
+    <rect x="48" y="180" width="144" height="22" rx="11" fill="url(#speedYellow)" />
+    <!-- Golden Mid Streak -->
+    <rect x="74" y="218" width="124" height="22" rx="11" fill="url(#speedYellow)" />
+    <!-- Bottom Lime Short Streak -->
+    <rect x="46" y="254" width="160" height="20" rx="10" fill="url(#speedLime)" />
+    <!-- Bottom Orange Dash -->
+    <rect x="108" y="288" width="104" height="24" rx="12" fill="url(#speedYellow)" />
+  </g>
+
+  <!-- Groceries Inside Cart (Behind Front Grids) -->
+  <g filter="url(#cartShadow)">
+    <!-- Baguette / Bread (Right) -->
+    <path d="M380 92 C410 92, 460 140, 460 170 C460 190, 430 230, 390 230 C370 230, 340 180, 345 150 Z"
+          fill="url(#breadGrad)" transform="rotate(18, 400, 160)" />
+    <path d="M386 122 L402 140 M394 150 L412 170 M402 180 L420 200" stroke="#b45309" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Cereal / Grocery Box (Golden Amber) -->
+    <rect x="345" y="104" width="48" height="74" rx="8" fill="#fbbf24" transform="rotate(-6, 365, 140)" />
+    <rect x="352" y="112" width="34" height="14" rx="4" fill="#f59e0b" />
+
+    <!-- Milk Bottle (White & Blue Cap) -->
+    <path d="M304 88 L330 88 C334 88, 338 94, 338 100 L342 165 C342 170, 336 175, 330 175 L298 175 C292 175, 288 170, 288 165 L294 100 C294 94, 298 88, 304 88 Z" fill="#ffffff" />
+    <rect x="306" y="68" width="22" height="22" rx="5" fill="#22c55e" />
+    <rect x="302" y="128" width="36" height="28" rx="4" fill="#22c55e" />
+
+    <!-- Red Apple -->
+    <circle cx="264" cy="154" r="38" fill="#ef4444" />
+    <path d="M260 120 C260 110, 266 102, 272 98" stroke="#78350f" stroke-width="6" stroke-linecap="round" fill="none" />
+
+    <!-- Fresh Green Leaves -->
+    <path d="M216 134 C216 84, 260 56, 260 56 C260 56, 268 96, 246 126 Z" fill="url(#leafGrad)" />
+    <path d="M256 120 C256 80, 298 62, 298 62 C298 62, 300 98, 276 120 Z" fill="url(#leafGrad)" />
+  </g>
+
+  <!-- Speeding White Shopping Cart Body -->
+  <g filter="url(#cartShadow)">
+    <!-- Cart Upper Rim & Handle -->
+    <path d="M142 120 C142 120, 168 118, 180 144 L212 258 C216 270, 228 280, 244 280 L420 280 C436 280, 448 266, 452 248 L474 138 C476 126, 466 116, 454 116 L174 116"
+          fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Cart Basket Grid Slots -->
+    <path d="M228 176 L440 176 M242 224 L420 224" stroke="#ffffff" stroke-width="18" stroke-linecap="round" />
+
+    <!-- Cart Under-chassis Base -->
+    <path d="M236 288 L394 288 C406 288, 412 296, 408 308 L394 316 L238 316 Z" fill="#ffffff" />
+
+    <!-- Fresh Leaf Badge on Cart Front -->
+    <path d="M298 274 C298 198, 394 198, 394 198 C394 198, 394 274, 298 274 Z" fill="url(#leafGrad)" />
+    <path d="M304 266 C336 244, 386 208, 386 208" stroke="#ffffff" stroke-width="4" stroke-linecap="round" fill="none" />
+
+    <!-- Cart Wheels -->
+    <circle cx="236" cy="326" r="32" fill="#ffffff" />
+    <circle cx="236" cy="326" r="16" fill="#16a34a" />
+
+    <circle cx="376" cy="326" r="32" fill="#ffffff" />
+    <circle cx="376" cy="326" r="16" fill="#16a34a" />
+  </g>
+
+  <!-- Official "Kiranape" Wordmark -->
+  <!-- "Kirana" in White with bold stroke -->
+  <g filter="url(#cartShadow)">
+    <text x="36" y="430"
+          font-family="'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
+          font-weight="900"
+          font-size="94"
+          letter-spacing="-1px"
+          fill="#ffffff">Kirana<tspan fill="#4ade80">pé</tspan></text>
+
+    <!-- Leaf accent on the 'é' -->
+    <path d="M434 372 C434 336, 474 332, 474 332 C474 332, 474 368, 438 376 Z" fill="url(#leafGrad)" />
+  </g>
+</svg>
