@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
         val defaultUserAgent = settings.userAgentString
         settings.userAgentString = "$defaultUserAgent KiranapeAndroidApp/1.0"
 
-        // WebChromeClient for page loading progress bar
+        // WebChromeClient for page loading progress bar and camera/mic permissions
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 if (newProgress < 100) {
@@ -115,6 +115,11 @@ class MainActivity : AppCompatActivity() {
                     progressBar.visibility = View.GONE
                     swipeRefreshLayout.isRefreshing = false
                 }
+            }
+
+            override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
+                // Automatically grant camera and microphone permissions requested by web app
+                request?.grant(request.resources)
             }
         }
 

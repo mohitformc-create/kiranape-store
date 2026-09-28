@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+import { MASTER_162_CATALOG } from './src/data/master162Catalog';
 
 dotenv.config();
 
@@ -45,7 +46,9 @@ interface CentralOrder {
   createdAt: string;
   timestamp: number;
   parchiImageUrl?: string;
+  slipImageUrl?: string;
   voiceNoteBase64?: string;
+  voiceAudioUrl?: string;
   isParchi?: boolean;
   orderType?: 'voice' | 'parchi' | 'cart';
   notes?: string;
@@ -55,10 +58,19 @@ interface CentralOrder {
 let centralOrders: CentralOrder[] = [];
 
 // ==========================================
-// CENTRAL SERVER INVENTORY (Bundled 105 Items)
+// CENTRAL SERVER INVENTORY (Persistent 162 Items)
 // ==========================================
 const INVENTORY_FILE_PATH = path.join(process.cwd(), 'data', 'central_inventory.json');
 let centralInventory: any[] = [];
+
+const persistCentralInventory = () => {
+  try {
+    fs.mkdirSync(path.dirname(INVENTORY_FILE_PATH), { recursive: true });
+    fs.writeFileSync(INVENTORY_FILE_PATH, JSON.stringify(centralInventory, null, 2));
+  } catch (err) {
+    console.error('[Central DB] Failed persisting inventory to disk:', err);
+  }
+};
 
 try {
   if (fs.existsSync(INVENTORY_FILE_PATH)) {
@@ -71,13 +83,50 @@ try {
   centralInventory = [];
 }
 
-const persistCentralInventory = () => {
-  try {
-    fs.writeFileSync(INVENTORY_FILE_PATH, JSON.stringify(centralInventory, null, 2));
-  } catch (err) {
-    console.error('[Central DB] Failed persisting inventory to disk:', err);
+// Auto-recovery / seed: Ensure all 162 verified items are preserved across restarts/sleep cycles
+if (!Array.isArray(centralInventory) || centralInventory.length < 162) {
+  console.log(`[Central DB] Inventory count (${centralInventory.length}) is below 162. Seeding full 162 master products...`);
+  const existingMap = new Map((centralInventory || []).map((p: any) => [p.id, p]));
+  MASTER_162_CATALOG.forEach((item) => {
+    if (!existingMap.has(item.id)) {
+      existingMap.set(item.id, item);
+    }
+  });
+  centralInventory = Array.from(existingMap.values());
+  persistCentralInventory();
+  console.log(`[Central DB] Inventory ready with ${centralInventory.length} products.`);
+}
+
+// ==========================================
+// CENTRAL CATEGORIES PERSISTENCE
+// ==========================================
+const CATEGORIES_FILE_PATH = path.join(process.cwd(), 'data', 'central_categories.json');
+const DEFAULT_CATEGORIES = [
+  'All',
+  'Snacks & Biscuits',
+  'Tea, Coffee & Drinks',
+  'Health & Nutrition',
+  'Personal Care',
+  'Household Essentials',
+  'Packaged Foods',
+  'Atta & Flours',
+  'Rice & Dal',
+  'Oil & Ghee',
+  'Spices & Salt',
+  'Dairy & Bakery',
+];
+
+let centralCategories: string[] = DEFAULT_CATEGORIES;
+try {
+  if (fs.existsSync(CATEGORIES_FILE_PATH)) {
+    centralCategories = JSON.parse(fs.readFileSync(CATEGORIES_FILE_PATH, 'utf-8'));
+  } else {
+    fs.mkdirSync(path.dirname(CATEGORIES_FILE_PATH), { recursive: true });
+    fs.writeFileSync(CATEGORIES_FILE_PATH, JSON.stringify(DEFAULT_CATEGORIES, null, 2));
   }
-};
+} catch (e) {
+  centralCategories = DEFAULT_CATEGORIES;
+}
 
 // Load existing orders on startup
 try {
@@ -96,6 +145,7 @@ try {
 
 const persistCentralOrders = () => {
   try {
+    fs.mkdirSync(path.dirname(ORDERS_FILE_PATH), { recursive: true });
     fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(centralOrders, null, 2));
   } catch (err) {
     console.error('[Central DB] Failed persisting orders to disk:', err);
@@ -152,6 +202,7 @@ app.post('/api/orders', (req, res) => {
     // Check if it's a Parchi Photo Order
     const isParchi = Boolean(
       body.isParchi ||
+      body.slipImageUrl ||
       body.parchiImageUrl ||
       body.parchiBase64 ||
       body.imageBase64
@@ -176,8 +227,8 @@ app.post('/api/orders', (req, res) => {
         : `ORD-${Math.floor(10000 + Math.random() * 90000)}`);
 
     const now = Date.now();
-    const parchiPhoto = body.parchiBase64 || body.imageBase64 || body.parchiImageUrl || body.imageUrl;
-    const voiceNoteBase64 = body.voiceNoteBase64 || body.audioBase64 || undefined;
+    const slipPhoto = body.slipImageUrl || body.parchiBase64 || body.imageBase64 || body.parchiImageUrl || body.imageUrl;
+    const voiceAudio = body.voiceAudioUrl || body.voiceNoteBase64 || body.audioBase64 || undefined;
 
     const newOrder: CentralOrder = {
       id: orderId,
@@ -198,9 +249,11 @@ app.post('/api/orders', (req, res) => {
       createdAt: body.createdAt || new Date().toISOString(),
       timestamp: body.timestamp || now,
       isParchi,
-      orderType: body.orderType || (voiceNoteBase64 ? 'voice' : (isParchi ? 'parchi' : 'cart')),
-      parchiImageUrl: isParchi ? parchiPhoto : undefined,
-      voiceNoteBase64,
+      orderType: body.orderType || (voiceAudio ? 'voice' : (isParchi ? 'parchi' : 'cart')),
+      parchiImageUrl: slipPhoto || undefined,
+      slipImageUrl: slipPhoto || undefined,
+      voiceNoteBase64: voiceAudio,
+      voiceAudioUrl: voiceAudio,
       notes: body.notes || undefined,
     };
 
@@ -301,7 +354,7 @@ app.patch('/api/orders/:id/status', (req, res) => {
   });
 });
 
-// 5. DELETE /api/orders/:id: Remove an order
+// 5. DELETE /api/orders/:id: Remove an individual order
 app.delete('/api/orders/:id', (req, res) => {
   const { id } = req.params;
   const initialLength = centralOrders.length;
@@ -313,7 +366,83 @@ app.delete('/api/orders/:id', (req, res) => {
 
   persistCentralOrders();
   console.log(`[Central DB] Order #${id} deleted by Admin.`);
-  res.json({ success: true, message: `Order #${id} deleted successfully.` });
+  res.json({ success: true, message: `Order #${id} deleted successfully.`, remainingCount: centralOrders.length });
+});
+
+// 5b. DELETE /api/orders: Bulk Clear Orders (e.g. ?status=completed_or_cancelled or ?all=true)
+app.delete('/api/orders', (req, res) => {
+  const statusFilter = (req.query.status as string) || (req.query.filter as string) || '';
+  const isAll = req.query.all === 'true' || statusFilter === 'all';
+
+  if (isAll) {
+    const deletedCount = centralOrders.length;
+    centralOrders = [];
+    persistCentralOrders();
+    console.log(`[Central DB] All order history cleared by Admin (${deletedCount} orders deleted).`);
+    return res.json({ success: true, message: 'All order history deleted successfully.', deletedCount });
+  }
+
+  if (statusFilter === 'completed_or_cancelled' || statusFilter === 'Delivered,Cancelled') {
+    const initialCount = centralOrders.length;
+    centralOrders = centralOrders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s !== 'delivered' && s !== 'cancelled';
+    });
+    const deletedCount = initialCount - centralOrders.length;
+    persistCentralOrders();
+    console.log(`[Central DB] Cleared ${deletedCount} completed and cancelled orders.`);
+    return res.json({
+      success: true,
+      message: `Cleared ${deletedCount} completed/cancelled orders.`,
+      deletedCount,
+      remainingCount: centralOrders.length,
+    });
+  }
+
+  return res.status(400).json({
+    success: false,
+    error: 'Filter required. Use ?status=completed_or_cancelled or ?all=true',
+  });
+});
+
+// 5c. POST /api/orders/clear: Direct clear orders endpoint
+app.post('/api/orders/clear', (req, res) => {
+  const filter = req.body?.filter || req.body?.status || '';
+  if (filter === 'all') {
+    const deletedCount = centralOrders.length;
+    centralOrders = [];
+    persistCentralOrders();
+    return res.json({ success: true, message: 'All orders cleared.', deletedCount });
+  }
+  if (filter === 'completed_or_cancelled') {
+    const initialCount = centralOrders.length;
+    centralOrders = centralOrders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s !== 'delivered' && s !== 'cancelled';
+    });
+    const deletedCount = initialCount - centralOrders.length;
+    persistCentralOrders();
+    return res.json({ success: true, message: `Cleared ${deletedCount} completed/cancelled orders.`, deletedCount });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid filter. Specify "all" or "completed_or_cancelled".' });
+});
+
+// ==========================================
+// CATEGORIES REST API ENDPOINTS
+// ==========================================
+app.get('/api/categories', (_req, res) => {
+  res.json({ success: true, categories: centralCategories });
+});
+
+app.post('/api/categories', (req, res) => {
+  if (Array.isArray(req.body.categories)) {
+    centralCategories = req.body.categories;
+    try {
+      fs.writeFileSync(CATEGORIES_FILE_PATH, JSON.stringify(centralCategories, null, 2));
+    } catch (e) {}
+    return res.json({ success: true, categories: centralCategories });
+  }
+  res.status(400).json({ success: false, error: 'Expected categories array' });
 });
 
 // ==========================================

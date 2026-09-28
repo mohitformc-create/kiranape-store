@@ -53,8 +53,15 @@ import { AdminCategoryManager } from './AdminCategoryManager';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
 import { getWhatsAppBillUrl, generateWhatsAppBillMessage } from '../utils/orderUtils';
+import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
-import { fetchCentralOrders, updateCentralOrderStatus } from '../services/orderApiService';
+import {
+  fetchCentralOrders,
+  updateCentralOrderStatus,
+  deleteOrderFromCentralServer,
+  clearCompletedOrCancelledOrdersFromCentralServer,
+  clearAllOrdersFromCentralServer,
+} from '../services/orderApiService';
 import {
   calculateFinalPrice,
   getProducts,
@@ -126,12 +133,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [zoomedParchi, setZoomedParchi] = useState<ParchiOrder | null>(null);
   const [zoomScale, setZoomScale] = useState(1);
 
+  // Real-time order notification alert
+  const [newOrderAlert, setNewOrderAlert] = useState<{
+    id: string;
+    customerName: string;
+    type: 'voice' | 'parchi' | 'cart';
+    time: string;
+  } | null>(null);
+  const knownOrderIdsRef = React.useRef<Set<string>>(new Set());
+  const isInitialLoadRef = React.useRef(true);
+
+  const checkIncomingAlerts = React.useCallback((ordersList: Order[], parchisList: ParchiOrder[]) => {
+    if (isInitialLoadRef.current) {
+      ordersList.forEach((o) => knownOrderIdsRef.current.add(o.id));
+      parchisList.forEach((p) => knownOrderIdsRef.current.add(p.id));
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    const brandNewParchi = parchisList.find((p) => !knownOrderIdsRef.current.has(p.id));
+    const brandNewOrder = ordersList.find((o) => !knownOrderIdsRef.current.has(o.id));
+
+    if (brandNewParchi || brandNewOrder) {
+      playAdminNotificationChime();
+      const target = brandNewParchi || brandNewOrder!;
+      const isVoice = Boolean(
+        target.voiceNoteBase64 ||
+        (target as any).orderType === 'voice' ||
+        (target as any).notes?.includes('वॉइस')
+      );
+      const isParchi = Boolean(
+        (target as any).imageBase64 ||
+        (target as any).parchiImageUrl ||
+        (target as any).orderType === 'parchi' ||
+        (target as any).isParchi
+      );
+
+      setNewOrderAlert({
+        id: target.id,
+        customerName: target.customerName || 'Customer',
+        type: isVoice ? 'voice' : isParchi ? 'parchi' : 'cart',
+        time: new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' }),
+      });
+
+      ordersList.forEach((o) => knownOrderIdsRef.current.add(o.id));
+      parchisList.forEach((p) => knownOrderIdsRef.current.add(p.id));
+    }
+  }, []);
+
   // Sync liveOrders if prop orders changes
   React.useEffect(() => {
     if (orders && orders.length > 0) {
       setLiveOrders(orders);
+      checkIncomingAlerts(orders, parchiOrders);
     }
-  }, [orders]);
+  }, [orders, checkIncomingAlerts, parchiOrders]);
 
   // Real-time polling from Central Server Database every 5 seconds (Zepto/Blinkit Architecture)
   React.useEffect(() => {
@@ -142,6 +198,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         const serverOrders = await fetchCentralOrders();
         if (isMounted && Array.isArray(serverOrders)) {
           setLiveOrders(serverOrders);
+          const currentParchis = getParchiOrders();
+          checkIncomingAlerts(serverOrders, currentParchis);
         }
       } catch (err) {
         console.warn('Central orders polling notice:', err);
@@ -158,14 +216,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, []);
+  }, [checkIncomingAlerts]);
 
   // Listen to external/restore sync events, custom kiranape_orders_updated event, and cross-tab storage
   React.useEffect(() => {
     const handleSync = () => {
-      setCustomCategories(getCustomCategories());
-      setParchiOrders(getParchiOrders());
-      setLiveOrders(getOrders());
+      const updatedCategories = getCustomCategories();
+      const updatedParchis = getParchiOrders();
+      const updatedOrders = getOrders();
+      setCustomCategories(updatedCategories);
+      setParchiOrders(updatedParchis);
+      setLiveOrders(updatedOrders);
+      checkIncomingAlerts(updatedOrders, updatedParchis);
     };
 
     const unsub = subscribeToSync(handleSync);
@@ -177,7 +239,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       window.removeEventListener('kiranape_orders_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [checkIncomingAlerts]);
 
   // Modal & Sync states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -220,6 +282,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Enlarged parchi preview modal
   const [viewingParchiImage, setViewingParchiImage] = useState<string | null>(null);
+
+  // Order deletion and bulk clearing states
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+  const [clearOrdersConfirm, setClearOrdersConfirm] = useState<'completed' | 'all' | null>(null);
+  const [isClearingOrders, setIsClearingOrders] = useState(false);
+
+  const handleConfirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    setIsDeletingOrder(true);
+    try {
+      const orderId = orderToDelete.id;
+      await deleteOrderFromCentralServer(orderId);
+      onDeleteOrder(orderId);
+      setLiveOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setParchiOrders((prev) => prev.filter((p) => p.id !== orderId));
+      setOrderToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete order:', err);
+    } finally {
+      setIsDeletingOrder(false);
+    }
+  };
+
+  const handleConfirmClearOrders = async () => {
+    if (!clearOrdersConfirm) return;
+    setIsClearingOrders(true);
+    try {
+      if (clearOrdersConfirm === 'all') {
+        await clearAllOrdersFromCentralServer();
+        setLiveOrders([]);
+        setParchiOrders([]);
+      } else {
+        await clearCompletedOrCancelledOrdersFromCentralServer();
+        setLiveOrders((prev) =>
+          prev.filter((o) => {
+            const s = (o.status || '').toLowerCase();
+            return s !== 'delivered' && s !== 'cancelled';
+          })
+        );
+        setParchiOrders((prev) =>
+          prev.filter((p) => {
+            const s = (p.status || '').toLowerCase();
+            return s !== 'delivered' && s !== 'cancelled';
+          })
+        );
+      }
+      setClearOrdersConfirm(null);
+    } catch (err) {
+      console.error('Failed to clear orders:', err);
+    } finally {
+      setIsClearingOrders(false);
+    }
+  };
 
   // Expanded variant rows
   const [expandedProductVariants, setExpandedProductVariants] = useState<Record<string, boolean>>({});
@@ -552,6 +668,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Admin Content Area */}
       <main className="max-w-6xl mx-auto w-full px-4 py-6 flex-1">
+        {/* Real-time Order Alert Notification Banner */}
+        {newOrderAlert && (
+          <div className="mb-5 bg-gradient-to-r from-emerald-600 via-amber-500 to-emerald-700 text-white p-4 rounded-2xl shadow-xl border-2 border-white/40 flex items-center justify-between gap-3 animate-bounce">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white text-emerald-800 flex items-center justify-center font-black text-xl shadow-xs">
+                🔔
+              </div>
+              <div>
+                <div className="font-heading font-black text-sm sm:text-base flex items-center gap-2">
+                  <span>नया आर्डर प्राप्त हुआ! (#{newOrderAlert.id})</span>
+                  <span className="text-[10px] bg-black/40 px-2 py-0.5 rounded-full font-bold">
+                    {newOrderAlert.type === 'voice'
+                      ? '🎙️ वॉइस नोट आर्डर'
+                      : newOrderAlert.type === 'parchi'
+                      ? '📸 पर्ची फोटो आर्डर'
+                      : '🛒 सामान्य कार्ट आर्डर'}
+                  </span>
+                </div>
+                <p className="text-xs text-white/95 font-medium mt-0.5">
+                  ग्राहक: <span className="font-bold">{newOrderAlert.customerName}</span> • समय: {newOrderAlert.time}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (newOrderAlert.type === 'parchi') {
+                    setActiveTab('parchi_orders');
+                  } else {
+                    setActiveTab('orders');
+                  }
+                  setNewOrderAlert(null);
+                }}
+                className="px-3.5 py-2 bg-white text-stone-900 rounded-xl font-heading font-black text-xs hover:bg-stone-100 transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap"
+              >
+                अभी देखें (View)
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewOrderAlert(null)}
+                className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                aria-label="Dismiss Alert"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ================= TAB 1: PRODUCT INVENTORY ================= */}
         {activeTab === 'inventory' && (
           <div className="space-y-4">
@@ -1235,7 +1401,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* ================= TAB 2: INCOMING COD ORDERS ================= */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-4 border border-stone-200/90 shadow-xs flex items-center justify-between">
+            <div className="bg-white rounded-2xl p-4 border border-stone-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-heading font-bold text-stone-900 text-base">
                   Incoming Cash on Delivery (COD) Orders
@@ -1244,9 +1410,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Customer orders placed through checkout appear here in real-time.
                 </p>
               </div>
-              <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
-                {liveOrders.length} Total Orders
-              </span>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-emerald-200">
+                  {liveOrders.length} Total Orders
+                </span>
+
+                {/* Bulk Clear Completed / Cancelled Orders */}
+                <button
+                  type="button"
+                  onClick={() => setClearOrdersConfirm('completed')}
+                  disabled={!liveOrders.some((o) => {
+                    const s = (o.status || '').toLowerCase();
+                    return s === 'delivered' || s === 'cancelled';
+                  })}
+                  className="px-3 py-1.5 rounded-xl border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Clear all Delivered and Cancelled orders from list"
+                >
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Clear Completed</span>
+                </button>
+
+                {/* Bulk Clear All Orders */}
+                <button
+                  type="button"
+                  onClick={() => setClearOrdersConfirm('all')}
+                  disabled={liveOrders.length === 0}
+                  className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Delete all order history permanently"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete All History</span>
+                </button>
+              </div>
             </div>
 
             {liveOrders.length === 0 ? (
@@ -1421,29 +1617,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <span className="line-clamp-2 leading-relaxed">{order.address}</span>
                       </div>
 
-                      {/* Handwritten Parchi Photo Preview (if uploaded) */}
-                      {order.parchiImageUrl && (
+                      {/* Handwritten Parchi / Ration Slip Photo Preview (if uploaded) */}
+                      {(order.slipImageUrl || order.parchiImageUrl) && (
                         <div className="bg-amber-50/80 rounded-xl p-2.5 border border-amber-300/80 space-y-1.5">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-amber-950 text-[11px] flex items-center gap-1">
                               <Camera className="w-3.5 h-3.5 text-amber-700" />
-                              <span>Handwritten Parchi Photo</span>
+                              <span>Handwritten Parchi / Slip Photo</span>
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setViewingParchiImage(order.parchiImageUrl!)}
-                              className="text-[10px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
-                            >
-                              View Full Image ↗
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setViewingParchiImage((order.slipImageUrl || order.parchiImageUrl)!)}
+                                className="text-[10px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                              >
+                                View Full Image ↗
+                              </button>
+                              <a
+                                href={order.slipImageUrl || order.parchiImageUrl}
+                                download={`slip-${order.id}.jpg`}
+                                className="text-[10px] font-bold text-stone-800 hover:text-stone-950 underline cursor-pointer flex items-center gap-0.5"
+                                title="Download photo"
+                              >
+                                <Download className="w-3 h-3 inline text-amber-600" />
+                                <span>Download</span>
+                              </a>
+                            </div>
                           </div>
                           <div
                             className="relative rounded-lg overflow-hidden border border-amber-200 bg-white cursor-pointer group"
-                            onClick={() => setViewingParchiImage(order.parchiImageUrl!)}
+                            onClick={() => setViewingParchiImage((order.slipImageUrl || order.parchiImageUrl)!)}
                           >
                             <img
-                              src={order.parchiImageUrl}
-                              alt="Customer Parchi"
+                              src={order.slipImageUrl || order.parchiImageUrl}
+                              alt="Customer Ration Slip"
                               className="w-full h-36 object-contain bg-stone-100 group-hover:scale-101 transition-transform"
                             />
                           </div>
@@ -1451,7 +1658,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       )}
 
                       {/* Customer Recorded Voice Note Audio Player */}
-                      {order.voiceNoteBase64 && (!order.items || order.items.length === 0) ? (
+                      {(order.voiceAudioUrl || order.voiceNoteBase64) && (!order.items || order.items.length === 0) ? (
                         <div className="bg-gradient-to-r from-amber-100 via-amber-50 to-emerald-50 rounded-2xl p-3.5 border-2 border-amber-400 space-y-2 shadow-xs">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center animate-pulse flex-shrink-0">
@@ -1466,16 +1673,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             </div>
                           </div>
-                          <audio controls src={order.voiceNoteBase64} className="w-full h-10 mt-1" />
+                          <audio controls src={order.voiceAudioUrl || order.voiceNoteBase64} className="w-full h-10 mt-1" />
                         </div>
                       ) : (
-                        order.voiceNoteBase64 && (
+                        (order.voiceAudioUrl || order.voiceNoteBase64) && (
                           <div className="bg-amber-50/90 rounded-2xl p-3 border border-amber-300 space-y-1 shadow-2xs">
                             <span className="font-heading font-black text-amber-950 text-xs flex items-center gap-1.5">
                               <Volume2 className="w-4 h-4 text-emerald-700" />
                               <span>🎧 Customer Voice Note (Suniye)</span>
                             </span>
-                            <audio controls src={order.voiceNoteBase64} className="w-full mt-2" />
+                            <audio controls src={order.voiceAudioUrl || order.voiceNoteBase64} className="w-full mt-2" />
                           </div>
                         )
                       )}
@@ -1620,10 +1827,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => onDeleteOrder(order.id)}
-                          className="text-[11px] text-rose-600 hover:text-rose-800 font-medium px-2 py-0.5 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                          onClick={() => setOrderToDelete(order)}
+                          className="text-[11px] text-rose-600 hover:text-rose-800 font-bold px-2 py-1 rounded-lg border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title="Delete this order"
                         >
-                          Delete
+                          <Trash2 className="w-3 h-3 text-rose-600" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
@@ -2022,7 +2231,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         storeSettings={storeSettings}
       />
 
-      {/* Delete Confirmation Alert */}
+      {/* Delete Product Confirmation Alert */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-2xl border border-stone-200 text-center space-y-3">
@@ -2047,6 +2256,115 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="flex-1 py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Single Order Confirmation Modal */}
+      {orderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-2xl border border-stone-200 text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h4 className="font-heading font-extrabold text-stone-900 text-base">
+              Delete Order #{orderToDelete.id}?
+            </h4>
+            <p className="text-xs text-stone-600">
+              Customer: <span className="font-bold text-stone-800">{orderToDelete.customerName}</span> ({orderToDelete.phone})
+            </p>
+            <p className="text-[11px] text-stone-500">
+              This order will be permanently removed from your central database and store history.
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setOrderToDelete(null)}
+                disabled={isDeletingOrder}
+                className="flex-1 py-2 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteOrder}
+                disabled={isDeletingOrder}
+                className="flex-1 py-2 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1"
+              >
+                {isDeletingOrder ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Yes, Delete</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Clear Orders Confirmation Modal */}
+      {clearOrdersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl p-5 shadow-2xl border border-stone-200 text-center space-y-3">
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${
+                clearOrdersConfirm === 'all'
+                  ? 'bg-rose-100 text-rose-600'
+                  : 'bg-emerald-100 text-emerald-600'
+              }`}
+            >
+              {clearOrdersConfirm === 'all' ? (
+                <AlertTriangle className="w-6 h-6" />
+              ) : (
+                <CheckCircle className="w-6 h-6" />
+              )}
+            </div>
+            <h4 className="font-heading font-extrabold text-stone-900 text-base">
+              {clearOrdersConfirm === 'all'
+                ? 'Delete All Order History?'
+                : 'Clear Completed & Cancelled Orders?'}
+            </h4>
+            <p className="text-xs text-stone-600">
+              {clearOrdersConfirm === 'all'
+                ? '⚠️ WARNING: This will permanently wipe all customer orders from the central database and disk storage. This cannot be undone.'
+                : 'All orders with status "Delivered" or "Cancelled" will be removed. Active pending and in-transit orders will remain intact.'}
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setClearOrdersConfirm(null)}
+                disabled={isClearingOrders}
+                className="flex-1 py-2 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearOrders}
+                disabled={isClearingOrders}
+                className={`flex-1 py-2 px-3 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  clearOrdersConfirm === 'all'
+                    ? 'bg-rose-600 hover:bg-rose-700 disabled:opacity-50'
+                    : 'bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50'
+                }`}
+              >
+                {isClearingOrders ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <span>
+                    {clearOrdersConfirm === 'all'
+                      ? 'Yes, Delete All'
+                      : 'Yes, Clear Completed'}
+                  </span>
+                )}
               </button>
             </div>
           </div>

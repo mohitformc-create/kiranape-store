@@ -1,8 +1,8 @@
 import { Product, StoreSettings, PromoBanner } from '../types';
-import { WHOLESALE_105_PRODUCTS } from './wholesaleCatalog105';
+import { MASTER_162_CATALOG } from './master162Catalog';
 
-export const INITIAL_PRODUCTS: Product[] = WHOLESALE_105_PRODUCTS;
-export const initialProducts: Product[] = WHOLESALE_105_PRODUCTS;
+export const INITIAL_PRODUCTS: Product[] = MASTER_162_CATALOG;
+export const initialProducts: Product[] = MASTER_162_CATALOG;
 
 export const STORE_DEFAULTS: StoreSettings = {
   name: 'Chaurasia Kirana Store',

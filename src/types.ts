@@ -103,9 +103,12 @@ export interface Order {
   timestamp: number;
   userId?: string;
   parchiImageUrl?: string; // Handwritten parchi photo preview if order placed via Parchi
+  slipImageUrl?: string; // Alias for ration slip photo preview
   voiceNoteBase64?: string; // Recorded voice note audio (base64 data URI)
+  voiceAudioUrl?: string; // Alias for recorded voice note audio
   isParchi?: boolean;
   orderType?: 'voice' | 'parchi' | 'cart';
+  notes?: string;
 }
 
 export type UserRole = 'customer' | 'admin';

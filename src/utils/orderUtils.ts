@@ -59,3 +59,76 @@ export function getWhatsAppBillUrl(order: Order, storeSettings?: StoreSettings):
   const billText = generateWhatsAppBillMessage(order, storeSettings);
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(billText)}`;
 }
+
+export interface StoreNotificationParams {
+  orderId: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+  deliveryLocation?: string;
+  deliverySlot?: string;
+  orderType: 'voice' | 'parchi' | 'cart';
+  textDetails?: string;
+  itemsCount?: number;
+  finalAmount?: number;
+}
+
+/**
+ * Formats a clean, high-priority WhatsApp notification message for the Store Owner
+ */
+export function generateStoreOwnerOrderNotificationMessage(
+  data: StoreNotificationParams,
+  storeSettings?: StoreSettings
+): string {
+  const storeName = storeSettings?.name || 'Chaurasia Kirana Store';
+  const orderTypeLabel =
+    data.orderType === 'voice'
+      ? '🎙️ वॉइस आर्डर (Voice Note Order)'
+      : data.orderType === 'parchi'
+      ? '📸 पर्ची फोटो आर्डर (Ration Slip Photo)'
+      : '🛒 सामान्य कार्ट आर्डर (Cart Order)';
+
+  let detailsBlock = '';
+  if (data.orderType === 'voice') {
+    detailsBlock = `🎙️ *ऑडियो स्थिति:* ग्राहक का वॉइस नोट एडमिन पैनल में सुरक्षित अपलोड है।\n${
+      data.textDetails ? `📝 *पहचाने गए शब्द / सामान:*\n${data.textDetails}\n` : ''
+    }`;
+  } else if (data.orderType === 'parchi') {
+    detailsBlock = `📸 *पर्ची स्थिति:* ग्राहक की हाथ से लिखी पर्ची की फोटो एडमिन पैनल में सुरक्षित अपलोड है।\n${
+      data.textDetails ? `📝 *नोट / निर्देश:*\n${data.textDetails}\n` : ''
+    }`;
+  } else {
+    detailsBlock = `📦 *सामान:* ${data.itemsCount || 1} आइटम्स\n💵 *कुल बिल राशि:* ₹${data.finalAmount || 0} (COD)\n${
+      data.textDetails ? `📝 *सामान विवरण:*\n${data.textDetails}\n` : ''
+    }`;
+  }
+
+  return (
+`🔔 *नया किराना आर्डर प्राप्त हुआ!*
+🏪 *${storeName} (Kiranape Express)*
+━━━━━━━━━━━━━━━━━━━━
+🆔 *ऑर्डर नंबर:* #${data.orderId}
+📦 *आर्डर प्रकार:* ${orderTypeLabel}
+━━━━━━━━━━━━━━━━━━━━
+👤 *ग्राहक:* ${data.customerName}
+📱 *फ़ोन:* ${data.customerPhone}
+📍 *डिलीवरी पता:* ${data.deliveryAddress}
+${data.deliveryLocation ? `🏘️ *इलाका:* ${data.deliveryLocation}\n` : ''}${data.deliverySlot ? `⏰ *डिलीवरी समय:* ${data.deliverySlot}\n` : ''}━━━━━━━━━━━━━━━━━━━━
+${detailsBlock}━━━━━━━━━━━━━━━━━━━━
+ℹ️ _ऑर्डर की पूरी जानकारी, ऑडियो क्लिप और पर्ची फोटो एडमिन डैशबोर्ड में 1-क्लिक में उपलब्ध है।_`
+  );
+}
+
+/**
+ * Returns WhatsApp click-to-chat URL directed to the store owner's WhatsApp number
+ */
+export function getStoreOwnerWhatsAppNotificationUrl(
+  data: StoreNotificationParams,
+  storeSettings?: StoreSettings
+): string {
+  const rawStorePhone = storeSettings?.whatsapp || storeSettings?.phone || '9424316081';
+  const cleanPhone = formatWhatsAppPhone(rawStorePhone);
+  const message = generateStoreOwnerOrderNotificationMessage(data, storeSettings);
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+

@@ -13,9 +13,9 @@
  */
 export function compressImageFile(
   file: File,
-  maxWidth = 1024,
-  maxHeight = 1024,
-  quality = 0.65
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.7
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file) {

@@ -47,6 +47,7 @@ import {
 import {
   sendOrderToCentralServer,
   fetchCentralOrders,
+  fetchCentralInventory,
   updateCentralOrderStatus,
   saveProductToCentralInventory,
   deleteProductFromCentralInventory,
@@ -83,6 +84,7 @@ import { ParchiUploadModal } from './components/ParchiUploadModal';
 import { VoiceGroceryModal } from './components/VoiceGroceryModal';
 import { QuickOrderActionBar } from './components/QuickOrderActionBar';
 import { playOrderChime } from './utils/sound';
+import { deleteOrderFromCentralServer } from './services/orderApiService';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -286,10 +288,17 @@ export default function App() {
       setBanners(newBanners);
     });
 
-    // 3. Initial load of orders from Central Server Database
+    // 3. Initial load of orders and products from Central Server Database
     fetchCentralOrders().then((serverOrders) => {
       if (serverOrders && serverOrders.length > 0) {
         setOrders(serverOrders);
+      }
+    }).catch(console.warn);
+
+    fetchCentralInventory().then((serverInventory) => {
+      if (Array.isArray(serverInventory) && serverInventory.length > 0) {
+        setProducts(serverInventory);
+        saveProducts(serverInventory);
       }
     }).catch(console.warn);
 
@@ -575,9 +584,14 @@ export default function App() {
     updateCentralOrderStatus(orderId, status).catch(console.warn);
   }, []);
 
-  const handleDeleteOrder = useCallback((orderId: string) => {
+  const handleDeleteOrder = useCallback(async (orderId: string) => {
     deleteOrder(orderId);
     setOrders(getOrders());
+    try {
+      await deleteOrderFromCentralServer(orderId);
+    } catch (e) {
+      console.warn('Central server delete order error:', e);
+    }
   }, []);
 
   const handleChangePin = useCallback((newPin: string) => {

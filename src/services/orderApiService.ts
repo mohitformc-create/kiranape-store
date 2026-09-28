@@ -36,7 +36,9 @@ export interface CreateOrderPayload {
   orderType?: 'voice' | 'parchi' | 'cart';
   parchiBase64?: string;
   parchiImageUrl?: string;
+  slipImageUrl?: string;
   voiceNoteBase64?: string;
+  voiceAudioUrl?: string;
   imageBase64?: string;
   imageUrl?: string;
   notes?: string;
@@ -258,7 +260,7 @@ export async function saveProductToCentralInventory(product: any) {
 /**
  * Delete product from Central Server Inventory (DELETE /api/inventory/:id)
  */
-export async function deleteProductFromCentralInventory(productId: string) {
+export async function deleteProductFromCentralInventory(productId: string): Promise<boolean> {
   try {
     const res = await fetch(`/api/inventory/${productId}`, {
       method: 'DELETE',
@@ -269,4 +271,148 @@ export async function deleteProductFromCentralInventory(productId: string) {
     return false;
   }
 }
+
+/**
+ * Delete single order from Central Server (DELETE /api/orders/:id)
+ */
+export async function deleteOrderFromCentralServer(orderId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: 'DELETE',
+    });
+
+    // Update local storage regardless so UI is immediate
+    const currentOrders = getOrders();
+    const updated = currentOrders.filter((o) => o.id !== orderId);
+    saveOrders(updated);
+
+    // Also clean up local parchi orders if matching
+    try {
+      const rawParchi = localStorage.getItem('kiranape_parchi_orders');
+      if (rawParchi) {
+        const parsed = JSON.parse(rawParchi);
+        const filteredParchi = parsed.filter((p: any) => p.id !== orderId);
+        localStorage.setItem('kiranape_parchi_orders', JSON.stringify(filteredParchi));
+      }
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiranape_orders_updated'));
+      window.dispatchEvent(new Event('storage'));
+    }
+
+    return res.ok;
+  } catch (err) {
+    console.warn('[Order API] Failed deleting order on server, deleted locally:', err);
+    const currentOrders = getOrders();
+    saveOrders(currentOrders.filter((o) => o.id !== orderId));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiranape_orders_updated'));
+      window.dispatchEvent(new Event('storage'));
+    }
+    return true;
+  }
+}
+
+/**
+ * Clear Completed and Cancelled Orders from Central Server (DELETE /api/orders?status=completed_or_cancelled)
+ */
+export async function clearCompletedOrCancelledOrdersFromCentralServer(): Promise<{
+  success: boolean;
+  deletedCount: number;
+}> {
+  try {
+    const res = await fetch('/api/orders?status=completed_or_cancelled', {
+      method: 'DELETE',
+    });
+
+    const data = await res.json().catch(() => ({ deletedCount: 0 }));
+
+    // Clean up local cache
+    const currentOrders = getOrders();
+    const activeOnly = currentOrders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s !== 'delivered' && s !== 'cancelled';
+    });
+    saveOrders(activeOnly);
+
+    try {
+      const rawParchi = localStorage.getItem('kiranape_parchi_orders');
+      if (rawParchi) {
+        const parsed = JSON.parse(rawParchi);
+        const activeParchi = parsed.filter((p: any) => {
+          const s = (p.status || '').toLowerCase();
+          return s !== 'delivered' && s !== 'cancelled';
+        });
+        localStorage.setItem('kiranape_parchi_orders', JSON.stringify(activeParchi));
+      }
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiranape_orders_updated'));
+      window.dispatchEvent(new Event('storage'));
+    }
+
+    return {
+      success: true,
+      deletedCount: data.deletedCount || (currentOrders.length - activeOnly.length),
+    };
+  } catch (err) {
+    console.warn('[Order API] Failed clearing completed orders on server, cleared locally:', err);
+    const currentOrders = getOrders();
+    const activeOnly = currentOrders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s !== 'delivered' && s !== 'cancelled';
+    });
+    saveOrders(activeOnly);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiranape_orders_updated'));
+    }
+    return { success: true, deletedCount: currentOrders.length - activeOnly.length };
+  }
+}
+
+/**
+ * Clear ALL Order History from Central Server (DELETE /api/orders?all=true)
+ */
+export async function clearAllOrdersFromCentralServer(): Promise<{
+  success: boolean;
+  deletedCount: number;
+}> {
+  try {
+    const res = await fetch('/api/orders?all=true', {
+      method: 'DELETE',
+    });
+
+    const data = await res.json().catch(() => ({ deletedCount: 0 }));
+
+    // Clear local orders cache
+    const currentCount = getOrders().length;
+    saveOrders([]);
+
+    try {
+      localStorage.setItem('kiranape_parchi_orders', JSON.stringify([]));
+      localStorage.setItem('kiranape_voice_orders', JSON.stringify([]));
+    } catch (e) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiranape_orders_updated'));
+      window.dispatchEvent(new Event('storage'));
+    }
+
+    return {
+      success: true,
+      deletedCount: data.deletedCount || currentCount,
+    };
+  } catch (err) {
+    console.warn('[Order API] Failed clearing all orders on server, cleared locally:', err);
+    const currentCount = getOrders().length;
+    saveOrders([]);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiranape_orders_updated'));
+    }
+    return { success: true, deletedCount: currentCount };
+  }
+}
+
 
