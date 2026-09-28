@@ -114,6 +114,33 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ==========================================
+// STATIC ASSETS & WEB APP MANIFEST
+// ==========================================
+const PUBLIC_DIR = path.join(process.cwd(), 'public');
+
+// Dedicated /manifest.json endpoint ensuring status 200 and application/manifest+json
+app.get('/manifest.json', (_req, res) => {
+  const manifestPath = path.join(PUBLIC_DIR, 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.status(200).sendFile(manifestPath);
+  }
+  return res.status(404).json({ error: 'manifest.json not found' });
+});
+
+// Statically serve all assets from the 'public' directory
+app.use(
+  express.static(PUBLIC_DIR, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('manifest.json')) {
+        res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+      }
+    },
+  })
+);
+
+// ==========================================
 // CENTRAL ORDERS API ENDPOINTS
 // ==========================================
 
