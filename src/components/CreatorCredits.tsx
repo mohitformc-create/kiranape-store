@@ -10,7 +10,7 @@ interface CreatorCreditsProps {
  * Official Brand Footer & Creator Credits
  * Required on: Customer Storefront, Admin Panel, and Splash/Login screens.
  *
- * • Line 1: "Design by Sam Private Limited"
+ * • Line 1: "Designed by Sam Private Limited"
  * • Line 2: "Mohit Chaurasia"
  * • Line 3: "Associated with Chaurasia Kirana and General Store"
  */
@@ -31,7 +31,7 @@ export const CreatorCredits: React.FC<CreatorCreditsProps> = ({
           isDark ? 'text-stone-400' : 'text-stone-500'
         }`}
       >
-        Design by Sam Private Limited
+        Designed by Sam Private Limited
       </p>
       <p
         className={`text-xs sm:text-sm font-bold tracking-tight ${

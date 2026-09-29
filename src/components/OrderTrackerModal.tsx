@@ -4,6 +4,7 @@ import { Order, StoreSettings } from '../types';
 import { ORDER_STATUS_STEPS, ORDER_STATUS_LABELS } from '../services/firebase';
 import { fetchOrderById } from '../services/orderApiService';
 import { STORE_DEFAULTS } from '../data/initialProducts';
+import { CreatorCredits } from './CreatorCredits';
 
 interface OrderTrackerModalProps {
   isOpen: boolean;
@@ -96,10 +97,11 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
   const statusKey = activeOrder?.status || 'received';
   let activeStepIndex = ORDER_STATUS_STEPS.findIndex((s) => s.key === statusKey);
   if (activeStepIndex === -1) {
-    if (statusKey === 'New Order') activeStepIndex = 0;
-    else if (statusKey === 'Packed') activeStepIndex = 1;
-    else if (statusKey === 'Out for Delivery') activeStepIndex = 2;
-    else if (statusKey === 'Delivered') activeStepIndex = 3;
+    const sk = statusKey.toLowerCase();
+    if (sk === 'new order' || sk === 'pending' || sk === 'received') activeStepIndex = 0;
+    else if (sk === 'packed' || sk === 'accepted' || sk === 'processing') activeStepIndex = 1;
+    else if (sk === 'out for delivery' || sk === 'out_for_delivery') activeStepIndex = 2;
+    else if (sk === 'delivered') activeStepIndex = 3;
     else activeStepIndex = 0;
   }
 
@@ -345,6 +347,11 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Official Creator & Branding Credits */}
+          <div className="w-full pt-4 mt-2 border-t border-stone-100">
+            <CreatorCredits />
+          </div>
         </div>
       </div>
     </div>

@@ -161,6 +161,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   } | null>(null);
   const knownOrderIdsRef = React.useRef<Set<string>>(new Set());
   const isInitialLoadRef = React.useRef(true);
+  const isBeepAlertEnabledRef = React.useRef(isBeepAlertEnabled);
+  isBeepAlertEnabledRef.current = isBeepAlertEnabled;
 
   const checkIncomingAlerts = React.useCallback((ordersList: Order[], parchisList: ParchiOrder[]) => {
     if (isInitialLoadRef.current) {
@@ -174,7 +176,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const brandNewOrder = ordersList.find((o) => !knownOrderIdsRef.current.has(o.id));
 
     if (brandNewParchi || brandNewOrder) {
-      if (isBeepAlertEnabled) {
+      if (isBeepAlertEnabledRef.current) {
         playAdminNotificationChime();
       }
       const target = brandNewParchi || brandNewOrder!;
@@ -202,15 +204,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, []);
 
+  // Helper to map central server orders to ParchiOrder model
+  const deriveParchiOrders = React.useCallback((serverOrders: Order[]): ParchiOrder[] => {
+    return serverOrders
+      .filter(
+        (o) =>
+          o.isParchi ||
+          (o as any).slipPhoto ||
+          (o as any).voiceAudio ||
+          o.parchiImageUrl ||
+          o.voiceNoteBase64 ||
+          (o as any).orderType === 'parchi' ||
+          (o as any).orderType === 'voice'
+      )
+      .map((o) => ({
+        id: o.id,
+        customerName: o.customerName,
+        customerPhone: o.phone,
+        phone: o.phone,
+        deliveryAddress: o.address,
+        address: o.address,
+        deliveryLocation: (o as any).deliveryLocation,
+        deliverySlot: o.deliverySlot,
+        slipPhoto: (o as any).slipPhoto || o.parchiImageUrl || (o as any).slipImageUrl,
+        parchiImageUrl: (o as any).slipPhoto || o.parchiImageUrl || (o as any).slipImageUrl,
+        imageBase64: (o as any).slipPhoto || o.parchiImageUrl || (o as any).slipImageUrl,
+        voiceAudio: (o as any).voiceAudio || o.voiceNoteBase64,
+        voiceNoteBase64: (o as any).voiceAudio || o.voiceNoteBase64,
+        voiceAudioUrl: (o as any).voiceAudio || o.voiceNoteBase64,
+        notes: (o as any).notes,
+        status: o.status,
+        createdAt: o.createdAt,
+        timestamp: (o as any).timestamp || Date.now(),
+      }));
+  }, []);
+
   // Sync liveOrders if prop orders changes
   React.useEffect(() => {
     if (orders && orders.length > 0) {
       setLiveOrders(orders);
-      checkIncomingAlerts(orders, parchiOrders);
+      const serverParchis = deriveParchiOrders(orders);
+      setParchiOrders(serverParchis);
+      checkIncomingAlerts(orders, serverParchis);
     }
-  }, [orders, checkIncomingAlerts, parchiOrders]);
+  }, [orders, checkIncomingAlerts, deriveParchiOrders]);
 
-  // Real-time polling from Central Server Database every 5 seconds (Zepto/Blinkit Architecture)
+  // Real-time polling from Central Server Database every 3 seconds (Multi-device live sync)
   React.useEffect(() => {
     let isMounted = true;
 
@@ -219,8 +258,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         const serverOrders = await fetchCentralOrders();
         if (isMounted && Array.isArray(serverOrders)) {
           setLiveOrders(serverOrders);
-          const currentParchis = getParchiOrders();
-          checkIncomingAlerts(serverOrders, currentParchis);
+          const serverParchis = deriveParchiOrders(serverOrders);
+          setParchiOrders(serverParchis);
+          checkIncomingAlerts(serverOrders, serverParchis);
         }
       } catch (err) {
         console.warn('Central orders polling notice:', err);
@@ -237,18 +277,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [checkIncomingAlerts]);
+  }, [checkIncomingAlerts, deriveParchiOrders]);
 
   // Listen to external/restore sync events, custom kiranape_orders_updated event, and cross-tab storage
   React.useEffect(() => {
-    const handleSync = () => {
+    const handleSync = async () => {
       const updatedCategories = getCustomCategories();
-      const updatedParchis = getParchiOrders();
-      const updatedOrders = getOrders();
       setCustomCategories(updatedCategories);
-      setParchiOrders(updatedParchis);
-      setLiveOrders(updatedOrders);
-      checkIncomingAlerts(updatedOrders, updatedParchis);
+      try {
+        const serverOrders = await fetchCentralOrders();
+        if (serverOrders && Array.isArray(serverOrders)) {
+          setLiveOrders(serverOrders);
+          const serverParchis = deriveParchiOrders(serverOrders);
+          setParchiOrders(serverParchis);
+          checkIncomingAlerts(serverOrders, serverParchis);
+        }
+      } catch (e) {
+        console.warn('Sync orders notice:', e);
+      }
     };
 
     const unsub = subscribeToSync(handleSync);
@@ -260,7 +306,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       window.removeEventListener('kiranape_orders_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, [checkIncomingAlerts]);
+  }, [checkIncomingAlerts, deriveParchiOrders]);
 
   // Modal & Sync states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -2283,9 +2329,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setParchiOrders(getParchiOrders())}
+                  onClick={async () => {
+                    const serverOrders = await fetchCentralOrders();
+                    if (Array.isArray(serverOrders)) {
+                      setLiveOrders(serverOrders);
+                      setParchiOrders(deriveParchiOrders(serverOrders));
+                    }
+                  }}
                   className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer"
-                  title="Refresh Parchi Orders"
+                  title="Refresh Parchi Orders from Central Server"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -2343,9 +2395,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {/* Quick Status Dropdown */}
                         <select
                           value={parchi.status || 'Pending'}
-                          onChange={(e) => {
-                            updateParchiOrderStatus(parchi.id, e.target.value);
-                            setParchiOrders(getParchiOrders());
+                          onChange={async (e) => {
+                            const newStatus = e.target.value;
+                            await updateCentralOrderStatus(parchi.id, newStatus as any);
+                            setLiveOrders((prev) =>
+                              prev.map((o) => (o.id === parchi.id ? { ...o, status: newStatus } : o))
+                            );
+                            setParchiOrders((prev) =>
+                              prev.map((p) => (p.id === parchi.id ? { ...p, status: newStatus } : p))
+                            );
                           }}
                           className={`text-[11px] font-black rounded-lg px-2 py-0.5 border cursor-pointer ${
                             parchi.status === 'Delivered'
@@ -2512,10 +2570,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </span>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (window.confirm(`Delete parchi record #${parchi.id}?`)) {
-                              deleteParchiOrder(parchi.id);
-                              setParchiOrders(getParchiOrders());
+                              await deleteOrderFromCentralServer(parchi.id);
+                              onDeleteOrder(parchi.id);
+                              setLiveOrders((prev) => prev.filter((o) => o.id !== parchi.id));
+                              setParchiOrders((prev) => prev.filter((p) => p.id !== parchi.id));
                             }
                           }}
                           className="text-[11px] text-rose-600 hover:text-rose-800 font-medium hover:underline cursor-pointer"

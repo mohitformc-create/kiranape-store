@@ -148,13 +148,9 @@ export async function fetchCentralOrders(): Promise<Order[]> {
     const data = await response.json();
     const serverOrders: Order[] = Array.isArray(data) ? data : (data.orders || []);
 
-    if (serverOrders.length > 0) {
-      // Sync local cache with central server
-      saveOrders(serverOrders);
-      return serverOrders;
-    }
-
-    return getOrders();
+    // Authoritative Server State: Always sync local cache with central server
+    saveOrders(serverOrders);
+    return serverOrders;
   } catch (error) {
     console.warn('[Order API] Error fetching central orders, falling back to local storage:', error);
     return getOrders();

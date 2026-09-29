@@ -3,6 +3,7 @@ import { X, User, Phone, MapPin, Banknote, ShieldCheck, CheckCircle2, ArrowRight
 import { CartItem, DeliverySlot, StoreSettings } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getCustomerSelectedLocation } from '../services/storageService';
+import { CreatorCredits } from './CreatorCredits';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -394,6 +395,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </>
             )}
           </button>
+
+          {/* Official Creator & Branding Credits */}
+          <div className="pt-2 border-t border-stone-100">
+            <CreatorCredits />
+          </div>
         </form>
       </div>
     </div>

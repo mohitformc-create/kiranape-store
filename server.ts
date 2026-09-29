@@ -16,6 +16,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // CENTRAL SERVER ORDERS DATABASE (Blinkit/Zepto Style)
 // ==========================================
 const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'central_orders.json');
+const SERVER_ORDERS_PATH = path.join(process.cwd(), 'server', 'data', 'orders.json');
 
 interface CentralOrder {
   id: string;
@@ -157,11 +158,17 @@ try {
 
 // Load existing orders on startup
 try {
-  if (fs.existsSync(ORDERS_FILE_PATH)) {
+  if (fs.existsSync(SERVER_ORDERS_PATH)) {
+    const rawData = fs.readFileSync(SERVER_ORDERS_PATH, 'utf-8');
+    centralOrders = JSON.parse(rawData);
+    console.log(`[Central DB] Loaded ${centralOrders.length} existing orders from server/data/orders.json`);
+  } else if (fs.existsSync(ORDERS_FILE_PATH)) {
     const rawData = fs.readFileSync(ORDERS_FILE_PATH, 'utf-8');
     centralOrders = JSON.parse(rawData);
     console.log(`[Central DB] Loaded ${centralOrders.length} existing orders from central_orders.json`);
   } else {
+    fs.mkdirSync(path.dirname(SERVER_ORDERS_PATH), { recursive: true });
+    fs.writeFileSync(SERVER_ORDERS_PATH, JSON.stringify([], null, 2));
     fs.mkdirSync(path.dirname(ORDERS_FILE_PATH), { recursive: true });
     fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify([], null, 2));
   }
@@ -174,6 +181,9 @@ const persistCentralOrders = () => {
   try {
     fs.mkdirSync(path.dirname(ORDERS_FILE_PATH), { recursive: true });
     fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(centralOrders, null, 2));
+
+    fs.mkdirSync(path.dirname(SERVER_ORDERS_PATH), { recursive: true });
+    fs.writeFileSync(SERVER_ORDERS_PATH, JSON.stringify(centralOrders, null, 2));
   } catch (err) {
     console.error('[Central DB] Failed persisting orders to disk:', err);
   }
@@ -325,58 +335,55 @@ app.get('/api/orders/:id', (req, res) => {
   res.json({ success: true, order: found });
 });
 
-// 4. PATCH /api/orders/:id/status: Update status (Fulfillment status update)
-app.patch('/api/orders/:id/status', (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
+// Helper to normalize status strings ('ACCEPTED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'PENDING', etc.)
+const normalizeOrderStatus = (raw: string): { status: string; statusLabel: string } => {
+  const clean = (raw || '').trim();
+  const lower = clean.toLowerCase().replace(/[\s_-]+/g, '');
 
-  const validStatuses = [
-    'Pending',
-    'Accepted',
-    'Packed',
-    'Out for Delivery',
-    'Delivered',
-    'Cancelled',
-    'received',
-    'processing',
-    'out_for_delivery',
-    'delivered',
-    'cancelled',
-    'New Order',
-  ];
-
-  if (!status || !validStatuses.includes(status)) {
-    return res.status(400).json({
-      success: false,
-      error: `Invalid status '${status}'. Must be one of: ${validStatuses.join(', ')}`,
-    });
+  if (lower === 'pending' || lower === 'received' || lower === 'neworder') {
+    return { status: 'Pending', statusLabel: 'Pending Confirmation' };
   }
+  if (lower === 'accepted' || lower === 'processing' || lower === 'packed') {
+    return { status: 'Accepted', statusLabel: 'Order Accepted & Packed' };
+  }
+  if (lower === 'outfordelivery') {
+    return { status: 'Out for Delivery', statusLabel: 'Out for Delivery' };
+  }
+  if (lower === 'delivered') {
+    return { status: 'Delivered', statusLabel: 'Delivered Successfully' };
+  }
+  if (lower === 'cancelled' || lower === 'canceled') {
+    return { status: 'Cancelled', statusLabel: 'Cancelled' };
+  }
+  return { status: clean || 'Pending', statusLabel: clean || 'Pending Confirmation' };
+};
+
+// 4. PATCH & PUT /api/orders/:id: Update status or order fields
+app.patch(['/api/orders/:id/status', '/api/orders/:id'], (req, res) => {
+  const { id } = req.params;
+  const { status, ...updates } = req.body || {};
 
   const orderIndex = centralOrders.findIndex((o) => o.id === id);
   if (orderIndex === -1) {
     return res.status(404).json({ success: false, error: 'Order not found.' });
   }
 
-  const statusLabels: Record<string, string> = {
-    received: 'Pending Confirmation',
-    Pending: 'Pending Confirmation',
-    'New Order': 'Pending Confirmation',
-    processing: 'Order Packed & Ready',
-    Packed: 'Order Packed & Ready',
-    Accepted: 'Order Accepted & Packed',
-    out_for_delivery: 'Out for Delivery',
-    'Out for Delivery': 'Out for Delivery',
-    delivered: 'Delivered Successfully',
-    Delivered: 'Delivered Successfully',
-    cancelled: 'Cancelled',
-    Cancelled: 'Cancelled',
-  };
+  if (status) {
+    const normalized = normalizeOrderStatus(status);
+    centralOrders[orderIndex].status = normalized.status;
+    centralOrders[orderIndex].statusLabel = normalized.statusLabel;
+  }
 
-  centralOrders[orderIndex].status = status;
-  centralOrders[orderIndex].statusLabel = statusLabels[status] || status;
+  if (Object.keys(updates).length > 0) {
+    centralOrders[orderIndex] = {
+      ...centralOrders[orderIndex],
+      ...updates,
+      id, // Preserve ID
+    };
+  }
+
   persistCentralOrders();
-
-  console.log(`[Central DB] Order #${id} status updated to: ${status} (${centralOrders[orderIndex].statusLabel})`);
+  console.log(`[Central DB] Order #${id} status updated to: ${centralOrders[orderIndex].status} (${centralOrders[orderIndex].statusLabel})`);
 
   res.json({
     success: true,
@@ -384,7 +391,101 @@ app.patch('/api/orders/:id/status', (req, res) => {
   });
 });
 
-// 5. DELETE /api/orders/:id: Remove an individual order
+app.put('/api/orders/:id', (req, res) => {
+  const { id } = req.params;
+  const orderIndex = centralOrders.findIndex((o) => o.id === id);
+  if (orderIndex === -1) {
+    return res.status(404).json({ success: false, error: 'Order not found.' });
+  }
+
+  const { status, ...rest } = req.body || {};
+  let normalized = status ? normalizeOrderStatus(status) : null;
+
+  centralOrders[orderIndex] = {
+    ...centralOrders[orderIndex],
+    ...rest,
+    ...(normalized ? { status: normalized.status, statusLabel: normalized.statusLabel } : {}),
+    id,
+  };
+
+  persistCentralOrders();
+  res.json({ success: true, order: centralOrders[orderIndex] });
+});
+
+// 5. DELETE & POST /api/orders/clear: Bulk Purge Orders (Must be defined BEFORE /:id route)
+app.delete('/api/orders/clear', (req, res) => {
+  const filter = (req.query.filter as string) || (req.query.status as string) || req.body?.filter || 'completed_or_cancelled';
+  if (filter === 'all' || req.query.all === 'true') {
+    const deletedCount = centralOrders.length;
+    centralOrders = [];
+    persistCentralOrders();
+    console.log(`[Central DB] All order history cleared (${deletedCount} orders deleted).`);
+    return res.json({ success: true, message: 'All order history deleted successfully.', deletedCount });
+  }
+
+  const initialCount = centralOrders.length;
+  centralOrders = centralOrders.filter((o) => {
+    const s = (o.status || '').toLowerCase();
+    return s !== 'delivered' && s !== 'cancelled';
+  });
+  const deletedCount = initialCount - centralOrders.length;
+  persistCentralOrders();
+  console.log(`[Central DB] Cleared ${deletedCount} completed/cancelled orders.`);
+  return res.json({
+    success: true,
+    message: `Cleared ${deletedCount} completed/cancelled orders.`,
+    deletedCount,
+    remainingCount: centralOrders.length,
+  });
+});
+
+app.post('/api/orders/clear', (req, res) => {
+  const filter = req.body?.filter || req.body?.status || (req.query.filter as string) || 'completed_or_cancelled';
+  if (filter === 'all' || req.query.all === 'true') {
+    const deletedCount = centralOrders.length;
+    centralOrders = [];
+    persistCentralOrders();
+    return res.json({ success: true, message: 'All orders cleared.', deletedCount });
+  }
+
+  const initialCount = centralOrders.length;
+  centralOrders = centralOrders.filter((o) => {
+    const s = (o.status || '').toLowerCase();
+    return s !== 'delivered' && s !== 'cancelled';
+  });
+  const deletedCount = initialCount - centralOrders.length;
+  persistCentralOrders();
+  return res.json({ success: true, message: `Cleared ${deletedCount} completed/cancelled orders.`, deletedCount, remainingCount: centralOrders.length });
+});
+
+// 5b. DELETE /api/orders: Query-based Bulk Clear Orders
+app.delete('/api/orders', (req, res) => {
+  const statusFilter = (req.query.status as string) || (req.query.filter as string) || '';
+  const isAll = req.query.all === 'true' || statusFilter === 'all';
+
+  if (isAll) {
+    const deletedCount = centralOrders.length;
+    centralOrders = [];
+    persistCentralOrders();
+    return res.json({ success: true, message: 'All order history deleted successfully.', deletedCount });
+  }
+
+  const initialCount = centralOrders.length;
+  centralOrders = centralOrders.filter((o) => {
+    const s = (o.status || '').toLowerCase();
+    return s !== 'delivered' && s !== 'cancelled';
+  });
+  const deletedCount = initialCount - centralOrders.length;
+  persistCentralOrders();
+  return res.json({
+    success: true,
+    message: `Cleared ${deletedCount} completed/cancelled orders.`,
+    deletedCount,
+    remainingCount: centralOrders.length,
+  });
+});
+
+// 5c. DELETE /api/orders/:id: Remove an individual order
 app.delete('/api/orders/:id', (req, res) => {
   const { id } = req.params;
   const initialLength = centralOrders.length;
@@ -395,66 +496,8 @@ app.delete('/api/orders/:id', (req, res) => {
   }
 
   persistCentralOrders();
-  console.log(`[Central DB] Order #${id} deleted by Admin.`);
+  console.log(`[Central DB] Order #${id} deleted permanently.`);
   res.json({ success: true, message: `Order #${id} deleted successfully.`, remainingCount: centralOrders.length });
-});
-
-// 5b. DELETE /api/orders: Bulk Clear Orders (e.g. ?status=completed_or_cancelled or ?all=true)
-app.delete('/api/orders', (req, res) => {
-  const statusFilter = (req.query.status as string) || (req.query.filter as string) || '';
-  const isAll = req.query.all === 'true' || statusFilter === 'all';
-
-  if (isAll) {
-    const deletedCount = centralOrders.length;
-    centralOrders = [];
-    persistCentralOrders();
-    console.log(`[Central DB] All order history cleared by Admin (${deletedCount} orders deleted).`);
-    return res.json({ success: true, message: 'All order history deleted successfully.', deletedCount });
-  }
-
-  if (statusFilter === 'completed_or_cancelled' || statusFilter === 'Delivered,Cancelled') {
-    const initialCount = centralOrders.length;
-    centralOrders = centralOrders.filter((o) => {
-      const s = (o.status || '').toLowerCase();
-      return s !== 'delivered' && s !== 'cancelled';
-    });
-    const deletedCount = initialCount - centralOrders.length;
-    persistCentralOrders();
-    console.log(`[Central DB] Cleared ${deletedCount} completed and cancelled orders.`);
-    return res.json({
-      success: true,
-      message: `Cleared ${deletedCount} completed/cancelled orders.`,
-      deletedCount,
-      remainingCount: centralOrders.length,
-    });
-  }
-
-  return res.status(400).json({
-    success: false,
-    error: 'Filter required. Use ?status=completed_or_cancelled or ?all=true',
-  });
-});
-
-// 5c. POST /api/orders/clear: Direct clear orders endpoint
-app.post('/api/orders/clear', (req, res) => {
-  const filter = req.body?.filter || req.body?.status || '';
-  if (filter === 'all') {
-    const deletedCount = centralOrders.length;
-    centralOrders = [];
-    persistCentralOrders();
-    return res.json({ success: true, message: 'All orders cleared.', deletedCount });
-  }
-  if (filter === 'completed_or_cancelled') {
-    const initialCount = centralOrders.length;
-    centralOrders = centralOrders.filter((o) => {
-      const s = (o.status || '').toLowerCase();
-      return s !== 'delivered' && s !== 'cancelled';
-    });
-    const deletedCount = initialCount - centralOrders.length;
-    persistCentralOrders();
-    return res.json({ success: true, message: `Cleared ${deletedCount} completed/cancelled orders.`, deletedCount });
-  }
-  return res.status(400).json({ success: false, error: 'Invalid filter. Specify "all" or "completed_or_cancelled".' });
 });
 
 // ==========================================

@@ -4,6 +4,7 @@ import { Order, OrderStatus } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { ORDER_STATUS_STEPS, ORDER_STATUS_LABELS } from '../services/firebase';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
+import { CreatorCredits } from './CreatorCredits';
 
 interface OrderConfirmationModalProps {
   order: Order | null;
@@ -364,6 +365,11 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
           >
             <ShoppingBag className="w-4 h-4" /> Back to Store <ArrowRight className="w-4 h-4" />
           </button>
+
+          {/* Official Creator & Branding Credits */}
+          <div className="pt-2 border-t border-stone-200">
+            <CreatorCredits />
+          </div>
         </div>
       </div>
     </div>

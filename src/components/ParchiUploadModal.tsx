@@ -22,6 +22,7 @@ import { playOrderChime } from '../utils/sound';
 import { StoreSettings } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
+import { CreatorCredits } from './CreatorCredits';
 
 interface ParchiUploadModalProps {
   isOpen: boolean;
@@ -273,6 +274,11 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
               >
                 दुकान पर वापस जाएं (Done)
               </button>
+
+              {/* Official Creator & Branding Credits */}
+              <div className="pt-2 border-t border-stone-200">
+                <CreatorCredits />
+              </div>
             </div>
           </div>
         ) : (
@@ -495,6 +501,11 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
               <p className="text-[10px] text-stone-400 text-center mt-1.5 font-medium">
                 🔒 सुरक्षित ऑर्डर • 100% कैश ऑन डिलीवरी • दुकान से ताज़ा सामान
               </p>
+
+              {/* Official Creator & Branding Credits */}
+              <div className="pt-2 mt-2 border-t border-stone-100">
+                <CreatorCredits />
+              </div>
             </div>
           </form>
         )}

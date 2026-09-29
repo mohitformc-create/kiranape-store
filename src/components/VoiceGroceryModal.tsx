@@ -28,6 +28,7 @@ import { StoreSettings } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
+import { CreatorCredits } from './CreatorCredits';
 
 interface VoiceGroceryModalProps {
   isOpen: boolean;
@@ -496,6 +497,11 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
               >
                 दुकान पर वापस जाएं (Done)
               </button>
+
+              {/* Official Creator & Branding Credits */}
+              <div className="pt-2 border-t border-stone-200">
+                <CreatorCredits />
+              </div>
             </div>
           </div>
         ) : (
@@ -814,6 +820,11 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
               <p className="text-[10px] text-stone-400 text-center mt-1.5 font-medium">
                 🔒 सुरक्षित ऑर्डर • दुकानदार ऑडियो सुनकर ताज़ा किराना पैक करेंगे
               </p>
+
+              {/* Official Creator & Branding Credits */}
+              <div className="pt-2 mt-2 border-t border-stone-100">
+                <CreatorCredits />
+              </div>
             </div>
           </form>
         )}
