@@ -560,24 +560,27 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
             )}
           </div>
 
-          {/* In Stock / Out of Stock 1-Tap Toggle (Replaces "+ ADD" button in Admin) */}
+          {/* In Stock / Out of Stock 1-Tap Toggle (Prominent Green/Red Switch) */}
           <button
             id={`admin-stock-toggle-${product.id}`}
             type="button"
             onClick={() => onUpdateProduct(product.id, { isAvailable: !product.isAvailable })}
-            className={`h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg text-[10px] sm:text-xs font-extrabold flex items-center gap-1.5 border transition-all active:scale-95 cursor-pointer flex-shrink-0 shadow-2xs ${
+            className={`h-8 px-2.5 rounded-full text-[10px] sm:text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-shrink-0 shadow-sm border ${
               product.isAvailable
-                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
-                : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 ring-2 ring-emerald-500/20'
+                : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 ring-2 ring-rose-500/20'
             }`}
             title="1-tap toggle In Stock / Out of Stock"
           >
+            {/* Visual Switch Track & Knob */}
             <span
-              className={`w-2 h-2 rounded-full ${
-                product.isAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+              className={`w-7 h-4 rounded-full flex items-center p-0.5 transition-colors ${
+                product.isAvailable ? 'bg-emerald-800 justify-end' : 'bg-rose-800 justify-start'
               }`}
-            />
-            <span className="whitespace-nowrap">
+            >
+              <span className="w-3 h-3 rounded-full bg-white shadow-xs" />
+            </span>
+            <span className="whitespace-nowrap font-bold">
               {product.isAvailable ? 'In Stock' : 'Out of Stock'}
             </span>
           </button>

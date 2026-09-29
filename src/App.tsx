@@ -52,6 +52,7 @@ import {
   saveProductToCentralInventory,
   deleteProductFromCentralInventory,
 } from './services/orderApiService';
+import { dispatchOrderInBackground } from './services/orderQueueService';
 import {
   isFirebaseConfigured,
   subscribeToAuth,
@@ -83,6 +84,7 @@ import { SplashScreen } from './components/SplashScreen';
 import { ParchiUploadModal } from './components/ParchiUploadModal';
 import { VoiceGroceryModal } from './components/VoiceGroceryModal';
 import { QuickOrderActionBar } from './components/QuickOrderActionBar';
+import { CreatorCredits } from './components/CreatorCredits';
 import { playOrderChime } from './utils/sound';
 import { deleteOrderFromCentralServer } from './services/orderApiService';
 
@@ -462,31 +464,15 @@ export default function App() {
       const orderId = 'CK-' + Math.floor(1000 + Math.random() * 9000);
       const selectedLoc = getCustomerSelectedLocation() || storeSettings.serviceArea || 'Waidhan, Singrauli';
 
-      let centralResult: { order: Order } | null = null;
-
-      // 1. PUSH to Central Server Database (POST /api/orders - Zepto/Blinkit Architecture)
-      try {
-        const res = await sendOrderToCentralServer({
-          id: orderId,
-          customerName: customerDetails.fullName,
-          phone: customerDetails.phoneNumber,
-          address: customerDetails.fullAddress,
-          deliverySlot: customerDetails.deliverySlot,
-          deliveryLocation: selectedLoc,
-          items: orderItems,
-          itemsCount: totalCartCount,
-          subtotalOriginal,
-          totalSavings,
-          deliveryFee,
-          finalPayableAmount,
-          isParchi: false,
-        });
-        if (res && res.order) {
-          centralResult = res;
+      // 1. Instant Haptic Feedback & Audio Chime (0 milliseconds feedback)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          navigator.vibrate([50, 50, 50]);
+        } catch {
+          // ignore if unsupported
         }
-      } catch (err) {
-        console.warn('Central server order ingest notice:', err);
       }
+      playOrderChime();
 
       // 2. Register in local storage engine for instant offline fallback
       const localOrder = createOrder({
@@ -505,20 +491,29 @@ export default function App() {
         paymentMethod: 'Cash on Delivery (COD)',
       });
 
-      const confirmedOrder = centralResult?.order || localOrder;
-
-      // Play crisp audio chime/bell sound immediately when any order is submitted
-      playOrderChime();
-
-      // 3. Clear Cart, close checkout modal, and display the Order Placed Successfully screen
-      // (Blinkit/Zepto Style: Zero client-side WhatsApp redirect. Central server records all orders)
+      // 3. OPTIMISTIC CONFIRMATION: Instantly clear Cart, close checkout modal, and display the Order Placed Successfully screen (0ms)
       setCartQuantities({});
       setIsCheckoutOpen(false);
       setIsCartOpen(false);
-      setPlacedOrder(confirmedOrder);
-
-      // Refresh orders in local state
+      setPlacedOrder(localOrder);
       setOrders(getOrders());
+
+      // 4. Asynchronous Background Dispatch to Central Server Database (auto-retry queue if offline or failed)
+      dispatchOrderInBackground({
+        id: orderId,
+        customerName: customerDetails.fullName,
+        phone: customerDetails.phoneNumber,
+        address: customerDetails.fullAddress,
+        deliverySlot: customerDetails.deliverySlot,
+        deliveryLocation: selectedLoc,
+        items: orderItems,
+        itemsCount: totalCartCount,
+        subtotalOriginal,
+        totalSavings,
+        deliveryFee,
+        finalPayableAmount,
+        isParchi: false,
+      });
     },
     [cartItems, totalCartCount, storeSettings]
   );
@@ -856,7 +851,7 @@ export default function App() {
       />
 
       {/* Customer Footer with dynamic store settings */}
-      <footer className="mt-16 bg-white border-t border-stone-200 py-8 px-4 text-xs text-stone-500">
+      <footer className="mt-16 bg-white border-t border-stone-200 pt-8 pb-24 sm:pb-12 px-4 text-xs text-stone-500">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div>
             <div className="flex items-center justify-center md:justify-start gap-2 text-stone-900 font-heading font-extrabold text-base">
@@ -906,6 +901,11 @@ export default function App() {
               Support: {storeSettings.phone || '9424316081'}
             </a>
           </div>
+        </div>
+
+        {/* Official Creator & Branding Credits */}
+        <div className="max-w-6xl mx-auto mt-6 pt-5 border-t border-stone-100">
+          <CreatorCredits />
         </div>
       </footer>
 

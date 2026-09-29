@@ -16,8 +16,8 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { compressImageFile, formatWhatsAppPhone } from '../utils/imageUtils';
-import { saveParchiOrder, getCustomerSelectedLocation } from '../services/storageService';
-import { sendOrderToCentralServer } from '../services/orderApiService';
+import { saveParchiOrder, getCustomerSelectedLocation, saveCustomerPhone } from '../services/storageService';
+import { dispatchOrderInBackground } from '../services/orderQueueService';
 import { playOrderChime } from '../utils/sound';
 import { StoreSettings } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
@@ -91,36 +91,25 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate() || !imagePreview) return;
 
+    // 1. Instant Haptic Feedback & Audio Chime (0 milliseconds feedback)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([50, 50, 50]);
+      } catch {
+        // ignore if not supported
+      }
+    }
     playOrderChime();
 
     const selectedLoc = getCustomerSelectedLocation() || storeSettings.serviceArea || 'Waidhan, Singrauli';
     const parchiId = `PRC-${Date.now().toString().slice(-5)}`;
 
-    // Step 1: Send to Central Server Database (POST /api/orders)
-    try {
-      await sendOrderToCentralServer({
-        id: parchiId,
-        customerName: customerName.trim(),
-        phone: customerPhone.trim(),
-        address: deliveryAddress.trim(),
-        deliveryLocation: selectedLoc,
-        isParchi: true,
-        orderType: 'parchi',
-        slipPhoto: imagePreview,
-        slipImageUrl: imagePreview,
-        parchiBase64: imagePreview,
-        parchiImageUrl: imagePreview,
-        notes: notes.trim() || undefined,
-      });
-    } catch (err) {
-      console.warn('Central server parchi ingest notice:', err);
-    }
-
-    // Step 2: Persist into local storage parchi orders
+    // 2. Persist customer phone and parchi order locally immediately
+    saveCustomerPhone(customerPhone.trim());
     saveParchiOrder({
       id: parchiId,
       customerName: customerName.trim(),
@@ -136,7 +125,7 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       status: 'Pending',
     });
 
-    // Step 3: Format WhatsApp URL for direct store owner notification
+    // 3. Format WhatsApp notification URL for store owner
     const waUrl = getStoreOwnerWhatsAppNotificationUrl(
       {
         orderId: parchiId,
@@ -149,16 +138,33 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       },
       storeSettings
     );
+
+    // 4. OPTIMISTIC CONFIRMATION: Instantly show success confirmation in 0 milliseconds
     setSubmittedWhatsAppUrl(waUrl);
     setSubmittedOrderId(parchiId);
+    setIsSuccess(true);
 
-    // Trigger Admin updates
+    // 5. Trigger live updates for same-tab / cross-tab Admin
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('kiranape_orders_updated'));
       window.dispatchEvent(new Event('storage'));
     }
 
-    setIsSuccess(true);
+    // 6. Asynchronously dispatch to central server in background (auto-retry queue if offline or failed)
+    dispatchOrderInBackground({
+      id: parchiId,
+      customerName: customerName.trim(),
+      phone: customerPhone.trim(),
+      address: deliveryAddress.trim(),
+      deliveryLocation: selectedLoc,
+      isParchi: true,
+      orderType: 'parchi',
+      slipPhoto: imagePreview,
+      slipImageUrl: imagePreview,
+      parchiBase64: imagePreview,
+      parchiImageUrl: imagePreview,
+      notes: notes.trim() || undefined,
+    });
   };
 
   const handleResetAndClose = () => {

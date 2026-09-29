@@ -260,6 +260,23 @@ export async function saveProductToCentralInventory(product: any) {
 }
 
 /**
+ * Bulk save or update products in Central Server Inventory (POST /api/inventory/bulk)
+ */
+export async function saveBulkProductsToCentralInventory(products: any[]): Promise<boolean> {
+  try {
+    const res = await fetch('/api/inventory/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Inventory API] Failed bulk saving products to central inventory:', err);
+    return false;
+  }
+}
+
+/**
  * Delete product from Central Server Inventory (DELETE /api/inventory/:id)
  */
 export async function deleteProductFromCentralInventory(productId: string): Promise<boolean> {

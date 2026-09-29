@@ -23,7 +23,7 @@ import {
   saveVoiceNoteOrder,
   saveParchiOrder,
 } from '../services/storageService';
-import { sendOrderToCentralServer } from '../services/orderApiService';
+import { dispatchOrderInBackground } from '../services/orderQueueService';
 import { StoreSettings } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -293,15 +293,19 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
     e.preventDefault();
     if (!validate()) return;
 
+    // 1. Instant Haptic Feedback & Audio Chime (0 milliseconds feedback)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([50, 50, 50]);
+      } catch {
+        // ignore if not supported
+      }
+    }
+    playOrderChime();
+
     if (isListening) stopListening();
 
     let voiceNoteBase64 = audioBase64Ref.current || audioBase64;
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      const exported = await stopAudioCapture();
-      if (exported) voiceNoteBase64 = exported;
-    }
-
-    playOrderChime();
 
     const voiceOrderId = `VOC-${Date.now().toString().slice(-5)}`;
     const fullTranscript = recognizedTranscript.trim() || optionalNotes.trim() || 'ग्राहक वॉइस नोट ऑडियो संलग्न';
@@ -309,29 +313,27 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
 
     saveCustomerPhone(customerPhone.trim());
 
-    // 1. Send to Central Server Database (POST /api/orders)
-    try {
-      await sendOrderToCentralServer({
-        id: voiceOrderId,
+    // 2. Format WhatsApp notification link for store owner
+    const waUrl = getStoreOwnerWhatsAppNotificationUrl(
+      {
+        orderId: voiceOrderId,
         customerName: customerName.trim(),
-        phone: customerPhone.trim(),
-        address: deliveryAddress.trim(),
-        deliverySlot,
+        customerPhone: customerPhone.trim(),
+        deliveryAddress: deliveryAddress.trim(),
         deliveryLocation: selectedLocation,
-        isParchi: true,
+        deliverySlot,
         orderType: 'voice',
-        voiceAudio: voiceNoteBase64 || undefined,
-        voiceNoteBase64: voiceNoteBase64 || undefined,
-        voiceAudioUrl: voiceNoteBase64 || undefined,
-        itemsCount: 1,
-        items: [],
-        notes: orderNotes,
-      });
-    } catch (err) {
-      console.warn('Central server voice order notice:', err);
-    }
+        textDetails: fullTranscript,
+      },
+      storeSettings
+    );
 
-    // 2. Save in Parchi and Voice local storage
+    // 3. OPTIMISTIC CONFIRMATION: Instantly show success screen in 0 milliseconds
+    setWhatsappShareUrl(waUrl);
+    setSubmittedOrderId(voiceOrderId);
+    setIsSuccess(true);
+
+    // 4. Save in Parchi and Voice local storage immediately
     saveParchiOrder({
       id: voiceOrderId,
       customerName: customerName.trim(),
@@ -356,30 +358,40 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
       voiceNoteBase64: voiceNoteBase64 || undefined,
     });
 
-    // 3. Generate instant WhatsApp link for store owner
-    const waUrl = getStoreOwnerWhatsAppNotificationUrl(
-      {
-        orderId: voiceOrderId,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        deliveryAddress: deliveryAddress.trim(),
-        deliveryLocation: selectedLocation,
-        deliverySlot,
-        orderType: 'voice',
-        textDetails: fullTranscript,
-      },
-      storeSettings
-    );
-    setWhatsappShareUrl(waUrl);
-    setSubmittedOrderId(voiceOrderId);
-
-    // 4. Trigger live updates for Admin
+    // 5. Trigger live updates for Admin
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('kiranape_orders_updated'));
       window.dispatchEvent(new Event('storage'));
     }
 
-    setIsSuccess(true);
+    // 6. Asynchronous Background Dispatch (auto-retry queue if offline or failed)
+    (async () => {
+      try {
+        if (!voiceNoteBase64 && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          const exported = await stopAudioCapture();
+          if (exported) voiceNoteBase64 = exported;
+        }
+
+        dispatchOrderInBackground({
+          id: voiceOrderId,
+          customerName: customerName.trim(),
+          phone: customerPhone.trim(),
+          address: deliveryAddress.trim(),
+          deliverySlot,
+          deliveryLocation: selectedLocation,
+          isParchi: true,
+          orderType: 'voice',
+          voiceAudio: voiceNoteBase64 || undefined,
+          voiceNoteBase64: voiceNoteBase64 || undefined,
+          voiceAudioUrl: voiceNoteBase64 || undefined,
+          itemsCount: 1,
+          items: [],
+          notes: orderNotes,
+        });
+      } catch (bgErr) {
+        console.warn('[Voice Order] Background dispatch notice:', bgErr);
+      }
+    })();
   };
 
   const handleResetAndClose = () => {

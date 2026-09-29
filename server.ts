@@ -61,19 +61,32 @@ let centralOrders: CentralOrder[] = [];
 // CENTRAL SERVER INVENTORY (Persistent 162 Items)
 // ==========================================
 const INVENTORY_FILE_PATH = path.join(process.cwd(), 'data', 'central_inventory.json');
+const SERVER_PRODUCTS_PATH = path.join(process.cwd(), 'server', 'data', 'products.json');
+const DEFAULT_CATALOG_PATH = path.join(process.cwd(), 'src', 'data', 'defaultCatalog.json');
+const BACKUP_INVENTORY_PATH = path.join(process.cwd(), 'data', 'master162Backup.json');
+const STATIC_SEED_PATH = path.join(process.cwd(), 'src', 'data', 'initialProducts.json');
+
 let centralInventory: any[] = [];
 
 const persistCentralInventory = () => {
   try {
     fs.mkdirSync(path.dirname(INVENTORY_FILE_PATH), { recursive: true });
     fs.writeFileSync(INVENTORY_FILE_PATH, JSON.stringify(centralInventory, null, 2));
+
+    // Also persist in server/data/products.json for Render/Cloud survival
+    fs.mkdirSync(path.dirname(SERVER_PRODUCTS_PATH), { recursive: true });
+    fs.writeFileSync(SERVER_PRODUCTS_PATH, JSON.stringify(centralInventory, null, 2));
   } catch (err) {
     console.error('[Central DB] Failed persisting inventory to disk:', err);
   }
 };
 
 try {
-  if (fs.existsSync(INVENTORY_FILE_PATH)) {
+  if (fs.existsSync(SERVER_PRODUCTS_PATH)) {
+    const rawInv = fs.readFileSync(SERVER_PRODUCTS_PATH, 'utf-8');
+    centralInventory = JSON.parse(rawInv);
+    console.log(`[Central DB] Loaded ${centralInventory.length} products from server/data/products.json`);
+  } else if (fs.existsSync(INVENTORY_FILE_PATH)) {
     const rawInv = fs.readFileSync(INVENTORY_FILE_PATH, 'utf-8');
     centralInventory = JSON.parse(rawInv);
     console.log(`[Central DB] Loaded ${centralInventory.length} products from central_inventory.json`);
@@ -84,16 +97,18 @@ try {
 }
 
 // Auto-recovery / seed: Ensure all 162 verified items are preserved across restarts/sleep cycles
-const BACKUP_INVENTORY_PATH = path.join(process.cwd(), 'data', 'master162Backup.json');
-const STATIC_SEED_PATH = path.join(process.cwd(), 'src', 'data', 'initialProducts.json');
 if (!Array.isArray(centralInventory) || centralInventory.length < 162) {
   console.log(`[Central DB] Inventory count (${centralInventory ? centralInventory.length : 0}) is below 162. Seeding full 162 master products...`);
   let backupCatalog: any[] = [];
   try {
-    if (fs.existsSync(BACKUP_INVENTORY_PATH)) {
+    if (fs.existsSync(DEFAULT_CATALOG_PATH)) {
+      backupCatalog = JSON.parse(fs.readFileSync(DEFAULT_CATALOG_PATH, 'utf-8'));
+    } else if (fs.existsSync(BACKUP_INVENTORY_PATH)) {
       backupCatalog = JSON.parse(fs.readFileSync(BACKUP_INVENTORY_PATH, 'utf-8'));
     } else if (fs.existsSync(STATIC_SEED_PATH)) {
       backupCatalog = JSON.parse(fs.readFileSync(STATIC_SEED_PATH, 'utf-8'));
+    } else if (fs.existsSync(INVENTORY_FILE_PATH)) {
+      backupCatalog = JSON.parse(fs.readFileSync(INVENTORY_FILE_PATH, 'utf-8'));
     }
   } catch (err) {
     console.warn('[Central DB] Failed to load backup inventory catalog:', err);
@@ -505,6 +520,52 @@ app.post(['/api/inventory', '/api/products'], (req, res) => {
     console.log(`[Central DB] Inventory item saved: ${newProduct.name} (#${productId})`);
 
     res.status(201).json({ success: true, product: newProduct });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 8b. POST /api/inventory/bulk: Bulk Upsert/Replace items from CSV Import or Backup
+app.post(['/api/inventory/bulk', '/api/products/bulk'], (req, res) => {
+  try {
+    const rawItems = Array.isArray(req.body) ? req.body : req.body?.products;
+    if (!Array.isArray(rawItems)) {
+      return res.status(400).json({ success: false, error: 'Expected products array' });
+    }
+
+    const existingMap = new Map(centralInventory.map((p) => [p.id, p]));
+    let updatedCount = 0;
+    let addedCount = 0;
+
+    rawItems.forEach((item: any, idx: number) => {
+      if (!item || !item.name) return;
+      const id = item.id || `prod_${Date.now()}_${idx}`;
+      const existing = existingMap.get(id);
+      const merged = {
+        ...(existing || {}),
+        ...item,
+        id,
+        updatedAt: Date.now(),
+      };
+      if (existing) {
+        updatedCount++;
+      } else {
+        addedCount++;
+      }
+      existingMap.set(id, merged);
+    });
+
+    centralInventory = Array.from(existingMap.values());
+    persistCentralInventory();
+    console.log(`[Central DB] Bulk inventory updated: ${updatedCount} updated, ${addedCount} added. Total: ${centralInventory.length}`);
+
+    res.json({
+      success: true,
+      totalCount: centralInventory.length,
+      updatedCount,
+      addedCount,
+      products: centralInventory,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, User, Lock, Mail, Phone, Store, LogIn, UserPlus } from 'lucide-react';
 import { AppUser } from '../types';
 import { signUpCustomer, signInCustomer } from '../services/firebase';
+import { CreatorCredits } from './CreatorCredits';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -235,6 +236,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 >
                   Continue shopping as Guest (No login needed to order COD)
                 </button>
+              </div>
+
+              {/* Creator & Branding Credits */}
+              <div className="mt-4 pt-3 border-t border-stone-100">
+                <CreatorCredits />
               </div>
             </div>
         </div>

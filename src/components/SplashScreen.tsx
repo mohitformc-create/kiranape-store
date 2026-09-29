@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
+import { CreatorCredits } from './CreatorCredits';
 
 interface SplashScreenProps {
   onFinish?: () => void;
@@ -75,11 +76,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         </div>
       </div>
 
-      {/* Bottom Subtle Indicator */}
-      <div className="pb-8 sm:pb-12 flex flex-col items-center gap-1.5 opacity-80">
-        <span className="text-[11px] text-stone-500 font-semibold">
+      {/* Bottom Subtle Indicator & Creator Credits */}
+      <div className="pb-6 sm:pb-8 flex flex-col items-center gap-3 w-full">
+        <span className="text-[11px] text-stone-400 font-medium">
           100% Shudh Rashan • Cash on Delivery Available
         </span>
+        <CreatorCredits />
       </div>
     </div>
   );

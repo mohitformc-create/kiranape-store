@@ -42,6 +42,9 @@ import {
   ZoomOut,
   ExternalLink,
   Volume2,
+  VolumeX,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -52,6 +55,7 @@ import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
+import { CreatorCredits } from './CreatorCredits';
 import { getWhatsAppBillUrl, generateWhatsAppBillMessage } from '../utils/orderUtils';
 import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
@@ -61,10 +65,12 @@ import {
   deleteOrderFromCentralServer,
   clearCompletedOrCancelledOrdersFromCentralServer,
   clearAllOrdersFromCentralServer,
+  saveBulkProductsToCentralInventory,
 } from '../services/orderApiService';
 import {
   calculateFinalPrice,
   getProducts,
+  saveProducts,
   getOrders,
   getCustomCategories,
   addCustomCategory,
@@ -134,6 +140,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [zoomScale, setZoomScale] = useState(1);
 
   // Real-time order notification alert
+  const [isBeepAlertEnabled, setIsBeepAlertEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('kiranape_beep_alert_enabled') !== 'false';
+  });
+
+  const toggleBeepAlert = () => {
+    const next = !isBeepAlertEnabled;
+    setIsBeepAlertEnabled(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kiranape_beep_alert_enabled', String(next));
+    }
+  };
+
   const [newOrderAlert, setNewOrderAlert] = useState<{
     id: string;
     customerName: string;
@@ -155,7 +174,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const brandNewOrder = ordersList.find((o) => !knownOrderIdsRef.current.has(o.id));
 
     if (brandNewParchi || brandNewOrder) {
-      playAdminNotificationChime();
+      if (isBeepAlertEnabled) {
+        playAdminNotificationChime();
+      }
       const target = brandNewParchi || brandNewOrder!;
       const isVoice = Boolean(
         target.voiceNoteBase64 ||
@@ -399,7 +420,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateProduct(prod.id, { stock: newStock });
   };
 
-  // Filter products
+  // Filter products with Category Quick Filter support (Sabji, Atta/Dal, Tel, Masala, Snacks, Dairy)
   const filteredProducts = products.filter((item) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
@@ -407,7 +428,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       item.name.toLowerCase().includes(q) ||
       (item.hindiName && item.hindiName.toLowerCase().includes(q)) ||
       item.category.toLowerCase().includes(q);
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+
+    let matchesCategory = false;
+    if (selectedCategory === 'All') {
+      matchesCategory = true;
+    } else if (selectedCategory === 'Sabji') {
+      matchesCategory =
+        item.category.toLowerCase().includes('sabji') ||
+        item.category.toLowerCase().includes('fresh') ||
+        item.category.toLowerCase().includes('fruit') ||
+        item.category.toLowerCase().includes('vegetable');
+    } else if (selectedCategory === 'Atta/Dal') {
+      matchesCategory = item.category === 'Atta & Flours' || item.category === 'Rice & Dal';
+    } else if (selectedCategory === 'Tel') {
+      matchesCategory = item.category === 'Oil & Ghee';
+    } else if (selectedCategory === 'Masala') {
+      matchesCategory = item.category === 'Spices & Salt';
+    } else if (selectedCategory === 'Snacks') {
+      matchesCategory = item.category === 'Snacks & Biscuits';
+    } else if (selectedCategory === 'Dairy') {
+      matchesCategory = item.category === 'Dairy & Bakery';
+    } else {
+      matchesCategory = item.category === selectedCategory;
+    }
+
     return matchesSearch && matchesCategory;
   });
 
@@ -434,41 +478,81 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setDeleteConfirmId(null);
   };
 
-  // 1-Click Export Inventory as Excel (CSV)
+  const csvFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Helper to parse RFC-4180 CSV text accounting for quotes, multiline and commas
+  const parseCsvText = (text: string): string[][] => {
+    const lines: string[][] = [];
+    let currentRow: string[] = [];
+    let currentCell = '';
+    let inQuotes = false;
+
+    const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (let i = 0; i < clean.length; i++) {
+      const char = clean[i];
+      const nextChar = clean[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentCell += '"';
+          i++; // skip escaped quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        currentRow.push(currentCell.trim());
+        currentCell = '';
+      } else if (char === '\n' && !inQuotes) {
+        currentRow.push(currentCell.trim());
+        if (currentRow.some((cell) => cell.length > 0)) {
+          lines.push(currentRow);
+        }
+        currentRow = [];
+        currentCell = '';
+      } else {
+        currentCell += char;
+      }
+    }
+
+    if (currentCell.length > 0 || currentRow.length > 0) {
+      currentRow.push(currentCell.trim());
+      if (currentRow.some((cell) => cell.length > 0)) {
+        lines.push(currentRow);
+      }
+    }
+
+    return lines;
+  };
+
+  // 1-Click Export Inventory as Excel (CSV) with required columns:
+  // id, name, hindiName, category, mrp, sellingPrice, unit, inStock, stockCount, imageUrl
   const handleDownloadInventoryCsv = () => {
     let inventoryItems: Product[] = [];
     try {
       const stored = getProducts();
       if (Array.isArray(stored) && stored.length > 0) {
         inventoryItems = stored;
-      } else {
-        const raw = localStorage.getItem('kiranape_inventory');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            inventoryItems = parsed;
-          }
-        }
       }
     } catch (e) {
       console.error('Error reading inventory for CSV export:', e);
     }
 
-    // Fallback to local state if storage item is empty
     if (inventoryItems.length === 0) {
       inventoryItems = products;
     }
 
-    // Format columns: ID, Item Name, Category, Pack Size, Original MRP, Selling Price, In Stock, Image URL
     const headers = [
-      'ID',
-      'Item Name',
-      'Category',
-      'Pack Size',
-      'Original MRP',
-      'Selling Price',
-      'In Stock',
-      'Image URL',
+      'id',
+      'name',
+      'hindiName',
+      'category',
+      'mrp',
+      'sellingPrice',
+      'unit',
+      'inStock',
+      'stockCount',
+      'imageUrl',
     ];
 
     const escapeCsvCell = (val: unknown): string => {
@@ -478,19 +562,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     const rows = inventoryItems.map((item) => {
-      const packSize = item.unit || (item.variants && item.variants.length > 0 ? item.variants[0].weight_unit : '');
-      const originalMrp = item.originalPrice !== undefined ? item.originalPrice : (item.finalPrice || 0);
-      const sellingPrice = item.finalPrice !== undefined ? item.finalPrice : 0;
-      const inStock = item.isAvailable ? 'Yes' : 'No';
+      const unit = item.unit || (item.variants && item.variants.length > 0 ? item.variants[0].weight_unit : '1 pc');
+      const mrp = item.originalPrice !== undefined ? item.originalPrice : (item.finalPrice || 0);
+      const sellingPrice = item.finalPrice !== undefined ? item.finalPrice : mrp;
+      const inStock = item.isAvailable ? 'true' : 'false';
+      const stockCount = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 50);
 
       return [
         escapeCsvCell(item.id),
         escapeCsvCell(item.name || ''),
+        escapeCsvCell(item.hindiName || ''),
         escapeCsvCell(item.category || ''),
-        escapeCsvCell(packSize),
-        escapeCsvCell(originalMrp),
+        escapeCsvCell(mrp),
         escapeCsvCell(sellingPrice),
+        escapeCsvCell(unit),
         escapeCsvCell(inStock),
+        escapeCsvCell(stockCount),
         escapeCsvCell(item.imageUrl || ''),
       ].join(',');
     });
@@ -506,6 +593,211 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     document.body.removeChild(link);
 
     setCatalogSyncNotice(`Downloaded ${inventoryItems.length} products to kiranape_inventory_export.csv successfully!`);
+    setTimeout(() => setCatalogSyncNotice(null), 5000);
+  };
+
+  // Download Sample CSV Template
+  const handleDownloadSampleCsvTemplate = () => {
+    const headers = [
+      'id',
+      'name',
+      'hindiName',
+      'category',
+      'mrp',
+      'sellingPrice',
+      'unit',
+      'inStock',
+      'stockCount',
+      'imageUrl',
+    ];
+
+    const sampleRows = [
+      [
+        '"prod_sample_1"',
+        '"Aashirvaad Shudh Chakki Atta"',
+        '"आशीर्वाद शुद्ध चक्की आटा"',
+        '"Atta & Flours"',
+        '"240"',
+        '"215"',
+        '"5 kg"',
+        '"true"',
+        '"50"',
+        '"https://images.openfoodfacts.org/images/products/890/103/001/0173/front_en.24.400.jpg"',
+      ].join(','),
+      [
+        '"prod_sample_2"',
+        '"Fortune Premium Kachi Ghani Mustard Oil"',
+        '"फॉर्च्यून कच्ची घानी सरसों का तेल"',
+        '"Oil & Ghee"',
+        '"165"',
+        '"145"',
+        '"1 Litre"',
+        '"true"',
+        '"40"',
+        '"https://images.openfoodfacts.org/images/products/890/600/728/0052/front_en.8.400.jpg"',
+      ].join(','),
+      [
+        '"prod_sample_3"',
+        '"Parle-G Original Gluco Biscuits"',
+        '"पारले-जी ग्लूकोज बिस्कुट"',
+        '"Snacks & Biscuits"',
+        '"30"',
+        '"28"',
+        '"250 g"',
+        '"true"',
+        '"100"',
+        '"https://images.openfoodfacts.org/images/products/890/171/910/1012/front_en.16.400.jpg"',
+      ].join(','),
+      [
+        '"prod_sample_4"',
+        '"Tata Salt Vacuum Evaporated Iodized"',
+        '"टाटा नमक देश का नमक"',
+        '"Spices & Salt"',
+        '"28"',
+        '"26"',
+        '"1 kg"',
+        '"true"',
+        '"60"',
+        '"https://images.openfoodfacts.org/images/products/890/106/500/0117/front_en.18.400.jpg"',
+      ].join(','),
+    ];
+
+    const csvContent = [headers.map((h) => `"${h}"`).join(','), ...sampleRows].join('\r\n');
+    const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + csvContent);
+
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', 'kiranape_sample_inventory_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Upload Excel (CSV)
+  const handleUploadInventoryCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (!text) {
+          alert('CSV file is empty.');
+          return;
+        }
+
+        const rows = parseCsvText(text);
+        if (rows.length < 2) {
+          alert('CSV file contains no product rows.');
+          return;
+        }
+
+        const rawHeaders = rows[0].map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const colMap: Record<string, number> = {};
+        rawHeaders.forEach((header, index) => {
+          if (header === 'id') colMap.id = index;
+          if (header === 'name' || header === 'itemname' || header === 'productname') colMap.name = index;
+          if (header === 'hindiname' || header === 'hindi') colMap.hindiName = index;
+          if (header === 'category') colMap.category = index;
+          if (header === 'mrp' || header === 'originalprice' || header === 'originalmrp') colMap.mrp = index;
+          if (header === 'sellingprice' || header === 'finalprice' || header === 'price') colMap.sellingPrice = index;
+          if (header === 'unit' || header === 'packsize' || header === 'weight') colMap.unit = index;
+          if (header === 'instock' || header === 'available' || header === 'isavailable') colMap.inStock = index;
+          if (header === 'stockcount' || header === 'stock') colMap.stockCount = index;
+          if (header === 'imageurl' || header === 'image') colMap.imageUrl = index;
+        });
+
+        if (colMap.name === undefined) {
+          alert('CSV must contain a "name" column.');
+          return;
+        }
+
+        const currentProducts = getProducts();
+        const existingById = new Map<string, Product>(currentProducts.map((p) => [p.id, p]));
+        const existingByName = new Map<string, Product>(currentProducts.map((p) => [p.name.trim().toLowerCase(), p]));
+
+        let updatedCount = 0;
+        let addedCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          const name = colMap.name !== undefined ? row[colMap.name]?.trim() : '';
+          if (!name) continue;
+
+          const rawId = colMap.id !== undefined ? row[colMap.id]?.trim() : '';
+          const hindiName = colMap.hindiName !== undefined ? row[colMap.hindiName]?.trim() : '';
+          const category = (colMap.category !== undefined && row[colMap.category]?.trim()) || 'Household Essentials';
+          const mrp = colMap.mrp !== undefined ? parseFloat(row[colMap.mrp]) || 0 : 0;
+          const sellingPrice = colMap.sellingPrice !== undefined ? parseFloat(row[colMap.sellingPrice]) || mrp : mrp;
+          const unit = (colMap.unit !== undefined && row[colMap.unit]?.trim()) || '1 pc';
+          const rawInStock = colMap.inStock !== undefined ? row[colMap.inStock]?.trim().toLowerCase() : 'true';
+          const isAvailable = rawInStock === 'true' || rawInStock === 'yes' || rawInStock === '1' || rawInStock === 'instock';
+          const stockCount = colMap.stockCount !== undefined ? parseInt(row[colMap.stockCount], 10) || 50 : 50;
+          const imageUrl = colMap.imageUrl !== undefined ? row[colMap.imageUrl]?.trim() : '';
+
+          const discountPercent = mrp > sellingPrice && mrp > 0 ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+
+          let existingProduct: Product | undefined;
+          if (rawId && existingById.has(rawId)) {
+            existingProduct = existingById.get(rawId);
+          } else if (existingByName.has(name.toLowerCase())) {
+            existingProduct = existingByName.get(name.toLowerCase());
+          }
+
+          if (existingProduct) {
+            existingProduct.name = name;
+            if (hindiName) existingProduct.hindiName = hindiName;
+            if (category) existingProduct.category = category as any;
+            if (mrp > 0) existingProduct.originalPrice = mrp;
+            if (sellingPrice > 0) existingProduct.finalPrice = sellingPrice;
+            existingProduct.discountPercent = discountPercent;
+            if (unit) existingProduct.unit = unit;
+            existingProduct.isAvailable = isAvailable;
+            existingProduct.stockCount = stockCount;
+            if (imageUrl) existingProduct.imageUrl = imageUrl;
+            existingProduct.updatedAt = Date.now();
+            updatedCount++;
+          } else {
+            const newId = rawId || `prod_${Date.now()}_${i}`;
+            const newProd: Product = {
+              id: newId,
+              name,
+              hindiName: hindiName || undefined,
+              category: category as any,
+              originalPrice: mrp || sellingPrice,
+              finalPrice: sellingPrice || mrp,
+              discountPercent,
+              unit,
+              isAvailable,
+              stockCount,
+              imageUrl: imageUrl || getCategoryFallbackSvg(category, name),
+              updatedAt: Date.now(),
+            };
+            existingById.set(newId, newProd);
+            existingByName.set(name.toLowerCase(), newProd);
+            addedCount++;
+          }
+        }
+
+        const mergedList = Array.from(existingById.values());
+        saveProducts(mergedList);
+
+        // Bulk sync with central server
+        await saveBulkProductsToCentralInventory(mergedList);
+
+        setCatalogSyncNotice(`Successfully loaded ${updatedCount + addedCount} products from CSV (${updatedCount} updated, ${addedCount} added).`);
+        setTimeout(() => setCatalogSyncNotice(null), 6000);
+      } catch (err: any) {
+        console.error('Error importing CSV:', err);
+        alert(`Error importing CSV: ${err.message || 'Invalid format'}`);
+      } finally {
+        if (csvFileInputRef.current) {
+          csvFileInputRef.current.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSavePin = (e: React.FormEvent) => {
@@ -543,6 +835,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Audible Alert Settings: Order Beep Alert (ON/OFF) Toggle */}
+            <button
+              type="button"
+              id="admin-header-beep-toggle-btn"
+              onClick={toggleBeepAlert}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all active:scale-95 cursor-pointer ${
+                isBeepAlertEnabled
+                  ? 'bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border-emerald-500/50 shadow-xs'
+                  : 'bg-rose-950/50 hover:bg-rose-950/70 text-rose-300 border-rose-800/60'
+              }`}
+              title={
+                isBeepAlertEnabled
+                  ? 'Order Beep Alert is ON - Audible chime will play on new orders (Click to Mute)'
+                  : 'Order Beep Alert is OFF - Audio is muted (Click to Enable Beep Alert)'
+              }
+            >
+              {isBeepAlertEnabled ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  <span>Order Beep Alert: ON</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Order Beep Alert: OFF</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               id="admin-header-sync-wholesale-btn"
@@ -796,7 +1117,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 border border-emerald-300 text-xs font-heading font-extrabold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
                     title="Export entire grocery inventory to Excel CSV spreadsheet"
                   >
-                    <span>📥 Download Inventory as Excel (CSV)</span>
+                    <Download className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Download Excel (CSV)</span>
+                  </button>
+
+                  {/* Upload Inventory from Excel (CSV) */}
+                  <input
+                    ref={csvFileInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={handleUploadInventoryCsv}
+                  />
+                  <button
+                    type="button"
+                    id="admin-upload-inventory-csv-btn"
+                    onClick={() => csvFileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-800 border border-blue-300 text-xs font-heading font-extrabold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                    title="Upload CSV spreadsheet to bulk update or add grocery products"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-blue-700" />
+                    <span>Upload Excel (CSV)</span>
+                  </button>
+
+                  {/* Download Sample CSV Template */}
+                  <button
+                    type="button"
+                    id="admin-sample-inventory-csv-btn"
+                    onClick={handleDownloadSampleCsvTemplate}
+                    className="flex items-center gap-1 text-[11px] font-bold text-stone-600 hover:text-stone-900 underline cursor-pointer px-2 py-1.5 rounded-lg hover:bg-stone-100 transition-colors"
+                    title="Download sample format with example columns and rows"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Download Sample CSV Template</span>
                   </button>
 
                   {/* Manual Add Item */}
@@ -821,71 +1174,107 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* Middle Row: Quick Category Filter Pills */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
-                  <Filter className="w-3 h-3 text-stone-400" />
-                  Categories:
-                </span>
-                {CATEGORIES.map((cat) => {
-                  const isSelected = selectedCategory === cat;
-                  const count = cat === 'All' ? products.length : products.filter((p) => p.category === cat).length;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer flex-shrink-0 ${
-                        isSelected
-                          ? 'bg-emerald-700 text-white shadow-xs font-bold'
-                          : 'bg-stone-100 text-stone-700 hover:bg-stone-200 border border-stone-200/80'
-                      }`}
-                    >
-                      <span>{cat}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-600'
+              {/* Sticky Category Quick Filter Pills & 1-Second Search Bar */}
+              <div className="sticky top-[58px] z-30 bg-white/95 backdrop-blur-md shadow-sm border border-stone-200/90 rounded-2xl p-3 space-y-2.5">
+                {/* Category Quick Filter Pills Row (Sabji, Atta/Dal, Tel, Masala, Snacks, Dairy) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <span className="text-[11px] font-black text-stone-500 uppercase tracking-wider flex items-center gap-1 flex-shrink-0 mr-1">
+                    <Filter className="w-3 h-3 text-amber-600" />
+                    Categories:
+                  </span>
+                  {[
+                    { id: 'All', label: 'All Items' },
+                    { id: 'Sabji', label: '🥦 Sabji' },
+                    { id: 'Atta/Dal', label: '🌾 Atta/Dal' },
+                    { id: 'Tel', label: '🛢️ Tel' },
+                    { id: 'Masala', label: '🌶️ Masala' },
+                    { id: 'Snacks', label: '🍪 Snacks' },
+                    { id: 'Dairy', label: '🥛 Dairy' },
+                    { id: 'Tea, Coffee & Drinks', label: '☕ Drinks' },
+                    { id: 'Household Essentials', label: '🧼 Household' },
+                    { id: 'Personal Care', label: '🧴 Personal' },
+                  ].map((pill) => {
+                    const isSelected = selectedCategory === pill.id;
+                    const count =
+                      pill.id === 'All'
+                        ? products.length
+                        : pill.id === 'Sabji'
+                        ? products.filter(
+                            (p) =>
+                              p.category.toLowerCase().includes('sabji') ||
+                              p.category.toLowerCase().includes('fresh') ||
+                              p.category.toLowerCase().includes('fruit') ||
+                              p.category.toLowerCase().includes('veg')
+                          ).length
+                        : pill.id === 'Atta/Dal'
+                        ? products.filter((p) => p.category === 'Atta & Flours' || p.category === 'Rice & Dal').length
+                        : pill.id === 'Tel'
+                        ? products.filter((p) => p.category === 'Oil & Ghee').length
+                        : pill.id === 'Masala'
+                        ? products.filter((p) => p.category === 'Spices & Salt').length
+                        : pill.id === 'Snacks'
+                        ? products.filter((p) => p.category === 'Snacks & Biscuits').length
+                        : pill.id === 'Dairy'
+                        ? products.filter((p) => p.category === 'Dairy & Bakery').length
+                        : products.filter((p) => p.category === pill.id).length;
+
+                    return (
+                      <button
+                        key={pill.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(pill.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer flex-shrink-0 active:scale-95 ${
+                          isSelected
+                            ? 'bg-emerald-700 text-white shadow-xs font-black'
+                            : 'bg-stone-100 text-stone-700 hover:bg-stone-200 border border-stone-200/80'
                         }`}
                       >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Bottom Search & Status Row */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
-                {/* Search with Clear */}
-                <div className="relative flex-1 max-w-md">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search grocery items by English name or Hindi (सरसों, आटा, चाय)..."
-                    className="w-full pl-9 pr-8 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600 p-0.5"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                        <span>{pill.label}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-600'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Status Indicator & Count */}
-                <div className="flex items-center gap-3 text-xs text-stone-500 justify-between sm:justify-end">
-                  <span>
-                    Showing <strong>{filteredProducts.length}</strong> of <strong>{products.length}</strong> grocery items in store
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 text-[11px]">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Internal Server Database (data/central_orders.json)
-                  </span>
+                {/* 1-Second Fast Search & Item Count */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-stone-100">
+                  {/* Search with Clear */}
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="w-4 h-4 text-emerald-600 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Quick search any item in 1 second (English / हिंदी)..."
+                      className="w-full pl-9 pr-8 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all font-medium"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status Indicator & Count */}
+                  <div className="flex items-center gap-3 text-xs text-stone-500 justify-between sm:justify-end">
+                    <span>
+                      Showing <strong>{filteredProducts.length}</strong> of <strong>{products.length}</strong> grocery items in store
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 text-[11px]">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      162+ Products Catalog
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1283,7 +1672,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 )}
                               </td>
 
-                              {/* Instant Status 1-Click Toggle */}
+                              {/* Instant Status 1-Click Toggle (Prominent Green/Red Switch) */}
                               <td className="py-3 px-3 whitespace-nowrap">
                                 <button
                                   type="button"
@@ -1292,14 +1681,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                       isAvailable: !product.isAvailable,
                                     })
                                   }
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+                                  className={`h-7 px-2.5 rounded-full text-[10px] font-black flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs border ${
                                     product.isAvailable
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                      : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 ring-2 ring-emerald-500/20'
+                                      : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 ring-2 ring-rose-500/20'
                                   }`}
                                   title="1-click toggle between In Stock and Out of Stock"
                                 >
-                                  {product.isAvailable ? '● In Stock' : '✕ Out of Stock'}
+                                  <span
+                                    className={`w-6 h-3.5 rounded-full flex items-center p-0.5 ${
+                                      product.isAvailable ? 'bg-emerald-800 justify-end' : 'bg-rose-800 justify-start'
+                                    }`}
+                                  >
+                                    <span className="w-2.5 h-2.5 rounded-full bg-white shadow-xs" />
+                                  </span>
+                                  <span className="whitespace-nowrap">
+                                    {product.isAvailable ? 'In Stock' : 'Out of Stock'}
+                                  </span>
                                 </button>
                               </td>
 
@@ -2224,6 +2622,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
       </main>
+
+      {/* Admin Panel Footer & Creator Credits */}
+      <footer className="mt-auto border-t border-stone-200/90 bg-white/80 py-6 px-4 pb-20 sm:pb-8">
+        <CreatorCredits />
+      </footer>
 
       {/* Product Add/Edit Modal */}
       <ProductFormModal

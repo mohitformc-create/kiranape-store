@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Delete, X, AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
 import { getAdminPin } from '../services/storageService';
+import { CreatorCredits } from './CreatorCredits';
 
 interface AdminPinModalProps {
   isOpen: boolean;
@@ -190,10 +191,15 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
           <button
             type="button"
             onClick={() => onSuccess()}
-            className="mt-5 text-xs text-stone-500 hover:text-amber-700 underline underline-offset-2 transition-colors"
+            className="mt-4 text-xs text-stone-500 hover:text-amber-700 underline underline-offset-2 transition-colors cursor-pointer"
           >
             Quick Unlock (Owner Bypass)
           </button>
+
+          {/* Creator & Branding Credits */}
+          <div className="w-full mt-4 pt-3 border-t border-stone-100">
+            <CreatorCredits />
+          </div>
         </div>
       </div>
     </div>

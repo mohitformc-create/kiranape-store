@@ -22,6 +22,7 @@ export interface Product {
   imageUrl: string;
   isAvailable: boolean;
   stock?: number; // In-stock unit count
+  stockCount?: number; // Alias for inventory count
   description?: string;
   variants?: ProductVariant[];
   updatedAt: number;

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { ShieldCheck, X, PhoneCall, Mail, MapPin, Lock, FileText, CheckCircle, Trash2, ArrowLeft } from 'lucide-react';
 import { StoreSettings } from '../types';
+import { CreatorCredits } from './CreatorCredits';
 
 interface PrivacyPolicyModalProps {
   isOpen: boolean;
@@ -213,13 +214,16 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-50 px-5 py-3 border-t border-stone-200 flex items-center justify-between">
-          <span className="text-[11px] text-stone-500">
-            © {new Date().getFullYear()} Chaurasia Kirana (Kiranape)
-          </span>
+        <div className="bg-stone-50 px-5 py-3 border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-1">
+            <span className="text-[11px] text-stone-500">
+              © {new Date().getFullYear()} Chaurasia Kirana (Kiranape)
+            </span>
+            <CreatorCredits className="!items-center sm:!items-start !text-center sm:!text-left" />
+          </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1"
+            className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 flex-shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Store</span>
