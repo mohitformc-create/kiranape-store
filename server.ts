@@ -3,8 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { MASTER_162_CATALOG } from './src/data/master162Catalog';
-
 dotenv.config();
 
 const app = express();
@@ -84,11 +82,20 @@ try {
 }
 
 // Auto-recovery / seed: Ensure all 162 verified items are preserved across restarts/sleep cycles
+const BACKUP_INVENTORY_PATH = path.join(process.cwd(), 'data', 'master162Backup.json');
 if (!Array.isArray(centralInventory) || centralInventory.length < 162) {
-  console.log(`[Central DB] Inventory count (${centralInventory.length}) is below 162. Seeding full 162 master products...`);
+  console.log(`[Central DB] Inventory count (${centralInventory ? centralInventory.length : 0}) is below 162. Seeding full 162 master products...`);
+  let backupCatalog: any[] = [];
+  try {
+    if (fs.existsSync(BACKUP_INVENTORY_PATH)) {
+      backupCatalog = JSON.parse(fs.readFileSync(BACKUP_INVENTORY_PATH, 'utf-8'));
+    }
+  } catch (err) {
+    console.warn('[Central DB] Failed to load backup inventory catalog:', err);
+  }
   const existingMap = new Map((centralInventory || []).map((p: any) => [p.id, p]));
-  MASTER_162_CATALOG.forEach((item) => {
-    if (!existingMap.has(item.id)) {
+  backupCatalog.forEach((item) => {
+    if (item && item.id && !existingMap.has(item.id)) {
       existingMap.set(item.id, item);
     }
   });
