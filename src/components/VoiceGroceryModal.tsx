@@ -320,6 +320,7 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
         deliveryLocation: selectedLocation,
         isParchi: true,
         orderType: 'voice',
+        voiceAudio: voiceNoteBase64 || undefined,
         voiceNoteBase64: voiceNoteBase64 || undefined,
         voiceAudioUrl: voiceNoteBase64 || undefined,
         itemsCount: 1,
@@ -339,6 +340,7 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
       deliveryLocation: selectedLocation,
       deliveryAddress: deliveryAddress.trim(),
       notes: orderNotes,
+      voiceAudio: voiceNoteBase64 || undefined,
       voiceNoteBase64: voiceNoteBase64 || undefined,
       status: 'Pending',
     });
@@ -350,6 +352,7 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
       deliveryAddress: deliveryAddress.trim(),
       deliverySlot,
       items: [fullTranscript],
+      voiceAudio: voiceNoteBase64 || undefined,
       voiceNoteBase64: voiceNoteBase64 || undefined,
     });
 
@@ -509,23 +512,29 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
                   <button
                     type="button"
                     onClick={handleToggleRecord}
-                    className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center shadow-xl transition-all cursor-pointer active:scale-95 ${
+                    className={`relative z-10 w-20 h-20 rounded-full flex flex-col items-center justify-center shadow-xl transition-all cursor-pointer active:scale-95 ${
                       isRecordingAudio || isListening
                         ? 'bg-rose-600 text-white shadow-rose-500/50 animate-pulse scale-105'
                         : audioRecordingUrl || audioBase64
-                        ? 'bg-emerald-600 text-white shadow-emerald-500/30 hover:bg-emerald-700'
-                        : 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-stone-950 hover:scale-105 shadow-amber-500/30'
+                        ? 'bg-emerald-700 text-white shadow-emerald-600/40 hover:bg-emerald-800'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-500 hover:scale-105 shadow-emerald-600/40'
                     }`}
                     title={
                       isRecordingAudio || isListening
-                        ? 'रिकॉर्डिंग रोकने के लिए टैप करें'
-                        : 'आवाज़ रिकॉर्ड करने के लिए टैप करें'
+                        ? 'रिकॉर्डिंग रोकने के लिए टैप करें (Stop)'
+                        : 'आवाज़ रिकॉर्ड करने के लिए टैप करें (Record)'
                     }
                   >
                     {isRecordingAudio || isListening ? (
-                      <Square className="w-8 h-8 fill-white text-white" />
+                      <>
+                        <Square className="w-7 h-7 fill-white text-white" />
+                        <span className="text-[10px] font-black uppercase tracking-wider mt-0.5">Stop</span>
+                      </>
                     ) : (
-                      <Mic className="w-10 h-10 stroke-[2.5]" />
+                      <>
+                        <Mic className="w-8 h-8 stroke-[2.5]" />
+                        <span className="text-[10px] font-black uppercase tracking-wider mt-0.5">Record</span>
+                      </>
                     )}
                   </button>
                 </div>

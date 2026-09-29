@@ -55,8 +55,8 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
 
     setIsCompressing(true);
     try {
-      // HTML5 Canvas compression: max 1200px, 0.7 JPEG quality (lightweight Base64 ~80-120KB)
-      const base64 = await compressImageFile(file, 1200, 1200, 0.7);
+      // HTML5 Canvas compression: max 1200x1200px, JPEG format, quality 0.75 (clean Base64 dataURL)
+      const base64 = await compressImageFile(file, 1200, 1200, 0.75);
       setImagePreview(base64);
       if (errors.image) {
         setErrors((prev) => ({ ...prev, image: '' }));
@@ -110,6 +110,7 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
         deliveryLocation: selectedLoc,
         isParchi: true,
         orderType: 'parchi',
+        slipPhoto: imagePreview,
         slipImageUrl: imagePreview,
         parchiBase64: imagePreview,
         parchiImageUrl: imagePreview,
@@ -128,6 +129,7 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       address: deliveryAddress.trim(),
       deliveryAddress: deliveryAddress.trim(),
       deliveryLocation: selectedLoc,
+      slipPhoto: imagePreview,
       imageBase64: imagePreview,
       imageUrl: imagePreview,
       notes: notes.trim() || undefined,

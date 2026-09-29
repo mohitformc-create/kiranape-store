@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, PhoneCall, Clock, MapPin, Banknote, ShoppingBag, ArrowRight, Truck, Package, Check, RefreshCw } from 'lucide-react';
+import { CheckCircle, PhoneCall, Clock, MapPin, Banknote, ShoppingBag, ArrowRight, Truck, Package, Check, RefreshCw, MessageCircle } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { ORDER_STATUS_STEPS, ORDER_STATUS_LABELS } from '../services/firebase';
+import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
 
 interface OrderConfirmationModalProps {
   order: Order | null;
@@ -325,12 +326,41 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
           </div>
         </div>
 
-        {/* Footer Action */}
-        <div className="p-4 bg-stone-50 border-t border-stone-200">
+        {/* Footer Actions: Direct WhatsApp Link to Owner + Back to Store */}
+        <div className="p-4 bg-stone-50 border-t border-stone-200 space-y-2">
+          {(() => {
+            const ownerWhatsAppUrl = getStoreOwnerWhatsAppNotificationUrl({
+              orderId: currentOrder.id,
+              customerName: currentOrder.customerName,
+              customerPhone: currentOrder.phone || currentOrder.customerPhone || '',
+              deliveryAddress: currentOrder.address,
+              deliveryLocation: currentOrder.deliveryLocation,
+              deliverySlot: currentOrder.deliverySlot,
+              orderType: (currentOrder.orderType as any) || 'cart',
+              itemsCount: currentOrder.itemsCount || currentOrder.items?.length,
+              finalAmount: currentOrder.finalPayableAmount,
+              textDetails: (currentOrder.items || [])
+                .map((i) => `${i.name} (${i.unit}) x${i.quantity}`)
+                .join(', '),
+            });
+
+            return (
+              <a
+                href={ownerWhatsAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-heading font-extrabold text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4 fill-white" />
+                <span>दुकानदार को WhatsApp पर ऑर्डर भेजें (Direct WhatsApp)</span>
+              </a>
+            );
+          })()}
+
           <button
             id="order-done-btn"
             onClick={onClose}
-            className="w-full py-3 px-4 bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white font-heading font-bold text-sm rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="w-full py-2.5 px-4 bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white font-heading font-bold text-xs sm:text-sm rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <ShoppingBag className="w-4 h-4" /> Back to Store <ArrowRight className="w-4 h-4" />
           </button>

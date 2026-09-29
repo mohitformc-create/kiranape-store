@@ -886,8 +886,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-stone-200">
                 <div className="w-14 h-14 rounded-lg bg-stone-50 border border-stone-200 p-1 flex items-center justify-center flex-shrink-0">
                   <img
-                    src={imageUrl}
+                    src={imageUrl || getCategoryFallbackSvg(category, name)}
                     alt="Preview"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(category, name);
+                    }}
                     className="w-full h-full object-contain mix-blend-multiply"
                   />
                 </div>

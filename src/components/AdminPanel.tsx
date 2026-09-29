@@ -209,8 +209,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     // Initial load
     loadCentralOrders();
 
-    // 5-second recurring poll for live customer orders across Singrauli
-    const intervalId = setInterval(loadCentralOrders, 5000);
+    // 3-second recurring poll for live customer orders across Singrauli
+    const intervalId = setInterval(loadCentralOrders, 3000);
 
     return () => {
       isMounted = false;
@@ -1618,7 +1618,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
 
                       {/* Handwritten Parchi / Ration Slip Photo Preview (if uploaded) */}
-                      {(order.slipImageUrl || order.parchiImageUrl) && (
+                      {Boolean(order.slipPhoto || order.slipImageUrl || order.parchiImageUrl) && (
                         <div className="bg-amber-50/80 rounded-xl p-2.5 border border-amber-300/80 space-y-1.5">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-amber-950 text-[11px] flex items-center gap-1">
@@ -1628,28 +1628,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setViewingParchiImage((order.slipImageUrl || order.parchiImageUrl)!)}
+                                onClick={() => setViewingParchiImage((order.slipPhoto || order.slipImageUrl || order.parchiImageUrl)!)}
                                 className="text-[10px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
                               >
                                 View Full Image ↗
                               </button>
                               <a
-                                href={order.slipImageUrl || order.parchiImageUrl}
+                                href={order.slipPhoto || order.slipImageUrl || order.parchiImageUrl}
                                 download={`slip-${order.id}.jpg`}
                                 className="text-[10px] font-bold text-stone-800 hover:text-stone-950 underline cursor-pointer flex items-center gap-0.5"
-                                title="Download photo"
+                                title="Download Slip"
                               >
                                 <Download className="w-3 h-3 inline text-amber-600" />
-                                <span>Download</span>
+                                <span>Download Slip</span>
                               </a>
                             </div>
                           </div>
                           <div
                             className="relative rounded-lg overflow-hidden border border-amber-200 bg-white cursor-pointer group"
-                            onClick={() => setViewingParchiImage((order.slipImageUrl || order.parchiImageUrl)!)}
+                            onClick={() => setViewingParchiImage((order.slipPhoto || order.slipImageUrl || order.parchiImageUrl)!)}
                           >
                             <img
-                              src={order.slipImageUrl || order.parchiImageUrl}
+                              src={order.slipPhoto || order.slipImageUrl || order.parchiImageUrl}
                               alt="Customer Ration Slip"
                               className="w-full h-36 object-contain bg-stone-100 group-hover:scale-101 transition-transform"
                             />
@@ -1658,7 +1658,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       )}
 
                       {/* Customer Recorded Voice Note Audio Player */}
-                      {(order.voiceAudioUrl || order.voiceNoteBase64) && (!order.items || order.items.length === 0) ? (
+                      {Boolean(order.voiceAudio || order.voiceAudioUrl || order.voiceNoteBase64) && (!order.items || order.items.length === 0) ? (
                         <div className="bg-gradient-to-r from-amber-100 via-amber-50 to-emerald-50 rounded-2xl p-3.5 border-2 border-amber-400 space-y-2 shadow-xs">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center animate-pulse flex-shrink-0">
@@ -1673,16 +1673,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             </div>
                           </div>
-                          <audio controls src={order.voiceAudioUrl || order.voiceNoteBase64} className="w-full h-10 mt-1" />
+                          <audio
+                            controls
+                            src={order.voiceAudio || order.voiceAudioUrl || order.voiceNoteBase64}
+                            preload="metadata"
+                            className="w-full mt-2"
+                          />
                         </div>
                       ) : (
-                        (order.voiceAudioUrl || order.voiceNoteBase64) && (
+                        Boolean(order.voiceAudio || order.voiceAudioUrl || order.voiceNoteBase64) && (
                           <div className="bg-amber-50/90 rounded-2xl p-3 border border-amber-300 space-y-1 shadow-2xs">
                             <span className="font-heading font-black text-amber-950 text-xs flex items-center gap-1.5">
                               <Volume2 className="w-4 h-4 text-emerald-700" />
                               <span>🎧 Customer Voice Note (Suniye)</span>
                             </span>
-                            <audio controls src={order.voiceAudioUrl || order.voiceNoteBase64} className="w-full mt-2" />
+                            <audio
+                              controls
+                              src={order.voiceAudio || order.voiceAudioUrl || order.voiceNoteBase64}
+                              preload="metadata"
+                              className="w-full mt-2"
+                            />
                           </div>
                         )
                       )}
@@ -2012,29 +2022,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               {parchi.notes}
                             </div>
                           )}
-                          {parchi.voiceNoteBase64 && (!parchi.items || parchi.items.length === 0) && !parchi.imageBase64 && !parchi.imageUrl ? (
+                          {Boolean(parchi.voiceAudio || parchi.voiceNoteBase64) && (!parchi.items || parchi.items.length === 0) && !parchi.slipPhoto && !parchi.imageBase64 && !parchi.imageUrl ? (
                             <div className="pt-1 mt-1 border-t border-stone-200/80 bg-gradient-to-r from-amber-100 via-amber-50 to-emerald-50 rounded-xl p-3 border border-amber-400 space-y-1.5">
                               <span className="font-heading font-black text-amber-950 text-xs flex items-center gap-1.5">
                                 <Volume2 className="w-4 h-4 text-emerald-700 animate-bounce" />
                                 <span>🎙️ वॉइस रिकॉर्डिंग ऑर्डर (ऑडियो सुनकर सामान पैक करें)</span>
                               </span>
-                              <audio controls src={parchi.voiceNoteBase64} className="w-full mt-1.5" />
+                              <audio controls src={parchi.voiceAudio || parchi.voiceNoteBase64} preload="metadata" className="w-full mt-1.5" />
                             </div>
                           ) : (
-                            parchi.voiceNoteBase64 && (
+                            Boolean(parchi.voiceAudio || parchi.voiceNoteBase64) && (
                               <div className="pt-1 mt-1 border-t border-stone-200/80">
                                 <span className="font-heading font-black text-amber-950 text-[11px] flex items-center gap-1">
                                   <Volume2 className="w-3.5 h-3.5 text-emerald-700" />
                                   <span>🎧 Customer Voice Note (Suniye)</span>
                                 </span>
-                                <audio controls src={parchi.voiceNoteBase64} className="w-full mt-2" />
+                                <audio controls src={parchi.voiceAudio || parchi.voiceNoteBase64} preload="metadata" className="w-full mt-2" />
                               </div>
                             )
                           )}
                         </div>
 
                         {/* Parchi Photo Section */}
-                        {(parchi.imageBase64 || parchi.imageUrl) ? (
+                        {Boolean(parchi.slipPhoto || parchi.imageBase64 || parchi.imageUrl) ? (
                           <div className="space-y-1.5 pt-1">
                             <div
                               onClick={() => {
@@ -2044,7 +2054,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className="relative rounded-xl overflow-hidden border border-amber-300/80 bg-stone-100 h-44 cursor-pointer group shadow-2xs"
                             >
                               <img
-                                src={parchi.imageBase64 || parchi.imageUrl}
+                                src={parchi.slipPhoto || parchi.imageBase64 || parchi.imageUrl}
                                 alt={`Parchi #${parchi.id}`}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                               />
@@ -2442,7 +2452,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   title="Download photo"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span className="hidden xs:inline">⬇️ Download Parchi</span>
+                  <span className="hidden xs:inline">⬇️ Download Slip</span>
                 </button>
                 <button
                   type="button"

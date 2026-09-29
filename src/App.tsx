@@ -62,7 +62,7 @@ import {
   saveStoreSettingsToFirestore,
   saveBannersToFirestore,
 } from './services/firebase';
-import { STORE_DEFAULTS, DEFAULT_BANNERS } from './data/initialProducts';
+import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
 import { CustomerHeader } from './components/CustomerHeader';
 import { HeroBanner } from './components/HeroBanner';
 import { PromoCarousel } from './components/PromoCarousel';
@@ -296,11 +296,18 @@ export default function App() {
     }).catch(console.warn);
 
     fetchCentralInventory().then((serverInventory) => {
-      if (Array.isArray(serverInventory) && serverInventory.length > 0) {
+      if (Array.isArray(serverInventory) && serverInventory.length >= 162) {
         setProducts(serverInventory);
         saveProducts(serverInventory);
+      } else {
+        // Fallback / re-hydrate complete 162 items
+        setProducts(INITIAL_PRODUCTS);
+        saveProducts(INITIAL_PRODUCTS);
       }
-    }).catch(console.warn);
+    }).catch(() => {
+      setProducts(INITIAL_PRODUCTS);
+      saveProducts(INITIAL_PRODUCTS);
+    });
 
     const handleOrdersUpdated = () => {
       setOrders(getOrders());

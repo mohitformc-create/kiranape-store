@@ -43,8 +43,10 @@ interface CentralOrder {
   statusLabel?: string;
   createdAt: string;
   timestamp: number;
-  parchiImageUrl?: string;
+  slipPhoto?: string;
   slipImageUrl?: string;
+  parchiImageUrl?: string;
+  voiceAudio?: string;
   voiceNoteBase64?: string;
   voiceAudioUrl?: string;
   isParchi?: boolean;
@@ -83,12 +85,15 @@ try {
 
 // Auto-recovery / seed: Ensure all 162 verified items are preserved across restarts/sleep cycles
 const BACKUP_INVENTORY_PATH = path.join(process.cwd(), 'data', 'master162Backup.json');
+const STATIC_SEED_PATH = path.join(process.cwd(), 'src', 'data', 'initialProducts.json');
 if (!Array.isArray(centralInventory) || centralInventory.length < 162) {
   console.log(`[Central DB] Inventory count (${centralInventory ? centralInventory.length : 0}) is below 162. Seeding full 162 master products...`);
   let backupCatalog: any[] = [];
   try {
     if (fs.existsSync(BACKUP_INVENTORY_PATH)) {
       backupCatalog = JSON.parse(fs.readFileSync(BACKUP_INVENTORY_PATH, 'utf-8'));
+    } else if (fs.existsSync(STATIC_SEED_PATH)) {
+      backupCatalog = JSON.parse(fs.readFileSync(STATIC_SEED_PATH, 'utf-8'));
     }
   } catch (err) {
     console.warn('[Central DB] Failed to load backup inventory catalog:', err);
@@ -209,6 +214,7 @@ app.post('/api/orders', (req, res) => {
     // Check if it's a Parchi Photo Order
     const isParchi = Boolean(
       body.isParchi ||
+      body.slipPhoto ||
       body.slipImageUrl ||
       body.parchiImageUrl ||
       body.parchiBase64 ||
@@ -234,8 +240,8 @@ app.post('/api/orders', (req, res) => {
         : `ORD-${Math.floor(10000 + Math.random() * 90000)}`);
 
     const now = Date.now();
-    const slipPhoto = body.slipImageUrl || body.parchiBase64 || body.imageBase64 || body.parchiImageUrl || body.imageUrl;
-    const voiceAudio = body.voiceAudioUrl || body.voiceNoteBase64 || body.audioBase64 || undefined;
+    const slipPhoto = body.slipPhoto || body.slipImageUrl || body.parchiBase64 || body.imageBase64 || body.parchiImageUrl || body.imageUrl;
+    const voiceAudio = body.voiceAudio || body.voiceAudioUrl || body.voiceNoteBase64 || body.audioBase64 || undefined;
 
     const newOrder: CentralOrder = {
       id: orderId,
@@ -257,8 +263,10 @@ app.post('/api/orders', (req, res) => {
       timestamp: body.timestamp || now,
       isParchi,
       orderType: body.orderType || (voiceAudio ? 'voice' : (isParchi ? 'parchi' : 'cart')),
+      slipPhoto: slipPhoto || undefined,
       parchiImageUrl: slipPhoto || undefined,
       slipImageUrl: slipPhoto || undefined,
+      voiceAudio: voiceAudio || undefined,
       voiceNoteBase64: voiceAudio,
       voiceAudioUrl: voiceAudio,
       notes: body.notes || undefined,

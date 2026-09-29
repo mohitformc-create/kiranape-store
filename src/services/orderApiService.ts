@@ -34,9 +34,11 @@ export interface CreateOrderPayload {
   finalTotal?: number;
   isParchi?: boolean;
   orderType?: 'voice' | 'parchi' | 'cart';
+  slipPhoto?: string;
   parchiBase64?: string;
   parchiImageUrl?: string;
   slipImageUrl?: string;
+  voiceAudio?: string;
   voiceNoteBase64?: string;
   voiceAudioUrl?: string;
   imageBase64?: string;

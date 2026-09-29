@@ -1,6 +1,7 @@
 import React from 'react';
 import { CustomCategory, Product } from '../types';
 import { Sparkles, ChevronRight } from 'lucide-react';
+import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 
 interface CategoryTileGridProps {
   categories: CustomCategory[];
@@ -248,7 +249,7 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
                             loading="lazy"
                             className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform"
                             onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
+                              (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(cat.name, item.name);
                             }}
                           />
                           {isFourthWithMore && (

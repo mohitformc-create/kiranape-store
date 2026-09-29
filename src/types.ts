@@ -102,8 +102,10 @@ export interface Order {
   createdAt: string;
   timestamp: number;
   userId?: string;
+  slipPhoto?: string; // Captured customer ration slip photo (Base64 JPEG)
   parchiImageUrl?: string; // Handwritten parchi photo preview if order placed via Parchi
   slipImageUrl?: string; // Alias for ration slip photo preview
+  voiceAudio?: string; // Customer recorded voice note audio (Base64 data URL)
   voiceNoteBase64?: string; // Recorded voice note audio (base64 data URI)
   voiceAudioUrl?: string; // Alias for recorded voice note audio
   isParchi?: boolean;
@@ -157,6 +159,8 @@ export interface ParchiOrder {
   items?: string[];
   imageUrl?: string;
   imageBase64?: string;
+  slipPhoto?: string;
+  voiceAudio?: string;
   voiceNoteBase64?: string;
   createdAt: string;
   timestamp: number;

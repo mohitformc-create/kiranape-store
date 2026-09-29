@@ -333,9 +333,15 @@ export function getProducts(): Product[] {
       }
     }
 
-    // ZERO INVENTORY DOWNTIME: Always fallback to bundled 105 items catalog if storage is empty
-    if (!loadedProducts || loadedProducts.length === 0) {
-      loadedProducts = INITIAL_PRODUCTS;
+    // ZERO INVENTORY DOWNTIME: Always fallback/rehydrate to bundled 162 items catalog if storage is empty or incomplete
+    if (!loadedProducts || loadedProducts.length < 162) {
+      const existingMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
+      INITIAL_PRODUCTS.forEach((item) => {
+        if (!existingMap.has(item.id)) {
+          existingMap.set(item.id, item);
+        }
+      });
+      loadedProducts = Array.from(existingMap.values());
       localStorage.setItem(PERMANENT_CATALOG_KEY, JSON.stringify(loadedProducts));
     }
 
@@ -952,6 +958,7 @@ export function saveVoiceNoteOrder(data: {
   deliveryAddress: string;
   deliverySlot: string;
   items: string[];
+  voiceAudio?: string;
   voiceNoteBase64?: string;
 }): Order {
   const voiceId = 'VN-' + Math.floor(1000 + Math.random() * 9000);
@@ -992,7 +999,8 @@ export function saveVoiceNoteOrder(data: {
     status: 'New Order',
     createdAt: formattedDate,
     timestamp: Date.now(),
-    voiceNoteBase64: data.voiceNoteBase64,
+    voiceAudio: data.voiceAudio || data.voiceNoteBase64,
+    voiceNoteBase64: data.voiceNoteBase64 || data.voiceAudio,
     isParchi: true,
   };
 
