@@ -239,15 +239,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }));
   }, []);
 
-  // Sync liveOrders if prop orders changes
+  // Sync liveOrders if prop orders changes only on initial mount if liveOrders is empty
   React.useEffect(() => {
-    if (orders && orders.length > 0) {
+    if (orders && orders.length > 0 && liveOrders.length === 0) {
       setLiveOrders(orders);
       const serverParchis = deriveParchiOrders(orders);
       setParchiOrders(serverParchis);
       checkIncomingAlerts(orders, serverParchis);
     }
-  }, [orders, checkIncomingAlerts, deriveParchiOrders]);
+  }, [orders, liveOrders.length, checkIncomingAlerts, deriveParchiOrders]);
 
   // Real-time polling from Central Server Database every 3 seconds (Multi-device live sync)
   React.useEffect(() => {
@@ -257,13 +257,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       try {
         const serverOrders = await fetchCentralOrders();
         if (isMounted && Array.isArray(serverOrders)) {
+          // DIRECTLY updates liveOrders state from central server on every 3s poll
           setLiveOrders(serverOrders);
           const serverParchis = deriveParchiOrders(serverOrders);
           setParchiOrders(serverParchis);
           checkIncomingAlerts(serverOrders, serverParchis);
         }
       } catch (err) {
-        console.warn('Central orders polling notice:', err);
+        console.error('[Admin Central Sync] Polling error:', err);
       }
     };
 

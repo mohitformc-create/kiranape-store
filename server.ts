@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
@@ -7,6 +8,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+// Enable CORS for all incoming mobile origins and preview domains
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
 
 // Generous body limit for high-res audio voice notes and compressed Parchi photos
 app.use(express.json({ limit: '50mb' }));
@@ -246,16 +250,10 @@ app.post('/api/orders', (req, res) => {
       body.imageBase64
     );
 
-    const customerName = (body.customerName || body.fullName || 'Valued Customer').trim();
-    const phone = (body.phone || body.phoneNumber || body.customerPhone || '').trim();
-    const address = (body.address || body.fullAddress || body.deliveryAddress || '').trim();
-
-    if (!phone) {
-      return res.status(400).json({ success: false, error: 'Mobile phone number is required.' });
-    }
-    if (!address) {
-      return res.status(400).json({ success: false, error: 'Delivery address is required.' });
-    }
+    const customerName = (body.customerName || body.fullName || 'Valued Customer').trim() || 'Valued Customer';
+    // Fallback for phone and address to guarantee NO order is rejected with 400
+    const phone = (body.phone || body.phoneNumber || body.customerPhone || 'Walk-in / Voice Order').trim() || 'Walk-in / Voice Order';
+    const address = (body.address || body.fullAddress || body.deliveryAddress || 'Address via Slip / Counter').trim() || 'Address via Slip / Counter';
 
     const orderId =
       body.id ||
@@ -301,6 +299,7 @@ app.post('/api/orders', (req, res) => {
     centralOrders.unshift(newOrder);
     persistCentralOrders();
 
+    console.log(`[CENTRAL SERVER] Received order ID: ${orderId}, type: ${newOrder.orderType}, phone: ${phone}`);
     console.log(`[Central DB] New order registered: #${newOrder.id} from ${newOrder.customerName} (${newOrder.phone}) - Type: ${isParchi ? 'PARCHI PHOTO' : 'CART ITEMS'}`);
 
     return res.status(201).json({

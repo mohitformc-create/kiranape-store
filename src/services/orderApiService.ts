@@ -59,17 +59,43 @@ export async function sendOrderToCentralServer(payload: CreateOrderPayload): Pro
   message?: string;
 }> {
   try {
+    const payloadToSend = {
+      id: payload.id || payload.orderId,
+      customerName: payload.customerName || payload.fullName || 'Valued Customer',
+      phone: payload.phone || payload.phoneNumber || payload.customerPhone || 'Walk-in / Voice Order',
+      address: payload.address || payload.fullAddress || payload.deliveryAddress || 'Address via Slip / Counter',
+      deliverySlot: payload.deliverySlot || 'Standard Delivery',
+      deliveryLocation: payload.deliveryLocation || 'Waidhan, Singrauli',
+      items: payload.items || payload.cartItems || [],
+      itemsCount: payload.itemsCount || (payload.items ? payload.items.length : 1),
+      subtotalOriginal: payload.subtotalOriginal || payload.finalPayableAmount || 0,
+      totalSavings: payload.totalSavings || 0,
+      deliveryFee: payload.deliveryFee || 0,
+      finalPayableAmount: payload.finalPayableAmount || payload.finalTotal || 0,
+      paymentMethod: 'Cash on Delivery (COD)',
+      isParchi: Boolean(payload.isParchi),
+      orderType: payload.orderType || (payload.voiceAudio || payload.voiceNoteBase64 ? 'voice' : (payload.slipPhoto || payload.parchiImageUrl || payload.isParchi ? 'parchi' : 'cart')),
+      voiceAudio: payload.voiceAudio || payload.voiceNoteBase64 || payload.voiceAudioUrl,
+      voiceNoteBase64: payload.voiceNoteBase64 || payload.voiceAudio,
+      slipPhoto: payload.slipPhoto || payload.slipImageUrl || payload.parchiImageUrl || payload.parchiBase64 || payload.imageBase64,
+      parchiImageUrl: payload.slipPhoto || payload.slipImageUrl || payload.parchiImageUrl || payload.parchiBase64 || payload.imageBase64,
+      notes: payload.notes,
+      createdAt: payload.createdAt || new Date().toISOString(),
+      timestamp: payload.timestamp || Date.now(),
+    };
+
     const response = await fetch('/api/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payloadToSend),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Server responded with status ${response.status}`);
+      const errorText = await response.text().catch(() => '');
+      console.error(`[Order API] Central server rejected order (Status ${response.status}):`, errorText);
+      throw new Error(`Server responded with status ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
@@ -84,7 +110,7 @@ export async function sendOrderToCentralServer(payload: CreateOrderPayload): Pro
 
     return data;
   } catch (error) {
-    console.warn('[Order API] Network/Central server request failed, saving to local resilient storage:', error);
+    console.error('[Order API] Error sending order to central server:', error);
 
     // Fallback: create local order so user order is NEVER lost
     const fallbackId =

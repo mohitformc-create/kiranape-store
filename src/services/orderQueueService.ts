@@ -130,10 +130,35 @@ export async function processPendingOrdersQueue(): Promise<void> {
 
     for (const item of toProcess) {
       try {
+        const payloadToSend = {
+          id: item.id || (item as any).orderId,
+          customerName: item.customerName || (item as any).fullName || 'Valued Customer',
+          phone: item.phone || (item as any).phoneNumber || (item as any).customerPhone || 'Walk-in / Voice Order',
+          address: item.address || (item as any).fullAddress || (item as any).deliveryAddress || 'Address via Slip / Counter',
+          deliverySlot: item.deliverySlot || 'Standard Delivery',
+          deliveryLocation: item.deliveryLocation || 'Waidhan, Singrauli',
+          items: item.items || (item as any).cartItems || [],
+          itemsCount: item.itemsCount || (item.items ? item.items.length : 1),
+          subtotalOriginal: item.subtotalOriginal || item.finalPayableAmount || 0,
+          totalSavings: item.totalSavings || 0,
+          deliveryFee: item.deliveryFee || 0,
+          finalPayableAmount: item.finalPayableAmount || (item as any).finalTotal || 0,
+          paymentMethod: 'Cash on Delivery (COD)',
+          isParchi: Boolean(item.isParchi),
+          orderType: item.orderType || (item.voiceAudio || item.voiceNoteBase64 ? 'voice' : (item.slipPhoto || item.parchiImageUrl || item.isParchi ? 'parchi' : 'cart')),
+          voiceAudio: item.voiceAudio || item.voiceNoteBase64 || (item as any).voiceAudioUrl,
+          voiceNoteBase64: item.voiceNoteBase64 || item.voiceAudio,
+          slipPhoto: item.slipPhoto || item.slipImageUrl || item.parchiImageUrl || item.parchiBase64 || (item as any).imageBase64,
+          parchiImageUrl: item.slipPhoto || item.slipImageUrl || item.parchiImageUrl || item.parchiBase64 || (item as any).imageBase64,
+          notes: item.notes,
+          createdAt: item.createdAt || new Date().toISOString(),
+          timestamp: item.timestamp || Date.now(),
+        };
+
         const res = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item),
+          body: JSON.stringify(payloadToSend),
         });
 
         if (res.ok) {
@@ -143,10 +168,11 @@ export async function processPendingOrdersQueue(): Promise<void> {
             window.dispatchEvent(new Event('kiranape_orders_updated'));
           }
         } else {
-          console.warn(`[Order Queue] Server returned ${res.status} for Order #${item.id}. Will retry.`);
+          const errBody = await res.text().catch(() => '');
+          console.error(`[Order Queue] Server rejected Order #${item.id} (Status: ${res.status}): ${errBody}`);
         }
       } catch (networkErr) {
-        console.warn(`[Order Queue] Network error dispatching Order #${item.id}:`, networkErr);
+        console.error(`[Order Queue] Network error dispatching Order #${item.id}:`, networkErr);
         // Break loop if connection dropped
         break;
       }
