@@ -17,7 +17,7 @@ export const STORE_DEFAULTS: StoreSettings = {
   deliveryTagline: 'Shuddh Samaan, Bharosemand Delivery - Waidhan Store',
   minOrderForFreeDelivery: 199,
   deliveryCharge: 25,
-  adminPin: '9779',
+  adminPin: '@2508',
 };
 
 export const DEFAULT_BANNERS: PromoBanner[] = [

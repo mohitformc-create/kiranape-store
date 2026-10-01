@@ -856,8 +856,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleSavePin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPinInput.length === 4 && /^\d{4}$/.test(newPinInput)) {
-      onChangePin(newPinInput);
+    const clean = newPinInput.trim();
+    if (clean.length >= 4) {
+      onChangePin(clean);
       setNewPinInput('');
       setPinChangeSuccess(true);
       setTimeout(() => setPinChangeSuccess(false), 3000);
@@ -2654,10 +2655,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div>
                   <h3 className="font-heading font-extrabold text-stone-900 text-base">
-                    Change 4-Digit Owner PIN
+                    Change Owner Password / PIN
                   </h3>
                   <p className="text-xs text-stone-500">
-                    Secret PIN for administrative actions: <strong className="font-mono text-stone-800">{adminPin}</strong>
+                    Secret password for store owner access: <strong className="font-mono text-stone-800 bg-stone-100 px-2 py-0.5 rounded">{adminPin}</strong>
                   </p>
                 </div>
               </div>
@@ -2665,25 +2666,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {pinChangeSuccess && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-medium flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  Owner PIN updated successfully!
+                  Owner password updated successfully!
                 </div>
               )}
 
               <form onSubmit={handleSavePin} className="flex flex-col sm:flex-row gap-3 max-w-md">
                 <input
-                  type="password"
-                  maxLength={4}
+                  type="text"
+                  maxLength={16}
                   value={newPinInput}
-                  onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Enter new 4 digits (e.g. 5678)"
+                  onChange={(e) => setNewPinInput(e.target.value)}
+                  placeholder="Enter new password (e.g. @2508)"
                   className="px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-sm font-mono tracking-widest text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500/30 flex-1"
                 />
                 <button
                   type="submit"
-                  disabled={newPinInput.length !== 4}
+                  disabled={newPinInput.trim().length < 4}
                   className="py-2.5 px-5 bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-white rounded-xl text-xs font-heading font-bold transition-all cursor-pointer flex-shrink-0"
                 >
-                  Save New PIN
+                  Save Password
                 </button>
               </form>
             </div>

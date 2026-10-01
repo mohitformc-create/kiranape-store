@@ -133,7 +133,15 @@ export default function App() {
 
   // Admin PIN verification and Direct Link (#admin) state
   const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
-  const [isAdminPinVerified, setIsAdminPinVerified] = useState(false);
+  const [isAdminPinVerified, setIsAdminPinVerified] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return sessionStorage.getItem('kiranape_admin_authenticated') === 'true' ||
+             localStorage.getItem('kiranape_admin_authenticated') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [toastBanner, setToastBanner] = useState<string | null>(null);
 
   // Toast listener for network connection status updates
@@ -164,6 +172,12 @@ export default function App() {
   const handleAdminPinSuccess = useCallback(async () => {
     setIsAdminPinVerified(true);
     setIsAdminPinModalOpen(false);
+    try {
+      sessionStorage.setItem('kiranape_admin_authenticated', 'true');
+      localStorage.setItem('kiranape_admin_authenticated', 'true');
+    } catch {
+      // ignore
+    }
     try {
       const adminUser = await signInAdminDirectly();
       setCurrentUser(adminUser);

@@ -174,7 +174,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (searchQuery.trim() === '9779') {
+          const clean = searchQuery.trim();
+          if (clean === '@2508' || clean === '9779') {
             onSearchChange('');
             onSecretAdminTrigger?.();
           }
@@ -193,7 +194,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={searchQuery}
           onChange={(e) => {
             const val = e.target.value;
-            if (val.trim() === '9779') {
+            const clean = val.trim();
+            if (clean === '@2508' || clean === '9779') {
               onSearchChange('');
               onSecretAdminTrigger?.();
               return;
@@ -203,7 +205,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               const trimmed = searchQuery?.trim();
-              if (trimmed === '9779') {
+              if (trimmed === '@2508' || trimmed === '9779') {
                 e.preventDefault();
                 onSearchChange('');
                 onSecretAdminTrigger?.();

@@ -554,21 +554,21 @@ export function saveOrders(orders: Order[]): void {
 // ---------------- ADMIN PIN REPOSITORY ---------------- //
 
 export function getAdminPin(): string {
-  if (typeof window === 'undefined') return STORE_DEFAULTS.adminPin || '9779';
+  if (typeof window === 'undefined') return STORE_DEFAULTS.adminPin || '@2508';
   try {
     const val = localStorage.getItem(PIN_STORAGE_KEY);
-    if (!val || val === '1234') {
-      return '9779';
+    if (!val || val === '1234' || val === '9779') {
+      return '@2508';
     }
-    return val?.toString()?.trim() || '9779';
+    return val?.toString()?.trim() || '@2508';
   } catch {
-    return '9779';
+    return '@2508';
   }
 }
 
 export function setAdminPin(newPin: string): void {
   if (typeof window === 'undefined') return;
-  const safePin = (newPin?.trim() || '9779');
+  const safePin = (newPin?.trim() || '@2508');
   localStorage.setItem(PIN_STORAGE_KEY, safePin);
   notifySync();
 }
