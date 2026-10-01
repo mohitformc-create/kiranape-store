@@ -218,17 +218,17 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
             <RefreshCw className="w-6 h-6 animate-spin" />
             <span className="text-[11px] font-bold">Uploading photo...</span>
           </div>
-        ) : imageError ? (
-          <img
-            src={getCategoryFallbackSvg(product.category, product.name)}
-            alt={product.name}
-            className="w-full h-full object-cover rounded-xl"
-          />
         ) : (
           <img
-            src={product.imageUrl || getCategoryFallbackSvg(product.category, product.name)}
+            src={imageError || !product.imageUrl ? getCategoryFallbackSvg(product.category, product.name) : product.imageUrl}
             alt={product.name}
-            onError={() => setImageError(true)}
+            onError={(e) => {
+              setImageError(true);
+              const fallback = getCategoryFallbackSvg(product.category, product.name);
+              if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                (e.currentTarget as HTMLImageElement).src = fallback;
+              }
+            }}
             loading="lazy"
             className="w-full h-full object-contain mix-blend-multiply group-hover/img:scale-105 transition-transform duration-300"
           />

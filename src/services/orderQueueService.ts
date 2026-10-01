@@ -9,6 +9,8 @@
 
 import { CreateOrderPayload } from './orderApiService';
 import { idbGet, idbSet } from './idbStorage';
+import { API_BASE_URL } from '../config/api';
+import { showStoreServerToast } from '../utils/toast';
 
 const QUEUE_STORAGE_KEY = 'kiranape_pending_orders_queue_v1';
 const IDB_QUEUE_KEY = 'kiranape_idb_pending_order_queue';
@@ -155,14 +157,17 @@ export async function processPendingOrdersQueue(): Promise<void> {
           timestamp: item.timestamp || Date.now(),
         };
 
-        const res = await fetch('/api/orders', {
+        const res = await fetch(`${API_BASE_URL}/api/orders`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
           body: JSON.stringify(payloadToSend),
         });
 
         if (res.ok) {
-          console.log(`[Order Queue] Order #${item.id} synced with central server successfully.`);
+          console.log(`[Order Queue] Order #${item.id} synced with central server (${API_BASE_URL}) successfully.`);
           await dequeueOrder(item.id || '');
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('kiranape_orders_updated'));
@@ -170,9 +175,11 @@ export async function processPendingOrdersQueue(): Promise<void> {
         } else {
           const errBody = await res.text().catch(() => '');
           console.error(`[Order Queue] Server rejected Order #${item.id} (Status: ${res.status}): ${errBody}`);
+          showStoreServerToast('Connecting to store server... please wait 10 seconds.');
         }
       } catch (networkErr) {
-        console.error(`[Order Queue] Network error dispatching Order #${item.id}:`, networkErr);
+        console.error(`[Order Queue] Network error dispatching Order #${item.id} to ${API_BASE_URL}:`, networkErr);
+        showStoreServerToast('Connecting to store server... please wait 10 seconds.');
         // Break loop if connection dropped
         break;
       }

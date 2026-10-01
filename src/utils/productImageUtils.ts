@@ -274,20 +274,46 @@ export function findBestCdnImage(
  */
 export function getCategoryFallbackSvg(category: string, title?: string, unit?: string, price?: number): string {
   const t = (title || '').toLowerCase();
-  const c = category || 'Household Essentials';
+  const c = (category || '').toLowerCase();
 
   // 1. Detect authentic FMCG Brand & Theme
   let brandName = 'KIRANAPE EXPRESS';
   let brandColor = '#059669'; // default emerald
   let brandBg = '#ECFDF5';
-  let packType: 'biscuit' | 'cake' | 'tea' | 'soap' | 'detergent' | 'oral' | 'talc' | 'ketchup' | 'atta' | 'oil' | 'general' = 'general';
+  let packType: 'biscuit' | 'cake' | 'tea' | 'soap' | 'detergent' | 'oral' | 'talc' | 'ketchup' | 'atta' | 'oil' | 'dal' | 'spices' | 'dairy' | 'vegetables' | 'drinks' | 'general' = 'general';
 
-  if (t.includes('britannia') || t.includes('50-50') || t.includes('good day') || t.includes('bourbon') || t.includes('rusk') || t.includes('marie') || t.includes('gobbles') || t.includes('treat') || t.includes('nutrichoice') || t.includes('biscuit') || t.includes('cookies')) {
-    brandName = 'BRITANNIA';
+  // Category & Product specific detection
+  if (c.includes('vegetable') || c.includes('sabzi') || t.includes('potato') || t.includes('onion') || t.includes('tomato') || t.includes('aloo') || t.includes('pyaz')) {
+    brandName = 'FRESH SABZI';
+    brandColor = '#16A34A';
+    brandBg = '#F0FDF4';
+    packType = 'vegetables';
+  } else if (c.includes('dairy') || c.includes('milk') || c.includes('paneer') || c.includes('curd') || c.includes('dahi') || t.includes('amul milk') || t.includes('paneer') || t.includes('dahi')) {
+    brandName = 'AMUL DAIRY';
+    brandColor = '#2563EB';
+    brandBg = '#EFF6FF';
+    packType = 'dairy';
+  } else if (c.includes('spices') || c.includes('salt') || c.includes('masala') || t.includes('masala') || t.includes('mirch') || t.includes('haldi') || t.includes('dhaniya') || t.includes('jeera') || t.includes('salt') || t.includes('namak')) {
+    brandName = t.includes('everest') ? 'EVEREST' : t.includes('mdh') ? 'MDH' : t.includes('tata') ? 'TATA SALT' : 'SHUDH MASALA';
+    brandColor = '#EA580C';
+    brandBg = '#FFF7ED';
+    packType = 'spices';
+  } else if (c.includes('dal') || c.includes('pulses') || c.includes('rice') || t.includes('dal') || t.includes('toor') || t.includes('moong') || t.includes('chana') || t.includes('urad') || t.includes('rice') || t.includes('basmati')) {
+    brandName = t.includes('tata') ? 'TATA SAMPANN' : t.includes('india gate') ? 'INDIA GATE' : 'DESI DAL';
+    brandColor = '#D97706';
+    brandBg = '#FFFBEB';
+    packType = 'dal';
+  } else if (t.includes('britannia') || t.includes('50-50') || t.includes('good day') || t.includes('bourbon') || t.includes('rusk') || t.includes('marie') || t.includes('gobbles') || t.includes('treat') || t.includes('nutrichoice') || t.includes('biscuit') || t.includes('cookies') || c.includes('snack')) {
+    brandName = t.includes('parle') ? 'PARLE' : 'BRITANNIA';
     brandColor = '#DC2626';
     brandBg = '#FEF2F2';
     packType = t.includes('cake') || t.includes('gobbles') ? 'cake' : 'biscuit';
-  } else if (t.includes('red label') || t.includes('taaza') || t.includes('taj mahal') || t.includes('brooke bond')) {
+  } else if (t.includes('coke') || t.includes('pepsi') || t.includes('sprite') || t.includes('frooti') || t.includes('maaza') || t.includes('thums up') || c.includes('drink') || c.includes('beverage')) {
+    brandName = t.includes('frooti') ? 'FROOTI' : t.includes('pepsi') ? 'PEPSI' : 'CHILLED DRINK';
+    brandColor = '#0284C7';
+    brandBg = '#F0F9FF';
+    packType = 'drinks';
+  } else if (t.includes('red label') || t.includes('taaza') || t.includes('taj mahal') || t.includes('brooke bond') || c.includes('tea')) {
     brandName = 'BROOKE BOND';
     brandColor = '#B91C1C';
     brandBg = '#FEF2F2';
@@ -352,12 +378,12 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
     brandColor = '#E11D48';
     brandBg = '#FFF1F2';
     packType = 'ketchup';
-  } else if (t.includes('atta') || t.includes('flour') || t.includes('aashirvaad')) {
+  } else if (t.includes('atta') || t.includes('flour') || t.includes('aashirvaad') || c.includes('atta')) {
     brandName = 'AASHIRVAAD';
     brandColor = '#D97706';
     brandBg = '#FFFBEB';
     packType = 'atta';
-  } else if (t.includes('oil') || t.includes('ghee') || t.includes('fortune') || t.includes('amul')) {
+  } else if (t.includes('oil') || t.includes('ghee') || t.includes('fortune') || t.includes('amul') || c.includes('oil')) {
     brandName = t.includes('amul') ? 'AMUL' : 'FORTUNE';
     brandColor = '#CA8A04';
     brandBg = '#FEFCE8';
@@ -568,6 +594,104 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
           </g>
         `;
       }
+      break;
+
+    case 'dal':
+      packGraphic = `
+        <!-- Dal & Pulses Transparent Window Packshot -->
+        <g transform="translate(95, 60)">
+          <rect x="25" y="25" width="160" height="135" rx="12" fill="${brandColor}" />
+          <!-- Kraft / Clear Window -->
+          <rect x="38" y="38" width="134" height="108" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.5" />
+          <circle cx="105" cy="75" r="24" fill="#FDE68A" />
+          <text x="105" y="72" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="13" fill="${brandColor}">
+            ${brandName}
+          </text>
+          <text x="105" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="9" fill="#92400E">
+            UNPOLISHED DAL
+          </text>
+          <rect x="55" y="105" width="100" height="24" rx="6" fill="#F59E0B" />
+          <text x="105" y="121" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="10" fill="#FFFFFF">
+            100% PROTEIN RICH
+          </text>
+        </g>
+      `;
+      break;
+
+    case 'spices':
+      packGraphic = `
+        <!-- Spices & Masala Box Packshot -->
+        <g transform="translate(100, 60)">
+          <rect x="30" y="25" width="150" height="135" rx="8" fill="${brandColor}" />
+          <rect x="42" y="38" width="126" height="108" rx="6" fill="#FFF7ED" stroke="#F97316" stroke-width="1" />
+          <circle cx="105" cy="78" r="26" fill="#FFEDD5" />
+          <text x="105" y="75" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="13" fill="${brandColor}">
+            ${brandName}
+          </text>
+          <text x="105" y="90" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="9" fill="#9A3412">
+            SHUDH MASALA
+          </text>
+          <text x="105" y="125" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" fill="#EA580C">
+            NATURAL AROMA
+          </text>
+        </g>
+      `;
+      break;
+
+    case 'dairy':
+      packGraphic = `
+        <!-- Dairy Milk Pouch / Paneer Packshot -->
+        <g transform="translate(100, 55)">
+          <rect x="30" y="25" width="150" height="135" rx="14" fill="#EFF6FF" stroke="#3B82F6" stroke-width="2" />
+          <rect x="30" y="25" width="150" height="34" fill="#2563EB" rx="10" />
+          <text x="105" y="48" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="13" fill="#FFFFFF">
+            ${brandName}
+          </text>
+          <circle cx="105" cy="95" r="26" fill="#DBEAFE" />
+          <text x="105" y="92" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="11" fill="#1D4ED8">
+            PURE MILK
+          </text>
+          <text x="105" y="105" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="8" fill="#6B7280">
+            TAAZA & HYGIENIC
+          </text>
+        </g>
+      `;
+      break;
+
+    case 'vegetables':
+      packGraphic = `
+        <!-- Fresh Farm Vegetables Basket/Bag -->
+        <g transform="translate(95, 55)">
+          <rect x="25" y="35" width="160" height="120" rx="14" fill="#F0FDF4" stroke="#16A34A" stroke-width="2" />
+          <circle cx="105" cy="80" r="32" fill="#DCFCE7" />
+          <text x="105" y="75" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="13" fill="#15803D">
+            ${brandName}
+          </text>
+          <text x="105" y="92" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="10" fill="#166534">
+            100% FARM FRESH
+          </text>
+          <text x="105" y="130" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="9" fill="#15803D">
+            DIRECT FROM MANDI
+          </text>
+        </g>
+      `;
+      break;
+
+    case 'drinks':
+      packGraphic = `
+        <!-- Cold Drink / Beverage Bottle -->
+        <g transform="translate(110, 50)">
+          <rect x="75" y="10" width="30" height="15" rx="3" fill="#0284C7" />
+          <path d="M72,30 L108,30 L120,65 L120,160 Q120,168 112,168 L68,168 Q60,168 60,160 L60,65 Z" fill="#E0F2FE" stroke="#0284C7" stroke-width="1.5" />
+          <rect x="62" y="85" width="56" height="55" rx="4" fill="#0284C7" />
+          <text x="90" y="108" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="10" fill="#FFFFFF">
+            ${brandName}
+          </text>
+          <text x="90" y="125" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="7" fill="#E0F2FE">
+            CHILLED REFRESH
+          </text>
+        </g>
+      `;
       break;
 
     case 'atta':

@@ -1,5 +1,6 @@
 import { Order, OrderStatus } from '../types';
 import { getOrders, saveOrders } from './storageService';
+import { API_BASE_URL } from '../config/api';
 
 function cacheOrderLocally(order: Order) {
   try {
@@ -84,10 +85,11 @@ export async function sendOrderToCentralServer(payload: CreateOrderPayload): Pro
       timestamp: payload.timestamp || Date.now(),
     };
 
-    const response = await fetch('/api/orders', {
+    const response = await fetch(`${API_BASE_URL}/api/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify(payloadToSend),
     });
@@ -160,7 +162,7 @@ export async function sendOrderToCentralServer(payload: CreateOrderPayload): Pro
  */
 export async function fetchCentralOrders(): Promise<Order[]> {
   try {
-    const response = await fetch('/api/orders', {
+    const response = await fetch(`${API_BASE_URL}/api/orders`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -191,10 +193,11 @@ export async function updateCentralOrderStatus(
   status: OrderStatus
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/orders/${orderId}/status`, {
+    const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({ status }),
     });
@@ -232,7 +235,9 @@ export async function updateCentralOrderStatus(
  */
 export async function fetchOrderById(orderId: string): Promise<Order | null> {
   try {
-    const res = await fetch(`/api/orders/${orderId}`);
+    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
+      headers: { 'Accept': 'application/json' },
+    });
     if (res.ok) {
       const data = await res.json();
       return data.order || null;
@@ -247,15 +252,27 @@ export async function fetchOrderById(orderId: string): Promise<Order | null> {
 }
 
 /**
- * Fetch Product Catalog from Central Server (GET /api/inventory)
+ * Fetch Product Catalog from Central Server (GET /api/inventory or /api/products)
  */
 export async function fetchCentralInventory() {
   try {
-    const res = await fetch('/api/inventory');
+    const res = await fetch(`${API_BASE_URL}/api/products`, {
+      headers: { 'Accept': 'application/json' },
+    });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data;
+      }
+    }
+    // Fallback to /api/inventory
+    const resInv = await fetch(`${API_BASE_URL}/api/inventory`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    if (resInv.ok) {
+      const dataInv = await resInv.json();
+      if (Array.isArray(dataInv) && dataInv.length > 0) {
+        return dataInv;
       }
     }
   } catch (err) {
@@ -269,9 +286,9 @@ export async function fetchCentralInventory() {
  */
 export async function saveProductToCentralInventory(product: any) {
   try {
-    const res = await fetch('/api/inventory', {
+    const res = await fetch(`${API_BASE_URL}/api/inventory`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(product),
     });
     return res.ok;
@@ -286,9 +303,9 @@ export async function saveProductToCentralInventory(product: any) {
  */
 export async function saveBulkProductsToCentralInventory(products: any[]): Promise<boolean> {
   try {
-    const res = await fetch('/api/inventory/bulk', {
+    const res = await fetch(`${API_BASE_URL}/api/inventory/bulk`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ products }),
     });
     return res.ok;
@@ -303,7 +320,7 @@ export async function saveBulkProductsToCentralInventory(products: any[]): Promi
  */
 export async function deleteProductFromCentralInventory(productId: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/inventory/${productId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/inventory/${productId}`, {
       method: 'DELETE',
     });
     return res.ok;
@@ -318,7 +335,7 @@ export async function deleteProductFromCentralInventory(productId: string): Prom
  */
 export async function deleteOrderFromCentralServer(orderId: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/orders/${orderId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}`, {
       method: 'DELETE',
     });
 
@@ -363,7 +380,7 @@ export async function clearCompletedOrCancelledOrdersFromCentralServer(): Promis
   deletedCount: number;
 }> {
   try {
-    const res = await fetch('/api/orders?status=completed_or_cancelled', {
+    const res = await fetch(`${API_BASE_URL}/api/orders?status=completed_or_cancelled`, {
       method: 'DELETE',
     });
 
@@ -421,7 +438,7 @@ export async function clearAllOrdersFromCentralServer(): Promise<{
   deletedCount: number;
 }> {
   try {
-    const res = await fetch('/api/orders?all=true', {
+    const res = await fetch(`${API_BASE_URL}/api/orders?all=true`, {
       method: 'DELETE',
     });
 

@@ -299,6 +299,7 @@ app.post('/api/orders', (req, res) => {
     centralOrders.unshift(newOrder);
     persistCentralOrders();
 
+    console.log(`[CENTRAL SERVER] Order ${orderId} received from client.`);
     console.log(`[CENTRAL SERVER] Received order ID: ${orderId}, type: ${newOrder.orderType}, phone: ${phone}`);
     console.log(`[Central DB] New order registered: #${newOrder.id} from ${newOrder.customerName} (${newOrder.phone}) - Type: ${isParchi ? 'PARCHI PHOTO' : 'CART ITEMS'}`);
 
@@ -651,21 +652,22 @@ app.delete(['/api/inventory/:id', '/api/products/:id'], (req, res) => {
 // Setup Vite middleware for dev or static server for production
 async function startServer() {
   const distPath = path.join(process.cwd(), 'dist');
+  const publicPath = path.join(process.cwd(), 'public');
   const hasDist = fs.existsSync(path.join(distPath, 'index.html'));
 
+  // Always serve public static assets (logos, icons, manifest, etc.)
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+  }
+
   const isProduction =
-    (process.env.NODE_ENV === 'production' ||
-      Boolean(process.env.K_SERVICE) ||
-      Boolean(process.env.PORT && process.env.PORT !== '3000')) &&
+    process.env.NODE_ENV === 'production' ||
+    Boolean(process.env.RENDER) ||
+    Boolean(process.env.K_SERVICE) ||
+    Boolean(process.env.PORT && process.env.PORT !== '3000') ||
     hasDist;
 
-  if (!isProduction) {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
+  if (isProduction && hasDist) {
     app.use(express.static(distPath));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) {
@@ -677,6 +679,12 @@ async function startServer() {
       }
       next();
     });
+  } else {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
   }
 
   app.listen(PORT, '0.0.0.0', () => {

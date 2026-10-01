@@ -97,21 +97,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       >
         {/* Product Image & Badges */}
         <div className="relative w-full aspect-square bg-stone-50/80 overflow-hidden flex items-center justify-center p-2.5 sm:p-3">
-          {imageError ? (
-            <img
-              src={getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice)}
-              alt={product.name}
-              className="w-full h-full object-contain mix-blend-multiply rounded-xl"
-            />
-          ) : (
-            <img
-              src={product.imageUrl || getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice)}
-              alt={product.name}
-              onError={() => setImageError(true)}
-              loading="lazy"
-              className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300"
-            />
-          )}
+          <img
+            src={imageError || !product.imageUrl ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice) : product.imageUrl}
+            alt={product.name}
+            onError={(e) => {
+              setImageError(true);
+              const fallback = getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice);
+              if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                (e.currentTarget as HTMLImageElement).src = fallback;
+              }
+            }}
+            loading="lazy"
+            className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300"
+          />
 
           {/* Top Badges: Discount Pill + Veg Indicator */}
           <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 z-10 pointer-events-none">

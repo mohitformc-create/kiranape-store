@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, LayoutGrid, Camera, RotateCcw, ArrowRight, Zap, ShoppingBag } from 'lucide-react';
 import { CartItem } from '../types';
+import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 
 interface BottomNavBarProps {
   currentCategory: string;
@@ -58,11 +59,14 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
                       style={{ zIndex: 3 - idx }}
                     >
                       <img
-                        src={item.imageUrl || 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg'}
+                        src={item.imageUrl || getCategoryFallbackSvg(item.category || '', item.name)}
                         alt={item.name}
                         className="w-full h-full object-contain mix-blend-multiply"
                         onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
+                          const fallback = getCategoryFallbackSvg(item.category || '', item.name);
+                          if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                            (e.currentTarget as HTMLImageElement).src = fallback;
+                          }
                         }}
                       />
                     </div>

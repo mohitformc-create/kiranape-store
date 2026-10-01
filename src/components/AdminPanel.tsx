@@ -59,6 +59,7 @@ import { CreatorCredits } from './CreatorCredits';
 import { getWhatsAppBillUrl, generateWhatsAppBillMessage } from '../utils/orderUtils';
 import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { API_BASE_URL } from '../config/api';
 import {
   fetchCentralOrders,
   updateCentralOrderStatus,
@@ -255,13 +256,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const loadCentralOrders = async () => {
       try {
-        const serverOrders = await fetchCentralOrders();
-        if (isMounted && Array.isArray(serverOrders)) {
-          // DIRECTLY updates liveOrders state from central server on every 3s poll
-          setLiveOrders(serverOrders);
-          const serverParchis = deriveParchiOrders(serverOrders);
-          setParchiOrders(serverParchis);
-          checkIncomingAlerts(serverOrders, serverParchis);
+        const res = await fetch(`${API_BASE_URL}/api/orders`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const serverOrders: Order[] = Array.isArray(data) ? data : data.orders || [];
+          if (isMounted) {
+            // DIRECTLY updates liveOrders state from central server on every 3s poll
+            setLiveOrders(serverOrders);
+            const serverParchis = deriveParchiOrders(serverOrders);
+            setParchiOrders(serverParchis);
+            checkIncomingAlerts(serverOrders, serverParchis);
+          }
         }
       } catch (err) {
         console.error('[Admin Central Sync] Polling error:', err);

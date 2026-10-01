@@ -10,9 +10,8 @@ interface CreatorCreditsProps {
  * Official Brand Footer & Creator Credits
  * Required on: Customer Storefront, Admin Panel, and Splash/Login screens.
  *
- * • Line 1: "Designed by Sam Private Limited"
+ * • Line 1: "Designed by Sam Solutions"
  * • Line 2: "Mohit Chaurasia"
- * • Line 3: "Associated with Chaurasia Kirana and General Store"
  */
 export const CreatorCredits: React.FC<CreatorCreditsProps> = ({
   className = '',
@@ -31,7 +30,7 @@ export const CreatorCredits: React.FC<CreatorCreditsProps> = ({
           isDark ? 'text-stone-400' : 'text-stone-500'
         }`}
       >
-        Designed by Sam Private Limited
+        Designed by Sam Solutions
       </p>
       <p
         className={`text-xs sm:text-sm font-bold tracking-tight ${
@@ -39,13 +38,6 @@ export const CreatorCredits: React.FC<CreatorCreditsProps> = ({
         }`}
       >
         Mohit Chaurasia
-      </p>
-      <p
-        className={`text-[11px] sm:text-xs font-normal ${
-          isDark ? 'text-stone-400' : 'text-stone-500'
-        }`}
-      >
-        Associated with Chaurasia Kirana and General Store
       </p>
     </div>
   );

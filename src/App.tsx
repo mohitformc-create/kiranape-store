@@ -85,8 +85,10 @@ import { ParchiUploadModal } from './components/ParchiUploadModal';
 import { VoiceGroceryModal } from './components/VoiceGroceryModal';
 import { QuickOrderActionBar } from './components/QuickOrderActionBar';
 import { CreatorCredits } from './components/CreatorCredits';
+import { AdminPinModal } from './components/AdminPinModal';
 import { playOrderChime } from './utils/sound';
 import { deleteOrderFromCentralServer } from './services/orderApiService';
+import { API_BASE_URL } from './config/api';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -129,6 +131,24 @@ export default function App() {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
+  // Admin PIN verification and Direct Link (#admin) state
+  const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
+  const [isAdminPinVerified, setIsAdminPinVerified] = useState(false);
+  const [toastBanner, setToastBanner] = useState<string | null>(null);
+
+  // Toast listener for network connection status updates
+  useEffect(() => {
+    const handleToast = (e: any) => {
+      const msg = e.detail?.message || 'Connecting to store server... please wait 10 seconds.';
+      setToastBanner(msg);
+      setTimeout(() => {
+        setToastBanner((prev) => (prev === msg ? null : prev));
+      }, 7000);
+    };
+    window.addEventListener('kiranape_toast', handleToast);
+    return () => window.removeEventListener('kiranape_toast', handleToast);
+  }, []);
+
   const handleOpenPrivacy = useCallback(() => {
     setIsPrivacyOpen(true);
     window.location.hash = '#privacy';
@@ -141,9 +161,9 @@ export default function App() {
     }
   }, []);
 
-  // Secret direct access via search bar keyword "9779"
-  const handleSecretAdminAccess = useCallback(async () => {
-    setSearchQuery('');
+  const handleAdminPinSuccess = useCallback(async () => {
+    setIsAdminPinVerified(true);
+    setIsAdminPinModalOpen(false);
     try {
       const adminUser = await signInAdminDirectly();
       setCurrentUser(adminUser);
@@ -161,42 +181,50 @@ export default function App() {
     window.location.hash = '#admin';
   }, []);
 
+  const handleCloseAdminPin = useCallback(() => {
+    setIsAdminPinModalOpen(false);
+    if (!isAdminPinVerified) {
+      setCurrentView('customer');
+      if (window.location.hash === '#admin') {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+  }, [isAdminPinVerified]);
+
+  // Secret direct access via search bar keyword "9779"
+  const handleSecretAdminAccess = useCallback(async () => {
+    setSearchQuery('');
+    setIsAdminPinModalOpen(true);
+  }, []);
+
   // URL route listener for #admin or ?view=admin, #tracker, #privacy
   useEffect(() => {
     const handleRoute = async () => {
       const hash = window.location.hash;
       const search = window.location.search;
+
       if (hash === '#admin' || search.includes('view=admin')) {
-        const stored = getStoredUser();
-        if (stored?.role === 'admin') {
+        // Direct Admin URL (https://kiranape-store.onrender.com/#admin):
+        // Keep 4-digit Store Owner PIN modal intact before revealing admin controls
+        if (isAdminPinVerified) {
           setCurrentView('admin');
         } else {
-          try {
-            const adminUser = await signInAdminDirectly();
-            setCurrentUser(adminUser);
-          } catch {
-            const fallbackAdmin: AppUser = {
-              uid: 'admin-store-owner',
-              displayName: 'Store Owner (Admin)',
-              email: 'admin@chaurasiakirana.local',
-              phone: '+91 98765 43210',
-              role: 'admin',
-            };
-            setCurrentUser(fallbackAdmin);
-          }
-          setCurrentView('admin');
+          setIsAdminPinModalOpen(true);
         }
       } else if (hash === '#tracker') {
         setIsTrackerOpen(true);
       } else if (hash === '#privacy' || hash === '#/privacy' || search.includes('view=privacy')) {
         setIsPrivacyOpen(true);
+      } else {
+        // For regular customer visits (without the #admin hash), always show normal customer storefront
+        setCurrentView('customer');
       }
     };
 
     handleRoute();
     window.addEventListener('hashchange', handleRoute);
     return () => window.removeEventListener('hashchange', handleRoute);
-  }, []);
+  }, [isAdminPinVerified]);
 
   // Android Back Button Interceptor (Prevents WebIntoApp Exit Interstitial Ad)
   useEffect(() => {
