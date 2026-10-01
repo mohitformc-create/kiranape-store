@@ -41,9 +41,16 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
     if (e) e.preventDefault();
     const enteredPassword = password.trim();
 
-    // Verify against exactly @2508 or dynamically configured store password
-    if (enteredPassword === '@2508' || enteredPassword === currentPassword) {
+    // Accept BOTH "@2508" and "2508" (without @ symbol), or stored configured pin
+    const isMatch =
+      enteredPassword === '@2508' ||
+      enteredPassword === '2508' ||
+      enteredPassword === currentPassword ||
+      enteredPassword === currentPassword.replace(/^@/, '');
+
+    if (isMatch) {
       setError('');
+      // Store session state immediately
       try {
         sessionStorage.setItem('kiranape_admin_auth', 'true');
         sessionStorage.setItem('kiranape_admin_authenticated', 'true');

@@ -92,7 +92,16 @@ import { API_BASE_URL } from './config/api';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
-  const [currentView, setCurrentView] = useState<'customer' | 'admin'>('customer');
+  const [currentView, setCurrentView] = useState<'customer' | 'admin'>(() => {
+    if (typeof window === 'undefined') return 'customer';
+    const isAuthed =
+      sessionStorage.getItem('kiranape_admin_auth') === 'true' ||
+      sessionStorage.getItem('kiranape_admin_authenticated') === 'true';
+    if (isAuthed && (window.location.hash === '#admin' || window.location.search.includes('view=admin'))) {
+      return 'admin';
+    }
+    return 'customer';
+  });
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => getStoredUser());
