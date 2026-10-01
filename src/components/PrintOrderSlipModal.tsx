@@ -42,7 +42,8 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const itemsList = Array.isArray(order.items) ? order.items : [];
+  const subtotal = itemsList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const deliveryFee = order.deliveryFee ?? (order.totalAmount > subtotal ? order.totalAmount - subtotal : 0);
 
   return (
@@ -51,9 +52,21 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
       role="dialog"
       aria-modal="true"
     >
-      {/* Thermal Print Media Styling */}
+      {/* Thermal Receipt Print Media Styling */}
       <style>{`
+        @page {
+          size: 80mm auto;
+          margin: 0;
+        }
         @media print {
+          html, body {
+            width: 80mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -62,17 +75,20 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
             visibility: visible !important;
           }
           #kirana-thermal-receipt-wrap {
-            position: fixed !important;
+            position: absolute !important;
             left: 0 !important;
             top: 0 !important;
             width: 80mm !important;
             max-width: 80mm !important;
             margin: 0 !important;
-            padding: 4mm !important;
-            background: white !important;
-            color: black !important;
+            padding: 4mm 3mm !important;
+            background: #ffffff !important;
+            color: #000000 !important;
             box-shadow: none !important;
             border: none !important;
+            font-family: 'Courier New', Courier, monospace, monospace !important;
+            font-size: 11px !important;
+            line-height: 1.25 !important;
           }
           .no-print {
             display: none !important;
@@ -189,17 +205,25 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
                 <span>QTY x PRICE = AMT</span>
               </div>
 
-              {order.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-start gap-1 text-[11px]">
-                  <div className="flex-1 min-w-0 pr-1">
-                    <span className="font-semibold block truncate">{item.name}</span>
-                    <span className="text-[10px] text-stone-600">({item.unit})</span>
+              {itemsList.length > 0 ? (
+                itemsList.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-start gap-1 text-[11px]">
+                    <div className="flex-1 min-w-0 pr-1">
+                      <span className="font-semibold block truncate">{item.name}</span>
+                      <span className="text-[10px] text-stone-600">({item.unit})</span>
+                    </div>
+                    <div className="text-right flex-shrink-0 font-medium">
+                      {item.quantity} x ₹{item.price} = <strong className="font-bold">₹{item.total}</strong>
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0 font-medium">
-                    {item.quantity} x ₹{item.price} = <strong className="font-bold">₹{item.total}</strong>
-                  </div>
+                ))
+              ) : (
+                <div className="py-2 text-[11px] text-stone-600 italic">
+                  {order.slipPhoto || order.slipImageUrl || order.parchiImageUrl
+                    ? '📸 Handwritten Parchi Order (Refer attached customer photo slip)'
+                    : '🎙️ Voice Note Order (Refer recorded customer audio note)'}
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Bill Summary */}

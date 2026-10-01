@@ -97,6 +97,7 @@ interface AdminPanelProps {
   adminPin: string;
   onChangePin: (newPin: string) => void;
   onExitAdmin: () => void;
+  onLogoutAdmin?: () => void;
   isFirebaseConnected?: boolean;
   onSyncToFirestore?: () => void;
   storeSettings: StoreSettings;
@@ -117,6 +118,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   adminPin,
   onChangePin,
   onExitAdmin,
+  onLogoutAdmin,
   isFirebaseConnected = false,
   onSyncToFirestore,
   storeSettings,
@@ -954,8 +956,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold border border-stone-700 transition-colors cursor-pointer"
               title="Return to customer shop"
             >
-              <LogOut className="w-4 h-4 text-amber-400" />
               <span>Back to Storefront</span>
+            </button>
+
+            <button
+              onClick={onLogoutAdmin || onExitAdmin}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 text-rose-200 text-xs font-bold border border-rose-800 transition-colors cursor-pointer active:scale-95"
+              title="Lock Admin Panel & Sign Out"
+            >
+              <LogOut className="w-4 h-4 text-rose-400" />
+              <span>Log Out</span>
             </button>
           </div>
         </div>

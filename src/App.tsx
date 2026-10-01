@@ -136,8 +136,10 @@ export default function App() {
   const [isAdminPinVerified, setIsAdminPinVerified] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
-      return sessionStorage.getItem('kiranape_admin_authenticated') === 'true' ||
-             localStorage.getItem('kiranape_admin_authenticated') === 'true';
+      return (
+        sessionStorage.getItem('kiranape_admin_auth') === 'true' ||
+        sessionStorage.getItem('kiranape_admin_authenticated') === 'true'
+      );
     } catch {
       return false;
     }
@@ -173,8 +175,8 @@ export default function App() {
     setIsAdminPinVerified(true);
     setIsAdminPinModalOpen(false);
     try {
+      sessionStorage.setItem('kiranape_admin_auth', 'true');
       sessionStorage.setItem('kiranape_admin_authenticated', 'true');
-      localStorage.setItem('kiranape_admin_authenticated', 'true');
     } catch {
       // ignore
     }
@@ -193,6 +195,21 @@ export default function App() {
     }
     setCurrentView('admin');
     window.location.hash = '#admin';
+  }, []);
+
+  const handleLogoutAdmin = useCallback(() => {
+    setIsAdminPinVerified(false);
+    try {
+      sessionStorage.removeItem('kiranape_admin_auth');
+      sessionStorage.removeItem('kiranape_admin_authenticated');
+      localStorage.removeItem('kiranape_admin_authenticated');
+    } catch {
+      // ignore
+    }
+    setCurrentView('customer');
+    if (window.location.hash === '#admin') {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   }, []);
 
   const handleCloseAdminPin = useCallback(() => {
@@ -670,8 +687,8 @@ export default function App() {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  // If currently in Admin View, render Store Owner Panel
-  if (currentView === 'admin') {
+  // If currently in Admin View, render Store Owner Panel ONLY if authenticated
+  if (currentView === 'admin' && isAdminPinVerified) {
     return (
       <AdminPanel
         products={products}
@@ -686,8 +703,11 @@ export default function App() {
         onChangePin={handleChangePin}
         onExitAdmin={() => {
           setCurrentView('customer');
-          window.location.hash = '';
+          if (window.location.hash === '#admin') {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
         }}
+        onLogoutAdmin={handleLogoutAdmin}
         isFirebaseConnected={isFirebaseConfigured()}
         onSyncToFirestore={handleSyncToFirestore}
         storeSettings={storeSettings}
@@ -1033,6 +1053,13 @@ export default function App() {
         isOpen={isPrivacyOpen}
         onClose={handleClosePrivacy}
         storeSettings={storeSettings}
+      />
+
+      {/* 7.5. Store Owner Admin Password Gate Modal */}
+      <AdminPinModal
+        isOpen={isAdminPinModalOpen}
+        onClose={handleCloseAdminPin}
+        onSuccess={handleAdminPinSuccess}
       />
 
       {/* 8. PWA Offline Connectivity Indicator */}

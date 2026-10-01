@@ -41,9 +41,15 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
     if (e) e.preventDefault();
     const enteredPassword = password.trim();
 
-    // Verify against @2508 or dynamically configured store password
-    if (enteredPassword === '@2508' || enteredPassword === currentPassword || enteredPassword === '9779') {
+    // Verify against exactly @2508 or dynamically configured store password
+    if (enteredPassword === '@2508' || enteredPassword === currentPassword) {
       setError('');
+      try {
+        sessionStorage.setItem('kiranape_admin_auth', 'true');
+        sessionStorage.setItem('kiranape_admin_authenticated', 'true');
+      } catch {
+        // ignore
+      }
       onSuccess();
     } else {
       setShake(true);
@@ -94,21 +100,10 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 
         {/* Content */}
         <div className="p-6 flex flex-col items-center">
-          {/* Quick Password Reminder Badge */}
-          <div className="w-full bg-amber-50 border border-amber-200/80 rounded-2xl p-3 mb-4 text-center">
-            <p className="text-xs text-amber-900 font-medium flex items-center justify-center gap-1.5">
-              <KeyRound className="w-4 h-4 text-amber-700 flex-shrink-0" />
-              <span>Owner Password:</span>
-              <strong className="font-mono bg-amber-200/80 px-2 py-0.5 rounded text-amber-950 text-sm font-bold tracking-wider">
-                @2508
-              </strong>
-            </p>
-          </div>
-
           <form onSubmit={handleVerify} className="w-full space-y-3">
             <div className="space-y-1.5">
               <label htmlFor="admin-password-input" className="block text-xs font-bold text-stone-700">
-                Password / सिक्योरिटी पासवर्ड:
+                Admin Password / सिक्योरिटी पासवर्ड:
               </label>
 
               {/* Password Input with Show/Hide Toggle */}
@@ -122,7 +117,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                     setPassword(e.target.value);
                     if (error) setError('');
                   }}
-                  placeholder="Enter @2508"
+                  placeholder="Enter Admin Password"
                   autoComplete="current-password"
                   className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-2xl text-stone-900 font-mono text-base tracking-wider focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 transition-all pr-11"
                 />
@@ -157,22 +152,10 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
               disabled={!password.trim()}
               className="w-full py-3 px-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 active:scale-[0.99] text-white font-heading font-extrabold text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
             >
-              <span>Verify & Open Admin Panel</span>
+              <span>Submit & Open Admin Panel</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick 1-click test button */}
-          <button
-            type="button"
-            onClick={() => {
-              setPassword('@2508');
-              onSuccess();
-            }}
-            className="mt-4 text-xs text-stone-500 hover:text-amber-700 underline underline-offset-2 transition-colors cursor-pointer"
-          >
-            Quick Unlock (Owner Bypass)
-          </button>
 
           {/* Creator & Branding Credits */}
           <div className="w-full mt-4 pt-3 border-t border-stone-100">
