@@ -61,6 +61,13 @@ import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 import { API_BASE_URL } from '../config/api';
 import { matchesUniversalSearch } from '../utils/universalSearch';
+import { supabase } from '../config/supabase';
+import {
+  mapSupabaseRowToOrder,
+  fetchSupabaseOrders,
+  updateSupabaseOrderStatus,
+  deleteSupabaseOrder,
+} from '../services/supabaseOrderService';
 import {
   fetchCentralOrders,
   updateCentralOrderStatus,
@@ -253,6 +260,81 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, [orders, liveOrders.length, checkIncomingAlerts, deriveParchiOrders]);
 
+  // Supabase PostgreSQL Real-Time Listener and Initial Load
+  React.useEffect(() => {
+    let isMounted = true;
+
+    // 1. Initial Load from Supabase 'orders' cloud table
+    const loadSupabaseOrders = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0 && isMounted) {
+          const mappedOrders = data.map(mapSupabaseRowToOrder);
+          setLiveOrders((prev) => {
+            // Merge existing and supabase orders cleanly
+            const existingMap = new Map(prev.map((o) => [o.id, o]));
+            mappedOrders.forEach((o) => existingMap.set(o.id, o));
+            const merged = Array.from(existingMap.values()).sort(
+              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+            );
+            const serverParchis = deriveParchiOrders(merged);
+            setParchiOrders(serverParchis);
+            checkIncomingAlerts(merged, serverParchis);
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn('[Supabase Initial Load]:', err);
+      }
+    };
+
+    loadSupabaseOrders();
+
+    // 2. Real-time Subscription to Supabase 'orders' table
+    const channel = supabase
+      .channel('orders-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (!payload.new) return;
+          const newOrder = mapSupabaseRowToOrder(payload.new);
+          playAdminNotificationChime();
+          setLiveOrders((prev) => {
+            const updated = [newOrder, ...prev.filter((o) => o.id !== newOrder.id)];
+            const serverParchis = deriveParchiOrders(updated);
+            setParchiOrders(serverParchis);
+            checkIncomingAlerts(updated, serverParchis);
+            return updated;
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (!payload.new) return;
+          const updatedOrder = mapSupabaseRowToOrder(payload.new);
+          setLiveOrders((prev) => {
+            const next = prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o));
+            const serverParchis = deriveParchiOrders(next);
+            setParchiOrders(serverParchis);
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [checkIncomingAlerts, deriveParchiOrders]);
+
   // Real-time polling from Central Server Database every 3 seconds (Multi-device live sync)
   React.useEffect(() => {
     let isMounted = true;
@@ -403,6 +485,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsDeletingOrder(true);
     try {
       const orderId = orderToDelete.id;
+      await deleteSupabaseOrder(orderId);
       await deleteOrderFromCentralServer(orderId);
       onDeleteOrder(orderId);
       setLiveOrders((prev) => prev.filter((o) => o.id !== orderId));
@@ -1973,6 +2056,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           const newStatus = e.target.value as OrderStatus;
                           onUpdateOrderStatus(order.id, newStatus);
                           updateCentralOrderStatus(order.id, newStatus).catch(console.warn);
+                          updateSupabaseOrderStatus(order.id, newStatus).catch(console.warn);
                           setLiveOrders((prev) =>
                             prev.map((o) => (o.id === order.id ? { ...o, status: newStatus, statusLabel: newStatus } : o))
                           );
@@ -2040,6 +2124,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => {
                             onUpdateOrderStatus(order.id, 'received');
                             updateCentralOrderStatus(order.id, 'received').catch(console.warn);
+                            updateSupabaseOrderStatus(order.id, 'received').catch(console.warn);
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === order.id ? { ...o, status: 'received', statusLabel: 'Pending Confirmation' } : o))
                             );
@@ -2056,6 +2141,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => {
                             onUpdateOrderStatus(order.id, 'processing');
                             updateCentralOrderStatus(order.id, 'processing').catch(console.warn);
+                            updateSupabaseOrderStatus(order.id, 'processing').catch(console.warn);
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === order.id ? { ...o, status: 'processing', statusLabel: 'Packed' } : o))
                             );
@@ -2072,6 +2158,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => {
                             onUpdateOrderStatus(order.id, 'out_for_delivery');
                             updateCentralOrderStatus(order.id, 'out_for_delivery').catch(console.warn);
+                            updateSupabaseOrderStatus(order.id, 'out_for_delivery').catch(console.warn);
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === order.id ? { ...o, status: 'out_for_delivery', statusLabel: 'Out for Delivery' } : o))
                             );
@@ -2088,6 +2175,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => {
                             onUpdateOrderStatus(order.id, 'delivered');
                             updateCentralOrderStatus(order.id, 'delivered').catch(console.warn);
+                            updateSupabaseOrderStatus(order.id, 'delivered').catch(console.warn);
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === order.id ? { ...o, status: 'delivered', statusLabel: 'Delivered' } : o))
                             );
@@ -2232,6 +2320,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => {
                             onUpdateOrderStatus(order.id, 'processing');
                             updateCentralOrderStatus(order.id, 'processing');
+                            updateSupabaseOrderStatus(order.id, 'processing');
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === order.id ? { ...o, status: 'processing', statusLabel: 'Packed' } : o))
                             );
@@ -2253,6 +2342,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onClick={() => {
                             onUpdateOrderStatus(order.id, 'delivered');
                             updateCentralOrderStatus(order.id, 'delivered');
+                            updateSupabaseOrderStatus(order.id, 'delivered');
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === order.id ? { ...o, status: 'delivered', statusLabel: 'Delivered' } : o))
                             );
@@ -2445,6 +2535,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           onChange={async (e) => {
                             const newStatus = e.target.value;
                             await updateCentralOrderStatus(parchi.id, newStatus as any);
+                            await updateSupabaseOrderStatus(parchi.id, newStatus);
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === parchi.id ? { ...o, status: newStatus } : o))
                             );

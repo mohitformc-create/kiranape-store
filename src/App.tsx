@@ -90,6 +90,7 @@ import { playOrderChime } from './utils/sound';
 import { deleteOrderFromCentralServer } from './services/orderApiService';
 import { API_BASE_URL } from './config/api';
 import { filterProductsUniversally } from './utils/universalSearch';
+import { insertSupabaseOrder } from './services/supabaseOrderService';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -587,7 +588,22 @@ export default function App() {
       setPlacedOrder(localOrder);
       setOrders(getOrders());
 
-      // 4. Asynchronous Background Dispatch to Central Server Database (auto-retry queue if offline or failed)
+      // 4. Asynchronous Background Dispatch to Supabase Cloud & Central Server
+      insertSupabaseOrder({
+        id: orderId,
+        customerName: customerDetails.fullName || 'Customer',
+        phone: customerDetails.phoneNumber || 'Not provided',
+        address: customerDetails.fullAddress || 'Store Pickup',
+        items: orderItems || [],
+        total: finalPayableAmount || 0,
+        orderType: 'cart',
+        voiceData: null,
+        parchiData: null,
+        status: 'Pending',
+      }).catch((err) => {
+        console.warn('[Supabase Cart Order Error]:', err);
+      });
+
       dispatchOrderInBackground({
         id: orderId,
         customerName: customerDetails.fullName,

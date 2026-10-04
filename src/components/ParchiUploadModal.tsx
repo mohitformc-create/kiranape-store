@@ -23,6 +23,8 @@ import { StoreSettings } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
 import { CreatorCredits } from './CreatorCredits';
+import { supabase } from '../config/supabase';
+import { insertSupabaseOrder } from '../services/supabaseOrderService';
 
 interface ParchiUploadModalProps {
   isOpen: boolean;
@@ -151,7 +153,22 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       window.dispatchEvent(new Event('storage'));
     }
 
-    // 6. Asynchronously dispatch to central server in background (auto-retry queue if offline or failed)
+    // 6. Asynchronously dispatch to Supabase & central server in background
+    insertSupabaseOrder({
+      id: parchiId,
+      customerName: customerName.trim() || 'Customer',
+      phone: customerPhone.trim() || 'Not provided',
+      address: deliveryAddress.trim() || 'Store Pickup',
+      items: notes.trim() ? [{ name: `Parchi Notes: ${notes.trim()}`, quantity: 1, price: 0 }] : [],
+      total: 0,
+      orderType: 'parchi',
+      voiceData: null,
+      parchiData: imagePreview || null,
+      status: 'Pending',
+    }).catch((err) => {
+      console.warn('[Supabase Parchi Order Error]:', err);
+    });
+
     dispatchOrderInBackground({
       id: parchiId,
       customerName: customerName.trim(),

@@ -29,6 +29,8 @@ import { STORE_DEFAULTS } from '../data/initialProducts';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
 import { CreatorCredits } from './CreatorCredits';
+import { supabase } from '../config/supabase';
+import { insertSupabaseOrder } from '../services/supabaseOrderService';
 
 interface VoiceGroceryModalProps {
   isOpen: boolean;
@@ -372,6 +374,20 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
           const exported = await stopAudioCapture();
           if (exported) voiceNoteBase64 = exported;
         }
+
+        // Direct Supabase insert
+        await insertSupabaseOrder({
+          id: voiceOrderId,
+          customerName: customerName.trim() || 'Customer',
+          phone: customerPhone.trim() || 'Not provided',
+          address: deliveryAddress.trim() || 'Store Pickup',
+          items: fullTranscript ? [{ name: fullTranscript, quantity: 1, price: 0 }] : [],
+          total: 0,
+          orderType: 'voice',
+          voiceData: voiceNoteBase64 || null,
+          parchiData: null,
+          status: 'Pending',
+        });
 
         dispatchOrderInBackground({
           id: voiceOrderId,
