@@ -101,9 +101,9 @@ try {
   centralInventory = [];
 }
 
-// Auto-recovery / seed: Ensure all 162 verified items are preserved across restarts/sleep cycles
-if (!Array.isArray(centralInventory) || centralInventory.length < 162) {
-  console.log(`[Central DB] Inventory count (${centralInventory ? centralInventory.length : 0}) is below 162. Seeding full 162 master products...`);
+// Auto-recovery / seed: Ensure all 162 verified items are preserved across restarts/sleep cycles ONLY if file did not exist
+if (!fs.existsSync(SERVER_PRODUCTS_PATH) && (!Array.isArray(centralInventory) || centralInventory.length < 162)) {
+  console.log(`[Central DB] Inventory file missing or count (${centralInventory ? centralInventory.length : 0}) is below 162. Seeding full 162 master products...`);
   let backupCatalog: any[] = [];
   try {
     if (fs.existsSync(DEFAULT_CATALOG_PATH)) {
@@ -120,8 +120,18 @@ if (!Array.isArray(centralInventory) || centralInventory.length < 162) {
   }
   const existingMap = new Map((centralInventory || []).map((p: any) => [p.id, p]));
   backupCatalog.forEach((item) => {
-    if (item && item.id && !existingMap.has(item.id)) {
-      existingMap.set(item.id, item);
+    if (item && item.id) {
+      const existing = existingMap.get(item.id);
+      if (!existing) {
+        existingMap.set(item.id, item);
+      } else if (existing.imageUrl && (existing.imageUrl.startsWith('data:') || existing.imageUrl.includes('http'))) {
+        // PRESERVE custom uploaded or edited photos on top priority
+        existingMap.set(item.id, {
+          ...item,
+          ...existing,
+          imageUrl: existing.imageUrl,
+        });
+      }
     }
   });
   centralInventory = Array.from(existingMap.values());
@@ -614,26 +624,51 @@ app.post(['/api/inventory/bulk', '/api/products/bulk'], (req, res) => {
   }
 });
 
-// 9. PUT /api/inventory/:id: Update product
-app.put(['/api/inventory/:id', '/api/products/:id'], (req, res) => {
-  const { id } = req.params;
-  const updates = req.body;
+// 9. PUT/PATCH /api/inventory/:id & /api/products/:id & /api/products/update: Update product
+app.all(
+  [
+    '/api/inventory/:id',
+    '/api/products/:id',
+    '/api/products/update',
+    '/api/inventory/update',
+  ],
+  (req, res, next) => {
+    if (req.method !== 'PUT' && req.method !== 'PATCH' && req.method !== 'POST') {
+      return next();
+    }
 
-  const idx = centralInventory.findIndex((p) => p.id === id);
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Product not found.' });
+    const id = req.params.id || req.body?.id;
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Product id is required.' });
+    }
+
+    const updates = req.body;
+    const idx = centralInventory.findIndex((p) => p.id === id);
+    if (idx === -1) {
+      // If product doesn't exist, upsert it
+      const newProduct = {
+        ...updates,
+        id,
+        updatedAt: Date.now(),
+      };
+      centralInventory.push(newProduct);
+      persistCentralInventory();
+      console.log(`[Central DB] Product #${id} created via update endpoint.`);
+      return res.status(201).json({ success: true, product: newProduct });
+    }
+
+    centralInventory[idx] = {
+      ...centralInventory[idx],
+      ...updates,
+      id,
+      updatedAt: Date.now(),
+    };
+
+    persistCentralInventory();
+    console.log(`[Central DB] Product #${id} permanently updated with custom image/data.`);
+    return res.json({ success: true, product: centralInventory[idx] });
   }
-
-  centralInventory[idx] = {
-    ...centralInventory[idx],
-    ...updates,
-    id,
-    updatedAt: Date.now(),
-  };
-
-  persistCentralInventory();
-  res.json({ success: true, product: centralInventory[idx] });
-});
+);
 
 // 10. DELETE /api/inventory/:id: Delete product
 app.delete(['/api/inventory/:id', '/api/products/:id'], (req, res) => {

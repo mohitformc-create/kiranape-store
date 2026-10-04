@@ -162,12 +162,24 @@ export async function sendOrderToCentralServer(payload: CreateOrderPayload): Pro
  */
 export async function fetchCentralOrders(): Promise<Order[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/orders`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    let response: Response | null = null;
+    try {
+      const url = API_BASE_URL ? `${API_BASE_URL}/api/orders` : '/api/orders';
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+    } catch (primaryErr) {
+      if (API_BASE_URL) {
+        try {
+          response = await fetch('/api/orders', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+          });
+        } catch {}
+      }
+      if (!response) throw primaryErr;
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to fetch central orders (status: ${response.status})`);
@@ -180,7 +192,7 @@ export async function fetchCentralOrders(): Promise<Order[]> {
     saveOrders(serverOrders);
     return serverOrders;
   } catch (error) {
-    console.warn('[Order API] Error fetching central orders, falling back to local storage:', error);
+    console.warn('[Order API] Notice fetching central orders, using local orders cache:', error);
     return getOrders();
   }
 }
@@ -255,47 +267,68 @@ export async function fetchOrderById(orderId: string): Promise<Order | null> {
  * Fetch Product Catalog from Central Server (GET /api/inventory or /api/products)
  */
 export async function fetchCentralInventory() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/products`, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data;
+  const endpoints = ['/api/products', '/api/inventory'];
+
+  for (const ep of endpoints) {
+    try {
+      const url = API_BASE_URL ? `${API_BASE_URL}${ep}` : ep;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
       }
+    } catch {}
+
+    // Fallback to relative path if API_BASE_URL failed
+    if (API_BASE_URL) {
+      try {
+        const res = await fetch(ep, { headers: { Accept: 'application/json' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            return data;
+          }
+        }
+      } catch {}
     }
-    // Fallback to /api/inventory
-    const resInv = await fetch(`${API_BASE_URL}/api/inventory`, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (resInv.ok) {
-      const dataInv = await resInv.json();
-      if (Array.isArray(dataInv) && dataInv.length > 0) {
-        return dataInv;
-      }
-    }
-  } catch (err) {
-    console.warn('[Inventory API] Failed fetching central inventory:', err);
   }
+
   return null;
 }
 
 /**
- * Save or update product in Central Server Inventory (POST /api/inventory)
+ * Save or update product in Central Server Inventory (POST /api/products/update or /api/inventory)
  */
 export async function saveProductToCentralInventory(product: any) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/inventory`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(product),
-    });
-    return res.ok;
-  } catch (err) {
-    console.warn('[Inventory API] Failed saving product to central inventory:', err);
-    return false;
+  const endpoints = ['/api/products/update', '/api/inventory'];
+
+  for (const ep of endpoints) {
+    try {
+      const url = API_BASE_URL ? `${API_BASE_URL}${ep}` : ep;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(product),
+      });
+      if (res.ok) return true;
+    } catch {}
+
+    // Fallback to relative
+    if (API_BASE_URL) {
+      try {
+        const res = await fetch(ep, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(product),
+        });
+        if (res.ok) return true;
+      } catch {}
+    }
   }
+
+  return false;
 }
 
 /**

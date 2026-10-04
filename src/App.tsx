@@ -89,6 +89,7 @@ import { AdminPinModal } from './components/AdminPinModal';
 import { playOrderChime } from './utils/sound';
 import { deleteOrderFromCentralServer } from './services/orderApiService';
 import { API_BASE_URL } from './config/api';
+import { filterProductsUniversally } from './utils/universalSearch';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -358,7 +359,7 @@ export default function App() {
       setBanners(newBanners);
     });
 
-    // 3. Initial load of orders and products from Central Server Database
+    // 3. Initial load of orders and products from Central Server Database with custom edits preservation
     fetchCentralOrders().then((serverOrders) => {
       if (serverOrders && serverOrders.length > 0) {
         setOrders(serverOrders);
@@ -366,17 +367,37 @@ export default function App() {
     }).catch(console.warn);
 
     fetchCentralInventory().then((serverInventory) => {
-      if (Array.isArray(serverInventory) && serverInventory.length >= 162) {
-        setProducts(serverInventory);
-        saveProducts(serverInventory);
-      } else {
-        // Fallback / re-hydrate complete 162 items
-        setProducts(INITIAL_PRODUCTS);
-        saveProducts(INITIAL_PRODUCTS);
-      }
+      // Check for persistent client-side custom edits backup
+      let localCustomProducts: Record<string, Partial<Product>> = {};
+      try {
+        const storedCustom = localStorage.getItem('chaurasia_custom_products');
+        if (storedCustom) {
+          localCustomProducts = JSON.parse(storedCustom) || {};
+        }
+      } catch {}
+
+      const baseList = (Array.isArray(serverInventory) && serverInventory.length > 0)
+        ? serverInventory
+        : getProducts();
+
+      // Merge: Custom uploaded image and fields always take top priority
+      const merged = baseList.map((p) => {
+        const customOverride = localCustomProducts[p.id];
+        if (customOverride) {
+          return {
+            ...p,
+            ...customOverride,
+            imageUrl: customOverride.imageUrl || p.imageUrl,
+          };
+        }
+        return p;
+      });
+
+      setProducts(merged);
+      saveProducts(merged);
     }).catch(() => {
-      setProducts(INITIAL_PRODUCTS);
-      saveProducts(INITIAL_PRODUCTS);
+      const current = getProducts();
+      setProducts(current);
     });
 
     const handleOrdersUpdated = () => {
@@ -600,6 +621,20 @@ export default function App() {
     const updatedList = getProducts();
     setProducts(updatedList);
     const updatedItem = updatedList.find((p) => p.id === id);
+
+    // Save persistent backup to localStorage.chaurasia_custom_products
+    try {
+      const stored = localStorage.getItem('chaurasia_custom_products');
+      const customMap = stored ? JSON.parse(stored) : {};
+      customMap[id] = {
+        ...(customMap[id] || {}),
+        ...updates,
+      };
+      localStorage.setItem('chaurasia_custom_products', JSON.stringify(customMap));
+    } catch (e) {
+      console.warn('Notice saving custom products backup:', e);
+    }
+
     if (updatedItem) {
       saveProductToCentralInventory(updatedItem).catch((err) => {
         console.warn('Could not update product in central inventory:', err);
@@ -679,21 +714,9 @@ export default function App() {
     await saveBannersToFirestore(newBanners);
   }, []);
 
-  // Filter products for customer catalog
+  // Filter products for customer catalog using Universal Bilingual Search Engine
   const filteredProducts = useMemo(() => {
-    return products.filter((item) => {
-      const query = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !query ||
-        item.name.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query) ||
-        (item.description && item.description.toLowerCase().includes(query));
-
-      const matchesCategory =
-        selectedCategory === 'All' || item.category === selectedCategory;
-
-      return matchesSearch && matchesCategory;
-    });
+    return filterProductsUniversally(products, searchQuery, selectedCategory);
   }, [products, searchQuery, selectedCategory]);
 
   // If currently in Admin View, render Store Owner Panel ONLY if authenticated

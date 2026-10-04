@@ -345,6 +345,25 @@ export function getProducts(): Product[] {
       localStorage.setItem(PERMANENT_CATALOG_KEY, JSON.stringify(loadedProducts));
     }
 
+    // Merge persistent custom edits (custom images, titles, pricing) from chaurasia_custom_products
+    try {
+      const rawCustom = localStorage.getItem('chaurasia_custom_products');
+      if (rawCustom) {
+        const customOverrides: Record<string, Partial<Product>> = JSON.parse(rawCustom) || {};
+        loadedProducts = loadedProducts.map((p) => {
+          const override = customOverrides[p.id];
+          if (override) {
+            return {
+              ...p,
+              ...override,
+              imageUrl: override.imageUrl || p.imageUrl,
+            };
+          }
+          return p;
+        });
+      }
+    } catch {}
+
     inMemoryProductsCache = loadedProducts;
 
     // Asynchronously hydrate from IndexedDB in case high-res images or more items are stored there
@@ -401,6 +420,15 @@ export function addProduct(
 
   const updated = [newProduct, ...products];
   saveProducts(updated);
+
+  // Persist newly added custom product
+  try {
+    const raw = localStorage.getItem('chaurasia_custom_products');
+    const customMap = raw ? JSON.parse(raw) : {};
+    customMap[newProduct.id] = newProduct;
+    localStorage.setItem('chaurasia_custom_products', JSON.stringify(customMap));
+  } catch {}
+
   return newProduct;
 }
 
@@ -425,6 +453,18 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
 
   products[index] = updatedProduct;
   saveProducts([...products]);
+
+  // Persist to chaurasia_custom_products map
+  try {
+    const raw = localStorage.getItem('chaurasia_custom_products');
+    const customMap = raw ? JSON.parse(raw) : {};
+    customMap[id] = {
+      ...(customMap[id] || {}),
+      ...updates,
+    };
+    localStorage.setItem('chaurasia_custom_products', JSON.stringify(customMap));
+  } catch {}
+
   return updatedProduct;
 }
 

@@ -5,6 +5,7 @@ import { STORE_DEFAULTS } from '../data/initialProducts';
 import { ORDER_STATUS_STEPS, ORDER_STATUS_LABELS } from '../services/firebase';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
 import { CreatorCredits } from './CreatorCredits';
+import { API_BASE_URL } from '../config/api';
 
 interface OrderConfirmationModalProps {
   order: Order | null;
@@ -24,7 +25,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     // Real-time live status updates from central internal server
     const pollInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/orders/${initialOrder.id}`);
+        const res = await fetch(`${API_BASE_URL}/api/orders/${initialOrder.id}`);
         if (res.ok) {
           const data = await res.json();
           if (data?.order) {

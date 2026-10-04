@@ -12,11 +12,11 @@ interface SearchBarProps {
 }
 
 const ROTATING_SEARCH_PLACEHOLDERS = [
-  'Search for atta, dal, tea, biscuits...',
-  'Search for fortune oil, ghee, spices...',
-  'Search for surf excel, vim, soaps...',
-  'Search for britannia biscuits, snacks...',
-  'Search for tata tea, sugar, pulses...',
+  'खोजें: चीनी, चावल, दाल, आटा, तेल...',
+  'Search for sugar, fortune oil, atta, spices...',
+  'Search for cheeni, chawal, sarso tel, ghee...',
+  'खोजें: बिस्कुट, चाय पत्ती, सर्फ़, साबुन...',
+  'Search for tata tea, surf excel, maggi, colgate...',
 ];
 
 export const SearchBar: React.FC<SearchBarProps> = ({

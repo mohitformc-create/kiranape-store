@@ -60,6 +60,7 @@ import { getWhatsAppBillUrl, generateWhatsAppBillMessage } from '../utils/orderU
 import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 import { API_BASE_URL } from '../config/api';
+import { matchesUniversalSearch } from '../utils/universalSearch';
 import {
   fetchCentralOrders,
   updateCentralOrderStatus,
@@ -255,13 +256,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Real-time polling from Central Server Database every 3 seconds (Multi-device live sync)
   React.useEffect(() => {
     let isMounted = true;
+    let hasLoggedError = false;
 
     const loadCentralOrders = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/orders`, {
-          headers: { Accept: 'application/json' },
-        });
-        if (res.ok) {
+        let res: Response | null = null;
+        try {
+          const targetUrl = API_BASE_URL ? `${API_BASE_URL}/api/orders` : '/api/orders';
+          res = await fetch(targetUrl, {
+            headers: { Accept: 'application/json' },
+          });
+        } catch (firstErr) {
+          // If external target failed (e.g. Render spin-up or CORS) and API_BASE_URL was set, fallback to relative /api/orders
+          if (API_BASE_URL) {
+            try {
+              res = await fetch('/api/orders', {
+                headers: { Accept: 'application/json' },
+              });
+            } catch {
+              // fallback also failed
+            }
+          }
+          if (!res) throw firstErr;
+        }
+
+        if (res && res.ok) {
           const data = await res.json();
           const serverOrders: Order[] = Array.isArray(data) ? data : data.orders || [];
           if (isMounted) {
@@ -270,10 +289,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             const serverParchis = deriveParchiOrders(serverOrders);
             setParchiOrders(serverParchis);
             checkIncomingAlerts(serverOrders, serverParchis);
+            hasLoggedError = false; // Reset on success
           }
         }
       } catch (err) {
-        console.error('[Admin Central Sync] Polling error:', err);
+        // Fallback to local storage if central backend is temporarily unreachable
+        if (isMounted) {
+          const localOrders = getOrders();
+          if (localOrders && localOrders.length > 0 && liveOrders.length === 0) {
+            setLiveOrders(localOrders);
+            const serverParchis = deriveParchiOrders(localOrders);
+            setParchiOrders(serverParchis);
+          }
+        }
+        if (!hasLoggedError) {
+          console.warn('[Admin Central Sync] Backend connecting, reading local orders:', err);
+          hasLoggedError = true;
+        }
       }
     };
 
@@ -478,12 +510,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Filter products with Category Quick Filter support (Sabji, Atta/Dal, Tel, Masala, Snacks, Dairy)
   const filteredProducts = products.filter((item) => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      item.name.toLowerCase().includes(q) ||
-      (item.hindiName && item.hindiName.toLowerCase().includes(q)) ||
-      item.category.toLowerCase().includes(q);
+    const q = searchQuery.trim();
+    const matchesSearch = !q || matchesUniversalSearch(item, q);
 
     let matchesCategory = false;
     if (selectedCategory === 'All') {
