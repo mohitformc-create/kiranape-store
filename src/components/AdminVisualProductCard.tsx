@@ -230,6 +230,7 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
               }
             }}
             loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain mix-blend-multiply group-hover/img:scale-105 transition-transform duration-300"
           />
         )}

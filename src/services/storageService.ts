@@ -17,6 +17,22 @@ export const CUSTOMER_SELECTED_LOCATION_KEY = 'customer_selected_location';
 export const DEVICE_USER_ID_KEY = 'kiranape_device_user_id';
 export const CUSTOMER_PHONE_KEY = 'kiranape_customer_phone';
 
+// One-time purge of obsolete/demo mock keys to prevent 12 demo orders from ever reappearing
+if (typeof window !== 'undefined') {
+  try {
+    const purgeFlag = 'kiranape_mock_orders_purged_v5';
+    if (!localStorage.getItem(purgeFlag)) {
+      localStorage.removeItem('kirana_orders');
+      localStorage.removeItem('admin_orders_backup');
+      localStorage.removeItem('chaurasia_kirana_orders_v1');
+      localStorage.removeItem('chaurasia_kirana_orders_v2');
+      localStorage.removeItem('dummy_orders');
+      localStorage.removeItem('demo_orders');
+      localStorage.setItem(purgeFlag, 'true');
+    }
+  } catch {}
+}
+
 export const DEFAULT_DELIVERY_LOCATIONS: string[] = [
   'बैढ़न (Waidhan)',
   'सिंगरौली (Singrauli)',
@@ -577,6 +593,18 @@ export function deleteOrder(orderId: string): void {
   const filtered = orders.filter((o) => o.id !== orderId);
   if (typeof window !== 'undefined') {
     localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(filtered));
+    notifyOrdersUpdated();
+  }
+}
+
+export function clearAllLocalOrders(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(ORDERS_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_ORDERS_STORAGE_KEY);
+    localStorage.removeItem('kirana_orders');
+    localStorage.removeItem('admin_orders_backup');
+    localStorage.removeItem('kiranape_parchi_orders');
+    localStorage.removeItem('chaurasia_kirana_parchi_orders_v1');
     notifyOrdersUpdated();
   }
 }

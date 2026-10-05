@@ -16,50 +16,71 @@ export interface SupabaseOrderRow {
 }
 
 /**
- * Maps a Supabase row back to the internal frontend Order model
+ * Maps a Supabase row back to the internal frontend Order model (with full dual snake_case/camelCase support)
  */
 export function mapSupabaseRowToOrder(row: any): Order {
-  const isParchi = row.order_type === 'parchi';
-  const isVoice = row.order_type === 'voice';
+  if (!row) return row;
+  const isParchi = row.order_type === 'parchi' || row.isParchi || Boolean(row.parchi_url || row.parchiImageUrl || row.slipPhoto);
+  const isVoice = row.order_type === 'voice' || row.orderType === 'voice' || Boolean(row.voice_url || row.voiceNoteBase64 || row.voiceAudio);
   const rawItems = Array.isArray(row.items) ? row.items : [];
 
-  const createdDate = row.created_at ? new Date(row.created_at) : new Date();
-  const formattedDate = createdDate.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const createdDate = row.created_at
+    ? new Date(row.created_at)
+    : (row.timestamp ? new Date(row.timestamp) : new Date());
+  const formattedDate = !isNaN(createdDate.getTime())
+    ? createdDate.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : String(row.createdAt || 'Just now');
+
+  const total = Number(row.total ?? row.finalPayableAmount ?? row.subtotalFinal ?? 0);
+  const customerName = row.customer_name || row.customerName || 'Customer';
+  const phone = row.phone || row.customerPhone || '';
+  const address = row.address || row.deliveryAddress || 'Store Pickup';
+  const status = (row.status || 'received') as OrderStatus;
+  const deliverySlot = row.delivery_slot || row.deliverySlot || 'Instant Delivery (30-45 mins)';
+  const deliveryLocation = row.delivery_location || row.deliveryLocation || 'Waidhan, Singrauli';
 
   return {
-    id: row.id,
-    customerName: row.customer_name || 'Customer',
-    phone: row.phone || '',
-    customerPhone: row.phone || '',
-    address: row.address || '',
-    deliveryLocation: 'Waidhan, Singrauli',
-    deliverySlot: row.delivery_slot || 'Instant Delivery (30-45 mins)',
+    ...row,
+    id: String(row.id),
+    customer_name: customerName,
+    customerName: customerName,
+    phone: phone,
+    customerPhone: phone,
+    address: address,
+    deliveryAddress: address,
+    deliveryLocation: deliveryLocation,
+    deliverySlot: deliverySlot,
     items: rawItems,
-    itemsCount: rawItems.length || 1,
-    subtotalOriginal: Number(row.total) || 0,
-    totalSavings: 0,
-    deliveryFee: 0,
-    finalPayableAmount: Number(row.total) || 0,
-    paymentMethod: 'Cash on Delivery (COD)',
-    status: (row.status || 'Pending') as OrderStatus,
-    statusLabel: row.status || 'Pending Confirmation',
+    itemsCount: rawItems.length || Number(row.itemsCount) || 1,
+    subtotalOriginal: Number(row.subtotalOriginal) || total,
+    totalSavings: Number(row.totalSavings) || 0,
+    deliveryFee: Number(row.deliveryFee) || 0,
+    total: total,
+    finalPayableAmount: total,
+    paymentMethod: row.paymentMethod || 'Cash on Delivery (COD)',
+    status: status,
+    statusLabel: row.statusLabel || status,
     createdAt: formattedDate,
-    timestamp: createdDate.getTime() || Date.now(),
-    isParchi: isParchi || Boolean(row.parchi_url),
-    orderType: (row.order_type as 'cart' | 'voice' | 'parchi') || (isVoice ? 'voice' : (isParchi ? 'parchi' : 'cart')),
-    slipPhoto: row.parchi_url || undefined,
-    parchiImageUrl: row.parchi_url || undefined,
-    slipImageUrl: row.parchi_url || undefined,
-    voiceAudio: row.voice_url || undefined,
-    voiceNoteBase64: row.voice_url || undefined,
-    voiceAudioUrl: row.voice_url || undefined,
+    created_at: row.created_at || (!isNaN(createdDate.getTime()) ? createdDate.toISOString() : new Date().toISOString()),
+    timestamp: !isNaN(createdDate.getTime()) ? createdDate.getTime() : Date.now(),
+    isParchi: isParchi,
+    orderType: isVoice ? 'voice' : (isParchi ? 'parchi' : 'cart'),
+    order_type: isVoice ? 'voice' : (isParchi ? 'parchi' : 'cart'),
+    slipPhoto: row.parchi_url || row.slipPhoto || row.parchiImageUrl || undefined,
+    parchiImageUrl: row.parchi_url || row.parchiImageUrl || row.slipPhoto || undefined,
+    slipImageUrl: row.parchi_url || row.slipImageUrl || row.slipPhoto || undefined,
+    voiceAudio: row.voice_url || row.voiceAudio || row.voiceNoteBase64 || undefined,
+    voiceNoteBase64: row.voice_url || row.voiceNoteBase64 || row.voiceAudio || undefined,
+    voiceAudioUrl: row.voice_url || row.voiceAudioUrl || row.voiceNoteBase64 || undefined,
   };
 }
+
+export const normalizeOrder = mapSupabaseRowToOrder;
 
 /**
  * Inserts an order directly into the Supabase 'orders' table
@@ -172,3 +193,48 @@ export async function deleteSupabaseOrder(orderId: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * True Cloud-Persistent Purge: Deletes ALL orders from Supabase PostgreSQL database
+ */
+export async function deleteAllSupabaseOrders(): Promise<boolean> {
+  try {
+    // Delete all records where id is not empty ('0')
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .neq('id', '0');
+
+    if (error) {
+      console.warn('[Supabase Delete All Error]:', error.message);
+      return false;
+    }
+    console.log('[Supabase] All orders wiped permanently from cloud database.');
+    return true;
+  } catch (err) {
+    console.error('[Supabase Delete All Exception]:', err);
+    return false;
+  }
+}
+
+/**
+ * Deletes completed or cancelled orders from Supabase
+ */
+export async function deleteCompletedSupabaseOrders(): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .in('status', ['delivered', 'Delivered', 'cancelled', 'Cancelled']);
+
+    if (error) {
+      console.warn('[Supabase Delete Completed Error]:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Supabase Delete Completed Exception]:', err);
+    return false;
+  }
+}
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Store,
   Plus,
@@ -67,6 +67,8 @@ import {
   fetchSupabaseOrders,
   updateSupabaseOrderStatus,
   deleteSupabaseOrder,
+  deleteAllSupabaseOrders,
+  deleteCompletedSupabaseOrders,
 } from '../services/supabaseOrderService';
 import {
   fetchCentralOrders,
@@ -91,6 +93,7 @@ import {
   getParchiOrders,
   updateParchiOrderStatus,
   deleteParchiOrder,
+  clearAllLocalOrders,
 } from '../services/storageService';
 
 interface AdminPanelProps {
@@ -139,14 +142,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   
-  // Custom Categories & Parchi state (synced with storage)
+  // Custom Categories & strictly empty initial liveOrders (no mock/demo orders)
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => getCustomCategories());
-  const [parchiOrders, setParchiOrders] = useState<ParchiOrder[]>(() => getParchiOrders());
-  const [liveOrders, setLiveOrders] = useState<Order[]>(() => {
-    const stored = getOrders();
-    return stored.length > 0 ? stored : orders;
-  });
+  const [liveOrders, setLiveOrders] = useState<Order[]>([]);
   const [parchiSearchQuery, setParchiSearchQuery] = useState('');
+  const [parchiPage, setParchiPage] = useState<number>(1);
   const [zoomedParchi, setZoomedParchi] = useState<ParchiOrder | null>(null);
   const [zoomScale, setZoomScale] = useState(1);
 
@@ -175,49 +175,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const isBeepAlertEnabledRef = React.useRef(isBeepAlertEnabled);
   isBeepAlertEnabledRef.current = isBeepAlertEnabled;
 
-  const checkIncomingAlerts = React.useCallback((ordersList: Order[], parchisList: ParchiOrder[]) => {
-    if (isInitialLoadRef.current) {
-      ordersList.forEach((o) => knownOrderIdsRef.current.add(o.id));
-      parchisList.forEach((p) => knownOrderIdsRef.current.add(p.id));
-      isInitialLoadRef.current = false;
-      return;
-    }
-
-    const brandNewParchi = parchisList.find((p) => !knownOrderIdsRef.current.has(p.id));
-    const brandNewOrder = ordersList.find((o) => !knownOrderIdsRef.current.has(o.id));
-
-    if (brandNewParchi || brandNewOrder) {
-      if (isBeepAlertEnabledRef.current) {
-        playAdminNotificationChime();
-      }
-      const target = brandNewParchi || brandNewOrder!;
-      const isVoice = Boolean(
-        target.voiceNoteBase64 ||
-        (target as any).orderType === 'voice' ||
-        (target as any).notes?.includes('वॉइस')
-      );
-      const isParchi = Boolean(
-        (target as any).imageBase64 ||
-        (target as any).parchiImageUrl ||
-        (target as any).orderType === 'parchi' ||
-        (target as any).isParchi
-      );
-
-      setNewOrderAlert({
-        id: target.id,
-        customerName: target.customerName || 'Customer',
-        type: isVoice ? 'voice' : isParchi ? 'parchi' : 'cart',
-        time: new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' }),
-      });
-
-      ordersList.forEach((o) => knownOrderIdsRef.current.add(o.id));
-      parchisList.forEach((p) => knownOrderIdsRef.current.add(p.id));
-    }
-  }, []);
-
-  // Helper to map central server orders to ParchiOrder model
-  const deriveParchiOrders = React.useCallback((serverOrders: Order[]): ParchiOrder[] => {
-    return serverOrders
+  // Unified Parchi orders derived directly from liveOrders (single source of truth)
+  const parchiOrders = React.useMemo<ParchiOrder[]>(() => {
+    return liveOrders
       .filter(
         (o) =>
           o.isParchi ||
@@ -248,17 +208,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         createdAt: o.createdAt,
         timestamp: (o as any).timestamp || Date.now(),
       }));
-  }, []);
+  }, [liveOrders]);
 
-  // Sync liveOrders if prop orders changes only on initial mount if liveOrders is empty
-  React.useEffect(() => {
-    if (orders && orders.length > 0 && liveOrders.length === 0) {
-      setLiveOrders(orders);
-      const serverParchis = deriveParchiOrders(orders);
-      setParchiOrders(serverParchis);
-      checkIncomingAlerts(orders, serverParchis);
+  const checkIncomingAlerts = React.useCallback((ordersList: Order[]) => {
+    if (isInitialLoadRef.current) {
+      ordersList.forEach((o) => knownOrderIdsRef.current.add(o.id));
+      isInitialLoadRef.current = false;
+      return;
     }
-  }, [orders, liveOrders.length, checkIncomingAlerts, deriveParchiOrders]);
+
+    const brandNewOrder = ordersList.find((o) => !knownOrderIdsRef.current.has(o.id));
+
+    if (brandNewOrder) {
+      if (isBeepAlertEnabledRef.current) {
+        playAdminNotificationChime();
+      }
+      const isVoice = Boolean(
+        brandNewOrder.voiceNoteBase64 ||
+        (brandNewOrder as any).orderType === 'voice' ||
+        (brandNewOrder as any).notes?.includes('वॉइस')
+      );
+      const isParchi = Boolean(
+        (brandNewOrder as any).imageBase64 ||
+        (brandNewOrder as any).parchiImageUrl ||
+        (brandNewOrder as any).orderType === 'parchi' ||
+        (brandNewOrder as any).isParchi
+      );
+
+      setNewOrderAlert({
+        id: brandNewOrder.id,
+        customerName: brandNewOrder.customerName || 'Customer',
+        type: isVoice ? 'voice' : isParchi ? 'parchi' : 'cart',
+        time: new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' }),
+      });
+
+      ordersList.forEach((o) => knownOrderIdsRef.current.add(o.id));
+    }
+  }, []);
 
   // Supabase PostgreSQL Real-Time Listener and Initial Load
   React.useEffect(() => {
@@ -272,20 +258,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && Array.isArray(data) && data.length > 0 && isMounted) {
+        if (!error && Array.isArray(data) && isMounted) {
           const mappedOrders = data.map(mapSupabaseRowToOrder);
-          setLiveOrders((prev) => {
-            // Merge existing and supabase orders cleanly
-            const existingMap = new Map(prev.map((o) => [o.id, o]));
-            mappedOrders.forEach((o) => existingMap.set(o.id, o));
-            const merged = Array.from(existingMap.values()).sort(
-              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
-            );
-            const serverParchis = deriveParchiOrders(merged);
-            setParchiOrders(serverParchis);
-            checkIncomingAlerts(merged, serverParchis);
-            return merged;
-          });
+          setLiveOrders(mappedOrders);
+          checkIncomingAlerts(mappedOrders);
         }
       } catch (err) {
         console.warn('[Supabase Initial Load]:', err);
@@ -294,9 +270,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     loadSupabaseOrders();
 
-    // 2. Real-time Subscription to Supabase 'orders' table
+    // 2. Real-time Subscription to Supabase 'orders' table (INSERT, UPDATE, DELETE)
     const channel = supabase
-      .channel('orders-channel')
+      .channel('orders-realtime-sync')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
@@ -305,11 +281,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           const newOrder = mapSupabaseRowToOrder(payload.new);
           playAdminNotificationChime();
           setLiveOrders((prev) => {
-            const updated = [newOrder, ...prev.filter((o) => o.id !== newOrder.id)];
-            const serverParchis = deriveParchiOrders(updated);
-            setParchiOrders(serverParchis);
-            checkIncomingAlerts(updated, serverParchis);
-            return updated;
+            if (prev.some((o) => o.id === newOrder.id)) return prev;
+            return [newOrder, ...prev];
+          });
+
+          // Show high-priority new order toast alert
+          const isVoice = Boolean(
+            newOrder.voiceNoteBase64 ||
+            (newOrder as any).orderType === 'voice' ||
+            (newOrder as any).notes?.includes('वॉइस')
+          );
+          const isParchi = Boolean(
+            (newOrder as any).imageBase64 ||
+            (newOrder as any).parchiImageUrl ||
+            (newOrder as any).orderType === 'parchi' ||
+            (newOrder as any).isParchi
+          );
+
+          setNewOrderAlert({
+            id: newOrder.id,
+            customerName: newOrder.customerName || 'Customer',
+            type: isVoice ? 'voice' : isParchi ? 'parchi' : 'cart',
+            time: new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' }),
           });
         }
       )
@@ -319,12 +312,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         (payload) => {
           if (!payload.new) return;
           const updatedOrder = mapSupabaseRowToOrder(payload.new);
-          setLiveOrders((prev) => {
-            const next = prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o));
-            const serverParchis = deriveParchiOrders(next);
-            setParchiOrders(serverParchis);
-            return next;
-          });
+          setLiveOrders((prev) =>
+            prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'orders' },
+        (payload) => {
+          const deletedId = (payload.old as { id?: string })?.id;
+          if (deletedId) {
+            setLiveOrders((prev) => prev.filter((o) => o.id !== deletedId));
+          }
         }
       )
       .subscribe();
@@ -333,104 +333,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [checkIncomingAlerts, deriveParchiOrders]);
+  }, [checkIncomingAlerts]);
 
-  // Real-time polling from Central Server Database every 3 seconds (Multi-device live sync)
+  // Window visibility & focus re-sync directly from Supabase Cloud Table
   React.useEffect(() => {
     let isMounted = true;
-    let hasLoggedError = false;
-
-    const loadCentralOrders = async () => {
-      try {
-        let res: Response | null = null;
+    const handleVisibilitySync = async () => {
+      if (document.visibilityState === 'visible') {
         try {
-          const targetUrl = API_BASE_URL ? `${API_BASE_URL}/api/orders` : '/api/orders';
-          res = await fetch(targetUrl, {
-            headers: { Accept: 'application/json' },
-          });
-        } catch (firstErr) {
-          // If external target failed (e.g. Render spin-up or CORS) and API_BASE_URL was set, fallback to relative /api/orders
-          if (API_BASE_URL) {
-            try {
-              res = await fetch('/api/orders', {
-                headers: { Accept: 'application/json' },
-              });
-            } catch {
-              // fallback also failed
-            }
+          const { data, error } = await supabase
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (!error && Array.isArray(data) && isMounted) {
+            setLiveOrders(data.map(mapSupabaseRowToOrder));
           }
-          if (!res) throw firstErr;
-        }
-
-        if (res && res.ok) {
-          const data = await res.json();
-          const serverOrders: Order[] = Array.isArray(data) ? data : data.orders || [];
-          if (isMounted) {
-            // DIRECTLY updates liveOrders state from central server on every 3s poll
-            setLiveOrders(serverOrders);
-            const serverParchis = deriveParchiOrders(serverOrders);
-            setParchiOrders(serverParchis);
-            checkIncomingAlerts(serverOrders, serverParchis);
-            hasLoggedError = false; // Reset on success
-          }
-        }
-      } catch (err) {
-        // Fallback to local storage if central backend is temporarily unreachable
-        if (isMounted) {
-          const localOrders = getOrders();
-          if (localOrders && localOrders.length > 0 && liveOrders.length === 0) {
-            setLiveOrders(localOrders);
-            const serverParchis = deriveParchiOrders(localOrders);
-            setParchiOrders(serverParchis);
-          }
-        }
-        if (!hasLoggedError) {
-          console.warn('[Admin Central Sync] Backend connecting, reading local orders:', err);
-          hasLoggedError = true;
+        } catch (err) {
+          console.warn('[Supabase Sync Notice]:', err);
         }
       }
     };
 
-    // Initial load
-    loadCentralOrders();
-
-    // 3-second recurring poll for live customer orders across Singrauli
-    const intervalId = setInterval(loadCentralOrders, 3000);
+    window.addEventListener('visibilitychange', handleVisibilitySync);
+    window.addEventListener('focus', handleVisibilitySync);
 
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
+      window.removeEventListener('visibilitychange', handleVisibilitySync);
+      window.removeEventListener('focus', handleVisibilitySync);
     };
-  }, [checkIncomingAlerts, deriveParchiOrders]);
+  }, []);
 
-  // Listen to external/restore sync events, custom kiranape_orders_updated event, and cross-tab storage
+  // Listen to external category sync events
   React.useEffect(() => {
-    const handleSync = async () => {
+    const handleCategorySync = () => {
       const updatedCategories = getCustomCategories();
       setCustomCategories(updatedCategories);
-      try {
-        const serverOrders = await fetchCentralOrders();
-        if (serverOrders && Array.isArray(serverOrders)) {
-          setLiveOrders(serverOrders);
-          const serverParchis = deriveParchiOrders(serverOrders);
-          setParchiOrders(serverParchis);
-          checkIncomingAlerts(serverOrders, serverParchis);
-        }
-      } catch (e) {
-        console.warn('Sync orders notice:', e);
-      }
     };
 
-    const unsub = subscribeToSync(handleSync);
-    window.addEventListener('kiranape_orders_updated', handleSync);
-    window.addEventListener('storage', handleSync);
-
+    const unsub = subscribeToSync(handleCategorySync);
     return () => {
       unsub();
-      window.removeEventListener('kiranape_orders_updated', handleSync);
-      window.removeEventListener('storage', handleSync);
     };
-  }, [checkIncomingAlerts, deriveParchiOrders]);
+  }, []);
 
   // Modal & Sync states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -489,7 +434,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await deleteOrderFromCentralServer(orderId);
       onDeleteOrder(orderId);
       setLiveOrders((prev) => prev.filter((o) => o.id !== orderId));
-      setParchiOrders((prev) => prev.filter((p) => p.id !== orderId));
       setOrderToDelete(null);
     } catch (err) {
       console.error('Failed to delete order:', err);
@@ -503,20 +447,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsClearingOrders(true);
     try {
       if (clearOrdersConfirm === 'all') {
+        await deleteAllSupabaseOrders();
         await clearAllOrdersFromCentralServer();
+        clearAllLocalOrders();
         setLiveOrders([]);
-        setParchiOrders([]);
       } else {
+        await deleteCompletedSupabaseOrders();
         await clearCompletedOrCancelledOrdersFromCentralServer();
         setLiveOrders((prev) =>
           prev.filter((o) => {
             const s = (o.status || '').toLowerCase();
-            return s !== 'delivered' && s !== 'cancelled';
-          })
-        );
-        setParchiOrders((prev) =>
-          prev.filter((p) => {
-            const s = (p.status || '').toLowerCase();
             return s !== 'delivered' && s !== 'cancelled';
           })
         );
@@ -591,36 +531,94 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateProduct(prod.id, { stock: newStock });
   };
 
-  // Filter products with Category Quick Filter support (Sabji, Atta/Dal, Tel, Masala, Snacks, Dairy)
-  const filteredProducts = products.filter((item) => {
-    const q = searchQuery.trim();
-    const matchesSearch = !q || matchesUniversalSearch(item, q);
+  // Memoized Universal Search & Category Filter for 1,000+ items without freezing DOM
+  const filteredProducts = useMemo(() => {
+    return products.filter((item) => {
+      const q = searchQuery.trim();
+      const matchesSearch = !q || matchesUniversalSearch(item, q);
 
-    let matchesCategory = false;
-    if (selectedCategory === 'All') {
-      matchesCategory = true;
-    } else if (selectedCategory === 'Sabji') {
-      matchesCategory =
-        item.category.toLowerCase().includes('sabji') ||
-        item.category.toLowerCase().includes('fresh') ||
-        item.category.toLowerCase().includes('fruit') ||
-        item.category.toLowerCase().includes('vegetable');
-    } else if (selectedCategory === 'Atta/Dal') {
-      matchesCategory = item.category === 'Atta & Flours' || item.category === 'Rice & Dal';
-    } else if (selectedCategory === 'Tel') {
-      matchesCategory = item.category === 'Oil & Ghee';
-    } else if (selectedCategory === 'Masala') {
-      matchesCategory = item.category === 'Spices & Salt';
-    } else if (selectedCategory === 'Snacks') {
-      matchesCategory = item.category === 'Snacks & Biscuits';
-    } else if (selectedCategory === 'Dairy') {
-      matchesCategory = item.category === 'Dairy & Bakery';
-    } else {
-      matchesCategory = item.category === selectedCategory;
-    }
+      let matchesCategory = false;
+      if (selectedCategory === 'All') {
+        matchesCategory = true;
+      } else if (selectedCategory === 'Sabji') {
+        matchesCategory =
+          item.category.toLowerCase().includes('sabji') ||
+          item.category.toLowerCase().includes('fresh') ||
+          item.category.toLowerCase().includes('fruit') ||
+          item.category.toLowerCase().includes('vegetable');
+      } else if (selectedCategory === 'Atta/Dal') {
+        matchesCategory = item.category === 'Atta & Flours' || item.category === 'Rice & Dal';
+      } else if (selectedCategory === 'Tel') {
+        matchesCategory = item.category === 'Oil & Ghee';
+      } else if (selectedCategory === 'Masala') {
+        matchesCategory = item.category === 'Spices & Salt';
+      } else if (selectedCategory === 'Snacks') {
+        matchesCategory = item.category === 'Snacks & Biscuits';
+      } else if (selectedCategory === 'Dairy') {
+        matchesCategory = item.category === 'Dairy & Bakery';
+      } else {
+        matchesCategory = item.category === selectedCategory;
+      }
 
-    return matchesSearch && matchesCategory;
-  });
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchQuery, selectedCategory]);
+
+  // Catalog Pagination (Zero DOM Freeze for 1,000+ items)
+  const [catalogPage, setCatalogPage] = useState<number>(1);
+  const [catalogPerPage, setCatalogPerPage] = useState<number>(36);
+
+  // Reset catalog page to 1 when search or category changes
+  React.useEffect(() => {
+    setCatalogPage(1);
+  }, [searchQuery, selectedCategory]);
+
+  const totalCatalogPages = catalogPerPage === 0 ? 1 : Math.max(1, Math.ceil(filteredProducts.length / catalogPerPage));
+  const safeCatalogPage = Math.min(catalogPage, totalCatalogPages);
+  const paginatedCatalogProducts = useMemo(() => {
+    if (catalogPerPage === 0) return filteredProducts;
+    const start = (safeCatalogPage - 1) * catalogPerPage;
+    return filteredProducts.slice(start, start + catalogPerPage);
+  }, [filteredProducts, safeCatalogPage, catalogPerPage]);
+
+  // Orders Sub-Filter & Pagination State (Zero-Hang DOM Optimization)
+  const [ordersFilterStatus, setOrdersFilterStatus] = useState<'all' | 'pending' | 'processing' | 'delivered' | 'cancelled'>('all');
+  const [ordersCurrentPage, setOrdersCurrentPage] = useState<number>(1);
+  const [ordersPerPage, setOrdersPerPage] = useState<number>(20);
+
+  // Reset order page when filter changes
+  React.useEffect(() => {
+    setOrdersCurrentPage(1);
+  }, [ordersFilterStatus]);
+
+  // Filtered orders based on selected sub-filter
+  const filteredLiveOrders = useMemo(() => {
+    return liveOrders.filter((o) => {
+      if (ordersFilterStatus === 'all') return true;
+      const s = (o.status || '').toLowerCase();
+      if (ordersFilterStatus === 'pending') {
+        return s === 'received' || s === 'new order' || s === 'pending';
+      }
+      if (ordersFilterStatus === 'processing') {
+        return s === 'processing' || s === 'packed' || s === 'out_for_delivery' || s === 'out for delivery';
+      }
+      if (ordersFilterStatus === 'delivered') {
+        return s === 'delivered';
+      }
+      if (ordersFilterStatus === 'cancelled') {
+        return s === 'cancelled';
+      }
+      return true;
+    });
+  }, [liveOrders, ordersFilterStatus]);
+
+  // Paginated orders slice
+  const totalOrderPages = Math.max(1, Math.ceil(filteredLiveOrders.length / ordersPerPage));
+  const safeOrderPage = Math.min(ordersCurrentPage, totalOrderPages);
+  const paginatedOrders = useMemo(() => {
+    const start = (safeOrderPage - 1) * ordersPerPage;
+    return filteredLiveOrders.slice(start, start + ordersPerPage);
+  }, [filteredLiveOrders, safeOrderPage, ordersPerPage]);
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -1516,17 +1514,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4 pb-16">
-                    {filteredProducts.map((product) => (
-                      <AdminVisualProductCard
-                        key={product.id}
-                        product={product}
-                        onUpdateProduct={onUpdateProduct}
-                        onRequestDelete={(id) => setDeleteConfirmId(id)}
-                        onOpenEditModal={handleOpenEdit}
-                        deliveryTime={storeSettings.deliveryTime || 'Bharosemand Delivery'}
-                      />
-                    ))}
+                  <div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4 pb-4">
+                      {paginatedCatalogProducts.map((product) => (
+                        <AdminVisualProductCard
+                          key={product.id}
+                          product={product}
+                          onUpdateProduct={onUpdateProduct}
+                          onRequestDelete={(id) => setDeleteConfirmId(id)}
+                          onOpenEditModal={handleOpenEdit}
+                          deliveryTime={storeSettings.deliveryTime || 'Bharosemand Delivery'}
+                        />
+                      ))}
+                    </div>
+
+                    {totalCatalogPages > 1 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-stone-200 shadow-xs mb-16">
+                        <div className="text-xs text-stone-600 font-medium">
+                          Showing {(safeCatalogPage - 1) * catalogPerPage + 1} to {Math.min(safeCatalogPage * catalogPerPage, filteredProducts.length)} of {filteredProducts.length} items
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCatalogPage((p) => Math.max(1, p - 1))}
+                            disabled={safeCatalogPage <= 1}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold border border-stone-300 bg-stone-50 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          >
+                            Previous
+                          </button>
+                          <span className="text-xs font-bold text-stone-800">
+                            Page {safeCatalogPage} of {totalCatalogPages}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setCatalogPage((p) => Math.min(totalCatalogPages, p + 1))}
+                            disabled={safeCatalogPage >= totalCatalogPages}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold border border-stone-300 bg-stone-50 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1594,7 +1623,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      filteredProducts.map((product) => {
+                      paginatedCatalogProducts.map((product) => {
                         const savings = product.originalPrice - product.finalPrice;
                         const hasVariants = Boolean(product.variants && product.variants.length > 0);
                         const isExpanded = Boolean(expandedProductVariants[product.id]);
@@ -1610,6 +1639,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <img
                                       src={product.imageUrl || getCategoryFallbackSvg(product.category, product.name)}
                                       alt={product.name}
+                                      loading="lazy"
+                                      decoding="async"
                                       onError={(e) => {
                                         (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(
                                           product.category,
@@ -1964,8 +1995,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </tbody>
                 </table>
               </div>
-              <div className="p-3 bg-stone-50 border-t border-stone-200 text-xs text-stone-500 text-center font-medium">
-                Showing {filteredProducts.length} of {products.length} grocery items in store
+              <div className="p-3 bg-stone-50 border-t border-stone-200 text-xs text-stone-500 flex flex-col sm:flex-row items-center justify-between gap-2 font-medium">
+                <div>
+                  Showing {(safeCatalogPage - 1) * catalogPerPage + 1} to {Math.min(safeCatalogPage * catalogPerPage, filteredProducts.length)} of {filteredProducts.length} grocery items
+                </div>
+                {totalCatalogPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCatalogPage((p) => Math.max(1, p - 1))}
+                      disabled={safeCatalogPage <= 1}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold border border-stone-300 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs font-bold text-stone-800">
+                      Page {safeCatalogPage} of {totalCatalogPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCatalogPage((p) => Math.min(totalCatalogPages, p + 1))}
+                      disabled={safeCatalogPage >= totalCatalogPages}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold border border-stone-300 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             )}
@@ -1986,6 +2042,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { data, error } = await supabase
+                      .from('orders')
+                      .select('*')
+                      .order('created_at', { ascending: false });
+                    if (!error && Array.isArray(data)) {
+                      setLiveOrders(data.map(mapSupabaseRowToOrder));
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Force refresh orders from Supabase cloud database"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-stone-600" />
+                  <span>Sync Cloud</span>
+                </button>
+
                 <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-emerald-200">
                   {liveOrders.length} Total Orders
                 </span>
@@ -2011,13 +2085,68 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={() => setClearOrdersConfirm('all')}
                   disabled={liveOrders.length === 0}
                   className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  title="Delete all order history permanently"
+                  title="Delete all order history permanently from cloud database"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Delete All History</span>
                 </button>
               </div>
             </div>
+
+            {/* Sub-Filters for Quick Order Triage */}
+            {liveOrders.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {(['all', 'pending', 'processing', 'delivered', 'cancelled'] as const).map((status) => {
+                  const count = status === 'all'
+                    ? liveOrders.length
+                    : status === 'pending'
+                    ? liveOrders.filter((o) => {
+                        const s = (o.status || '').toLowerCase();
+                        return s === 'received' || s === 'new order' || s === 'pending';
+                      }).length
+                    : status === 'processing'
+                    ? liveOrders.filter((o) => {
+                        const s = (o.status || '').toLowerCase();
+                        return s === 'processing' || s === 'packed' || s === 'out_for_delivery' || s === 'out for delivery';
+                      }).length
+                    : status === 'delivered'
+                    ? liveOrders.filter((o) => (o.status || '').toLowerCase() === 'delivered').length
+                    : liveOrders.filter((o) => (o.status || '').toLowerCase() === 'cancelled').length;
+
+                  const label = status === 'all'
+                    ? 'All'
+                    : status === 'pending'
+                    ? 'Pending / New'
+                    : status === 'processing'
+                    ? 'Processing / Out'
+                    : status === 'delivered'
+                    ? 'Delivered'
+                    : 'Cancelled';
+
+                  const isActive = ordersFilterStatus === status;
+
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setOrdersFilterStatus(status)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                        isActive
+                          ? 'bg-stone-900 text-white shadow-xs'
+                          : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                        isActive ? 'bg-stone-800 text-amber-300' : 'bg-stone-100 text-stone-600'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {liveOrders.length === 0 ? (
               <div className="bg-white rounded-2xl border border-stone-200/90 p-12 text-center shadow-xs">
@@ -2033,9 +2162,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Place a Test Order as Customer
                 </button>
               </div>
+            ) : filteredLiveOrders.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-stone-200/90 p-8 text-center shadow-xs">
+                <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+                <p className="font-semibold text-stone-700 text-sm">No orders matching &quot;{ordersFilterStatus}&quot;</p>
+                <button
+                  onClick={() => setOrdersFilterStatus('all')}
+                  className="mt-2 text-xs text-emerald-700 font-bold hover:underline cursor-pointer"
+                >
+                  Show all orders ({liveOrders.length})
+                </button>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {liveOrders.map((order) => (
+                {paginatedOrders.map((order) => (
                   <div
                     key={order.id}
                     className="bg-white rounded-2xl border border-stone-200/90 shadow-xs overflow-hidden flex flex-col justify-between"
@@ -2431,6 +2571,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 ))}
               </div>
             )}
+
+            {/* Orders Pagination Controls */}
+            {totalOrderPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-stone-200 shadow-xs">
+                <div className="text-xs text-stone-600 font-medium">
+                  Showing {(safeOrderPage - 1) * ordersPerPage + 1} to {Math.min(safeOrderPage * ordersPerPage, filteredLiveOrders.length)} of {filteredLiveOrders.length} orders
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOrdersCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeOrderPage <= 1}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold border border-stone-300 bg-stone-50 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-bold text-stone-800">
+                    Page {safeOrderPage} of {totalOrderPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersCurrentPage((p) => Math.min(totalOrderPages, p + 1))}
+                    disabled={safeOrderPage >= totalOrderPages}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold border border-stone-300 bg-stone-50 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2467,14 +2637,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="button"
                   onClick={async () => {
-                    const serverOrders = await fetchCentralOrders();
-                    if (Array.isArray(serverOrders)) {
-                      setLiveOrders(serverOrders);
-                      setParchiOrders(deriveParchiOrders(serverOrders));
+                    const { data, error } = await supabase
+                      .from('orders')
+                      .select('*')
+                      .order('created_at', { ascending: false });
+                    if (!error && Array.isArray(data)) {
+                      setLiveOrders(data.map(mapSupabaseRowToOrder));
                     }
                   }}
                   className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer"
-                  title="Refresh Parchi Orders from Central Server"
+                  title="Refresh Parchi Orders from Supabase Cloud"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -2510,9 +2682,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 );
               }
 
+              const parchiPerPage = 18;
+              const totalParchiPages = Math.max(1, Math.ceil(filteredParchi.length / parchiPerPage));
+              const safeParchiPage = Math.min(parchiPage, totalParchiPages);
+              const paginatedParchi = filteredParchi.slice((safeParchiPage - 1) * parchiPerPage, safeParchiPage * parchiPerPage);
+
               return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredParchi.map((parchi) => (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {paginatedParchi.map((parchi) => (
                     <div
                       key={parchi.id}
                       className="bg-white rounded-2xl border border-stone-200/90 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow"
@@ -2534,13 +2712,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           value={parchi.status || 'Pending'}
                           onChange={async (e) => {
                             const newStatus = e.target.value;
-                            await updateCentralOrderStatus(parchi.id, newStatus as any);
-                            await updateSupabaseOrderStatus(parchi.id, newStatus);
+                            await supabase.from('orders').update({ status: newStatus }).eq('id', parchi.id);
+                            await updateCentralOrderStatus(parchi.id, newStatus as any).catch(console.warn);
                             setLiveOrders((prev) =>
                               prev.map((o) => (o.id === parchi.id ? { ...o, status: newStatus } : o))
-                            );
-                            setParchiOrders((prev) =>
-                              prev.map((p) => (p.id === parchi.id ? { ...p, status: newStatus } : p))
                             );
                           }}
                           className={`text-[11px] font-black rounded-lg px-2 py-0.5 border cursor-pointer ${
@@ -2710,10 +2885,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           type="button"
                           onClick={async () => {
                             if (window.confirm(`Delete parchi record #${parchi.id}?`)) {
-                              await deleteOrderFromCentralServer(parchi.id);
+                              await supabase.from('orders').delete().eq('id', parchi.id);
+                              await deleteOrderFromCentralServer(parchi.id).catch(console.warn);
                               onDeleteOrder(parchi.id);
                               setLiveOrders((prev) => prev.filter((o) => o.id !== parchi.id));
-                              setParchiOrders((prev) => prev.filter((p) => p.id !== parchi.id));
                             }
                           }}
                           className="text-[11px] text-rose-600 hover:text-rose-800 font-medium hover:underline cursor-pointer"
@@ -2723,6 +2898,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                   ))}
+                  </div>
+
+                  {totalParchiPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-stone-200 shadow-xs">
+                      <div className="text-xs text-stone-600 font-medium">
+                        Showing {(safeParchiPage - 1) * parchiPerPage + 1} to {Math.min(safeParchiPage * parchiPerPage, filteredParchi.length)} of {filteredParchi.length} parchi orders
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setParchiPage((p) => Math.max(1, p - 1))}
+                          disabled={safeParchiPage <= 1}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold border border-stone-300 bg-stone-50 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-xs font-bold text-stone-800">
+                          Page {safeParchiPage} of {totalParchiPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setParchiPage((p) => Math.min(totalParchiPages, p + 1))}
+                          disabled={safeParchiPage >= totalParchiPages}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold border border-stone-300 bg-stone-50 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
