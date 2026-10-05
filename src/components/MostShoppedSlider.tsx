@@ -6,6 +6,7 @@ import { Flame, Sparkles, ChevronRight } from 'lucide-react';
 interface MostShoppedSliderProps {
   products: Product[];
   cartQuantities: Record<string, number>;
+  department?: 'grocery' | 'stationery';
   onAddToCart: (product: Product, variant?: ProductVariant) => void;
   onUpdateQuantity: (itemKey: string, newQuantity: number) => void;
   onViewAllCategory?: (categoryName: string) => void;
@@ -14,27 +15,31 @@ interface MostShoppedSliderProps {
 export const MostShoppedSlider: React.FC<MostShoppedSliderProps> = ({
   products,
   cartQuantities,
+  department = 'grocery',
   onAddToCart,
   onUpdateQuantity,
   onViewAllCategory,
 }) => {
-  // Select top 5 customer essentials strictly (curated FMCG top staples)
+  // Select top essentials based on active department
   const topFiveEssentials = useMemo(() => {
     if (!products || products.length === 0) return [];
 
-    // Prioritize high-demand FMCG staples
-    const priorityKeywords = [
-      'good day',
-      'red label',
-      'surf excel',
-      'dove',
-      'atta',
-      'fortune',
-      'bourbon',
-      'marie',
-    ];
+    const isStat = department === 'stationery';
+    const priorityKeywords = isStat
+      ? ['classmate', 'reynolds', 'fevicol', 'jk copier', 'apsara', 'kangaro', 'cello tape']
+      : ['good day', 'red label', 'surf excel', 'dove', 'atta', 'fortune', 'bourbon', 'marie'];
 
-    const scored = [...products].map((item) => {
+    const pool = products.filter((p) => {
+      const isItemStat =
+        p.department === 'stationery' ||
+        p.category.includes('Copies') ||
+        p.category.includes('Pens') ||
+        p.category.includes('Art') ||
+        p.category.includes('Office');
+      return isStat ? isItemStat : !isItemStat;
+    });
+
+    const scored = pool.map((item) => {
       const lowerName = item.name.toLowerCase();
       let score = 0;
       priorityKeywords.forEach((kw, idx) => {
@@ -42,14 +47,14 @@ export const MostShoppedSlider: React.FC<MostShoppedSliderProps> = ({
           score += (priorityKeywords.length - idx) * 10;
         }
       });
-      if (item.isFeatured) score += 50;
-      if (item.inStock !== false) score += 5;
+      if ((item as any).isFeatured) score += 50;
+      if (item.isAvailable !== false) score += 5;
       return { item, score };
     });
 
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 5).map((s) => s.item);
-  }, [products]);
+    return scored.slice(0, 6).map((s) => s.item);
+  }, [products, department]);
 
   if (topFiveEssentials.length === 0) return null;
 
@@ -58,20 +63,19 @@ export const MostShoppedSlider: React.FC<MostShoppedSliderProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-            <Flame className="w-4 h-4 fill-rose-500" />
+          <div className="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center shadow-2xs">
+            {department === 'stationery' ? <Sparkles className="w-4 h-4 text-amber-300" /> : <Flame className="w-4 h-4" />}
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h2 className="font-heading font-extrabold text-stone-900 text-base sm:text-lg tracking-tight">
-                Most Shopped Essentials
-              </h2>
-              <span className="bg-rose-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                Top 5
-              </span>
-            </div>
-            <p className="text-[11px] sm:text-xs text-stone-500">
-              Daily customer favorites in Waidhan & nearby
+            <h3 className="font-heading font-extrabold text-sm sm:text-base text-stone-900 leading-tight">
+              {department === 'stationery'
+                ? 'टॉप स्टेशनरी बेस्टसेलर्स (Top Stationery Bestsellers)'
+                : 'Most Shopped Daily Essentials'}
+            </h3>
+            <p className="text-[11px] text-stone-500">
+              {department === 'stationery'
+                ? 'क्लासमेट कॉपियां, रेनॉलड्स पेन व फेविकोल — 10-20 मिनट में घर पर'
+                : 'Top customer favorites directly at wholesale rates'}
             </p>
           </div>
         </div>

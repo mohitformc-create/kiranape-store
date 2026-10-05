@@ -10,11 +10,14 @@ export interface ProductVariant {
   stock?: number;
 }
 
+export type StoreDepartment = 'grocery' | 'stationery';
+
 export interface Product {
   id: string;
   name: string;
   hindiName?: string; // Bilingual Hindi Product Name (e.g. आशीर्वाद आटा)
   category: string;
+  department?: StoreDepartment;
   unit: string; // e.g., '1 kg', '5 kg', '1 Litre', '500 g', 'Pack of 4'
   originalPrice: number; // MRP in ₹
   discountPercent: number; // e.g., 15 for 15%
@@ -143,6 +146,7 @@ export interface CustomCategory {
   name: string; // English Name (e.g. "Pooja Samagri", "Baby Care", "Cold Drinks")
   hindiName?: string; // Hindi Name (e.g. "पूजा सामग्री")
   icon?: string; // Emoji or Icon identifier (e.g. "🪔", "🍼", "🥤")
+  department?: StoreDepartment;
   isSystem?: boolean;
   order?: number;
 }

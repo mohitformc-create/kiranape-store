@@ -6,6 +6,7 @@ import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 interface CategoryTileGridProps {
   categories: CustomCategory[];
   products: Product[];
+  department?: 'grocery' | 'stationery';
   onSelectCategory: (categoryName: string) => void;
 }
 
@@ -105,6 +106,34 @@ const CATEGORY_THEMES: Record<
     iconBg: 'bg-pink-100 text-pink-800',
     badgeBg: 'bg-pink-200/70 text-pink-900',
   },
+  'Copies & Registers': {
+    bg: 'bg-blue-50/90 hover:bg-blue-100/90',
+    border: 'border-blue-200/80',
+    text: 'text-blue-950',
+    iconBg: 'bg-blue-100 text-blue-800',
+    badgeBg: 'bg-blue-200/70 text-blue-900',
+  },
+  'Pens, Pencils & Geometry': {
+    bg: 'bg-indigo-50/90 hover:bg-indigo-100/90',
+    border: 'border-indigo-200/80',
+    text: 'text-indigo-950',
+    iconBg: 'bg-indigo-100 text-indigo-800',
+    badgeBg: 'bg-indigo-200/70 text-indigo-900',
+  },
+  'Art, Craft & Fevicol': {
+    bg: 'bg-purple-50/90 hover:bg-purple-100/90',
+    border: 'border-purple-200/80',
+    text: 'text-purple-950',
+    iconBg: 'bg-purple-100 text-purple-800',
+    badgeBg: 'bg-purple-200/70 text-purple-900',
+  },
+  'Office & Daily Stationery': {
+    bg: 'bg-teal-50/90 hover:bg-teal-100/90',
+    border: 'border-teal-200/80',
+    text: 'text-teal-950',
+    iconBg: 'bg-teal-100 text-teal-800',
+    badgeBg: 'bg-teal-200/70 text-teal-900',
+  },
 };
 
 const DEFAULT_THEME = {
@@ -164,6 +193,7 @@ const CURATED_COLLAGE_FALLBACKS: Record<string, { name: string; img: string }[]>
 export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
   categories,
   products,
+  department = 'grocery',
   onSelectCategory,
 }) => {
   // Precompute products list per category
@@ -177,25 +207,39 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
     return map;
   }, [products]);
 
-  // Filter out the meta "All" category from grid cards
+  // Filter out the meta "All" category from grid cards and filter by department
   const displayCategories = React.useMemo(() => {
-    return categories.filter((cat) => cat.name !== 'All');
-  }, [categories]);
+    return categories
+      .filter((cat) => cat.name !== 'All')
+      .filter((cat) => {
+        const isStationery =
+          cat.department === 'stationery' ||
+          cat.name.includes('Copies') ||
+          cat.name.includes('Pens') ||
+          cat.name.includes('Art') ||
+          cat.name.includes('Office');
+        return department === 'stationery' ? isStationery : !isStationery;
+      });
+  }, [categories, department]);
 
   return (
     <section className="mb-5 sm:mb-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-amber-400 text-stone-950 flex items-center justify-center text-sm font-black shadow-2xs">
-            ⚡
+          <div className="w-8 h-8 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center text-base font-black shadow-2xs">
+            {department === 'stationery' ? '📚' : '⚡'}
           </div>
           <div>
             <h2 className="font-heading font-black text-stone-900 text-base sm:text-lg tracking-tight">
-              Bestsellers & Curated Categories
+              {department === 'stationery'
+                ? 'स्टेशनरी व स्कूल सप्लाइज (Stationery & Supplies)'
+                : 'Bestsellers & Curated Categories'}
             </h2>
             <p className="text-[11px] sm:text-xs text-stone-500 font-medium">
-              Tap any category to view full instant delivery inventory
+              {department === 'stationery'
+                ? 'कॉपियां, रजिस्टर, पेन, फेविकोल और ऑफिस क्राफ्ट का सामान'
+                : 'Tap any category to view full instant delivery inventory'}
             </p>
           </div>
         </div>

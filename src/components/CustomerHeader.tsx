@@ -28,6 +28,8 @@ interface CustomerHeaderProps {
   hasActiveOrders?: boolean;
   storeSettings?: StoreSettings;
   categories?: CustomCategory[];
+  selectedDepartment?: 'grocery' | 'stationery';
+  onSelectDepartment?: (dept: 'grocery' | 'stationery') => void;
   onOpenParchiModal?: () => void;
   onOpenVoiceModal?: () => void;
 }
@@ -43,10 +45,37 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onSecretAdminTrigger,
   storeSettings = STORE_DEFAULTS,
   categories,
+  selectedDepartment = 'grocery',
+  onSelectDepartment,
   onOpenParchiModal,
   onOpenVoiceModal,
 }) => {
   const dynamicCategories = categories && categories.length > 0 ? categories : getCustomCategories();
+
+  // Filter categories shown in pills based on active department
+  const filteredCategories = React.useMemo(() => {
+    return dynamicCategories.filter((cat) => {
+      if (cat.name === 'All') return true;
+      if (selectedDepartment === 'stationery') {
+        return (
+          cat.department === 'stationery' ||
+          cat.name.includes('Copies') ||
+          cat.name.includes('Pens') ||
+          cat.name.includes('Art') ||
+          cat.name.includes('Office')
+        );
+      }
+      // grocery department
+      return (
+        cat.department !== 'stationery' &&
+        !cat.name.includes('Copies') &&
+        !cat.name.includes('Pens') &&
+        !cat.name.includes('Art, Craft') &&
+        !cat.name.includes('Office & Daily')
+      );
+    });
+  }, [dynamicCategories, selectedDepartment]);
+
   const [deliveryLocationsList, setDeliveryLocationsList] = useState<string[]>(() => getDeliveryLocations());
   const [selectedLocation, setSelectedLocation] = useState<string>(() => {
     return getCustomerSelectedLocation() || storeSettings?.serviceArea || 'बैढ़न (Waidhan)';
@@ -120,9 +149,50 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
             className="mt-2.5"
           />
 
+          {/* Top Department Switcher (Blinkit / Zepto Style Modern Dual Pills) */}
+          <div className="mt-2.5 flex items-center gap-2">
+            <button
+              type="button"
+              id="dept-tab-grocery"
+              onClick={() => {
+                if (onSelectDepartment) onSelectDepartment('grocery');
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-heading font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 ${
+                selectedDepartment === 'grocery'
+                  ? 'bg-white text-stone-900 shadow-xs ring-2 ring-emerald-600/30'
+                  : 'bg-amber-400/80 hover:bg-white/80 text-stone-800'
+              }`}
+            >
+              <span className="text-sm">🛒</span>
+              <span>किराना (Grocery)</span>
+              {selectedDepartment === 'grocery' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 ml-0.5 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              id="dept-tab-stationery"
+              onClick={() => {
+                if (onSelectDepartment) onSelectDepartment('stationery');
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-heading font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 ${
+                selectedDepartment === 'stationery'
+                  ? 'bg-white text-stone-900 shadow-xs ring-2 ring-blue-600/30'
+                  : 'bg-amber-400/80 hover:bg-white/80 text-stone-800'
+              }`}
+            >
+              <span className="text-sm">📚</span>
+              <span>स्टेशनरी (Stationery)</span>
+              {selectedDepartment === 'stationery' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 ml-0.5 animate-pulse" />
+              )}
+            </button>
+          </div>
+
           {/* Horizontal Category Pills Strip: Scrollable rounded pills with icons and active highlights */}
           <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar">
-            {dynamicCategories.map((cat) => {
+            {filteredCategories.map((cat) => {
               const isSelected = selectedCategory === cat.name;
               return (
                 <button

@@ -43,7 +43,7 @@ export const DEFAULT_BANNERS: PromoBanner[] = [
   },
 ];
 
-export const CATEGORIES = [
+export const GROCERY_CATEGORIES = [
   'All',
   'Snacks & Biscuits',
   'Tea, Coffee & Drinks',
@@ -56,4 +56,20 @@ export const CATEGORIES = [
   'Oil & Ghee',
   'Spices & Salt',
   'Dairy & Bakery',
+] as const;
+
+export const STATIONERY_CATEGORIES = [
+  'All',
+  'Copies & Registers',
+  'Pens, Pencils & Geometry',
+  'Art, Craft & Fevicol',
+  'Office & Daily Stationery',
+] as const;
+
+export const CATEGORIES = [
+  ...GROCERY_CATEGORIES,
+  'Copies & Registers',
+  'Pens, Pencils & Geometry',
+  'Art, Craft & Fevicol',
+  'Office & Daily Stationery',
 ] as const;

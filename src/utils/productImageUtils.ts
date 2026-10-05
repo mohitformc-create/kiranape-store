@@ -280,10 +280,15 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
   let brandName = 'KIRANAPE EXPRESS';
   let brandColor = '#059669'; // default emerald
   let brandBg = '#ECFDF5';
-  let packType: 'biscuit' | 'cake' | 'tea' | 'soap' | 'detergent' | 'oral' | 'talc' | 'ketchup' | 'atta' | 'oil' | 'dal' | 'spices' | 'dairy' | 'vegetables' | 'drinks' | 'general' = 'general';
+  let packType: 'biscuit' | 'cake' | 'tea' | 'soap' | 'detergent' | 'oral' | 'talc' | 'ketchup' | 'atta' | 'oil' | 'dal' | 'spices' | 'dairy' | 'vegetables' | 'drinks' | 'stationery' | 'general' = 'general';
 
   // Category & Product specific detection
-  if (c.includes('vegetable') || c.includes('sabzi') || t.includes('potato') || t.includes('onion') || t.includes('tomato') || t.includes('aloo') || t.includes('pyaz')) {
+  if (c.includes('stationery') || c.includes('copies') || c.includes('register') || c.includes('pen') || c.includes('pencil') || c.includes('craft') || t.includes('classmate') || t.includes('register') || t.includes('notebook') || t.includes('fevicol') || t.includes('paper') || t.includes('stapler') || t.includes('geometry')) {
+    brandName = t.includes('classmate') ? 'CLASSMATE' : t.includes('fevicol') ? 'FEVICOL MR' : t.includes('reynolds') ? 'REYNOLDS' : t.includes('apsara') ? 'APSARA' : t.includes('camlin') ? 'CAMLIN' : 'STATIONERY';
+    brandColor = '#1D4ED8';
+    brandBg = '#EFF6FF';
+    packType = 'stationery';
+  } else if (c.includes('vegetable') || c.includes('sabzi') || t.includes('potato') || t.includes('onion') || t.includes('tomato') || t.includes('aloo') || t.includes('pyaz')) {
     brandName = 'FRESH SABZI';
     brandColor = '#16A34A';
     brandBg = '#F0FDF4';
@@ -690,6 +695,33 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
           <text x="90" y="125" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="7" fill="#E0F2FE">
             CHILLED REFRESH
           </text>
+        </g>
+      `;
+      break;
+
+    case 'stationery':
+      packGraphic = `
+        <!-- Stationery / Notebook / Book / Pen Artwork -->
+        <g transform="translate(100, 50)">
+          <!-- Notebook cover -->
+          <rect x="25" y="20" width="160" height="145" rx="10" fill="${brandColor}" stroke="#1E3A8A" stroke-width="2" />
+          <!-- Spine -->
+          <rect x="25" y="20" width="22" height="145" rx="4" fill="#1E3A8A" opacity="0.9" />
+          <line x1="36" y1="20" x2="36" y2="165" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="4,4" />
+          <!-- Cover Label -->
+          <rect x="58" y="42" width="112" height="85" rx="8" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5" />
+          <text x="114" y="68" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="13" fill="${brandColor}">
+            ${brandName}
+          </text>
+          <text x="114" y="85" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="9" fill="#64748B">
+            STATIONERY EXPRESS
+          </text>
+          <line x1="68" y1="96" x2="160" y2="96" stroke="#E2E8F0" stroke-width="1.5" />
+          <line x1="68" y1="106" x2="160" y2="106" stroke="#E2E8F0" stroke-width="1.5" />
+          <line x1="68" y1="116" x2="140" y2="116" stroke="#E2E8F0" stroke-width="1.5" />
+          <!-- Pen / School Icon Badge -->
+          <circle cx="160" cy="140" r="18" fill="#FBBF24" stroke="#FFFFFF" stroke-width="2" />
+          <text x="160" y="146" text-anchor="middle" font-size="16">✏️</text>
         </g>
       `;
       break;

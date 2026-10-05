@@ -2,6 +2,7 @@ import { Product, Order, OrderStatus, StoreSettings, PromoBanner, CustomCategory
 import { INITIAL_PRODUCTS, STORE_DEFAULTS, DEFAULT_BANNERS } from '../data/initialProducts';
 import { WHOLESALE_105_PRODUCTS } from '../data/wholesaleCatalog105';
 import { FORTUNE_OIL_PRODUCTS } from '../data/fortuneCatalog';
+import { STATIONERY_PRODUCTS } from '../data/stationeryCatalog';
 import { idbGet, idbSet, idbDelete } from './idbStorage';
 
 export const ALL_VERIFIED_PRODUCTS: Product[] = [...WHOLESALE_105_PRODUCTS, ...FORTUNE_OIL_PRODUCTS];
@@ -359,6 +360,20 @@ export function getProducts(): Product[] {
       });
       loadedProducts = Array.from(existingMap.values());
       localStorage.setItem(PERMANENT_CATALOG_KEY, JSON.stringify(loadedProducts));
+    }
+
+    // Ensure all starter stationery products are present in the catalog
+    const existingStationeryMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
+    let hasNewStationery = false;
+    STATIONERY_PRODUCTS.forEach((statItem) => {
+      if (!existingStationeryMap.has(statItem.id)) {
+        existingStationeryMap.set(statItem.id, statItem);
+        hasNewStationery = true;
+      }
+    });
+    if (hasNewStationery) {
+      loadedProducts = Array.from(existingStationeryMap.values());
+      safeSaveProductsToLocalStorage(loadedProducts);
     }
 
     // Merge persistent custom edits (custom images, titles, pricing) from chaurasia_custom_products
@@ -761,19 +776,25 @@ export function saveStoredBanners(banners: PromoBanner[]): void {
 
 export const DEFAULT_CUSTOM_CATEGORIES: CustomCategory[] = [
   { id: 'cat-all', name: 'All', hindiName: 'सब कुछ', icon: '🏪', isSystem: true, order: 0 },
-  { id: 'cat-snacks', name: 'Snacks & Biscuits', hindiName: 'नमकीन और बिस्कुट', icon: '🍪', order: 1 },
-  { id: 'cat-drinks', name: 'Tea, Coffee & Drinks', hindiName: 'चाय और कोल्ड ड्रिंक्स', icon: '☕', order: 2 },
-  { id: 'cat-health', name: 'Health & Nutrition', hindiName: 'हेल्थ और न्यूट्रिशन', icon: '💪', order: 3 },
-  { id: 'cat-personal', name: 'Personal Care', hindiName: 'पर्सनल केयर व साबुन', icon: '🧴', order: 4 },
-  { id: 'cat-household', name: 'Household Essentials', hindiName: 'सफाई और घर का सामान', icon: '🧼', order: 5 },
-  { id: 'cat-packaged', name: 'Packaged Foods', hindiName: 'जैम, केचप व पैकेज्ड फूड', icon: '🥫', order: 6 },
-  { id: 'cat-atta', name: 'Atta & Flours', hindiName: 'आटा और मैदा', icon: '🌾', order: 7 },
-  { id: 'cat-rice-dal', name: 'Rice & Dal', hindiName: 'दाल और चावल', icon: '🍚', order: 8 },
-  { id: 'cat-oil-ghee', name: 'Oil & Ghee', hindiName: 'तेल और घी', icon: '🫒', order: 9 },
-  { id: 'cat-spices', name: 'Spices & Salt', hindiName: 'मसाले और नमक', icon: '🌶️', order: 10 },
-  { id: 'cat-dairy', name: 'Dairy & Bakery', hindiName: 'दूध, दही, ब्रेड', icon: '🥛', order: 11 },
-  { id: 'cat-pooja', name: 'Pooja Samagri', hindiName: 'पूजा सामग्री', icon: '🪔', order: 12 },
-  { id: 'cat-baby', name: 'Baby Care', hindiName: 'शिशु देखभाल', icon: '🍼', order: 13 },
+  // Grocery Department Categories
+  { id: 'cat-snacks', name: 'Snacks & Biscuits', hindiName: 'नमकीन और बिस्कुट', icon: '🍪', department: 'grocery', order: 1 },
+  { id: 'cat-drinks', name: 'Tea, Coffee & Drinks', hindiName: 'चाय और कोल्ड ड्रिंक्स', icon: '☕', department: 'grocery', order: 2 },
+  { id: 'cat-health', name: 'Health & Nutrition', hindiName: 'हेल्थ और न्यूट्रिशन', icon: '💪', department: 'grocery', order: 3 },
+  { id: 'cat-personal', name: 'Personal Care', hindiName: 'पर्सनल केयर व साबुन', icon: '🧴', department: 'grocery', order: 4 },
+  { id: 'cat-household', name: 'Household Essentials', hindiName: 'सफाई और घर का सामान', icon: '🧼', department: 'grocery', order: 5 },
+  { id: 'cat-packaged', name: 'Packaged Foods', hindiName: 'जैम, केचप व पैकेज्ड फूड', icon: '🥫', department: 'grocery', order: 6 },
+  { id: 'cat-atta', name: 'Atta & Flours', hindiName: 'आटा और मैदा', icon: '🌾', department: 'grocery', order: 7 },
+  { id: 'cat-rice-dal', name: 'Rice & Dal', hindiName: 'दाल और चावल', icon: '🍚', department: 'grocery', order: 8 },
+  { id: 'cat-oil-ghee', name: 'Oil & Ghee', hindiName: 'तेल और घी', icon: '🫒', department: 'grocery', order: 9 },
+  { id: 'cat-spices', name: 'Spices & Salt', hindiName: 'मसाले और नमक', icon: '🌶️', department: 'grocery', order: 10 },
+  { id: 'cat-dairy', name: 'Dairy & Bakery', hindiName: 'दूध, दही, ब्रेड', icon: '🥛', department: 'grocery', order: 11 },
+  { id: 'cat-pooja', name: 'Pooja Samagri', hindiName: 'पूजा सामग्री', icon: '🪔', department: 'grocery', order: 12 },
+  { id: 'cat-baby', name: 'Baby Care', hindiName: 'शिशु देखभाल', icon: '🍼', department: 'grocery', order: 13 },
+  // Stationery Department Categories (स्टेशनरी)
+  { id: 'cat-copies', name: 'Copies & Registers', hindiName: 'रजिस्टर / कॉपियां', icon: '📓', department: 'stationery', order: 14 },
+  { id: 'cat-pens', name: 'Pens, Pencils & Geometry', hindiName: 'पेन / पेंसिल / बॉक्स', icon: '🖊️', department: 'stationery', order: 15 },
+  { id: 'cat-craft', name: 'Art, Craft & Fevicol', hindiName: 'गोंद / चार्ट / क्राफ्ट', icon: '🎨', department: 'stationery', order: 16 },
+  { id: 'cat-office', name: 'Office & Daily Stationery', hindiName: 'टेप / कैंची / स्टेपलर / लिफाफे', icon: '📎', department: 'stationery', order: 17 },
 ];
 
 export function getCustomCategories(): CustomCategory[] {

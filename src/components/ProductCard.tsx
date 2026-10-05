@@ -69,6 +69,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? (cartQuantities[itemKey] || 0)
     : quantityInCart;
 
+  // Determine if item is stationery (to suppress food/veg badge)
+  const isStationeryItem =
+    product.department === 'stationery' ||
+    product.category.toLowerCase().includes('stationery') ||
+    product.category.toLowerCase().includes('copies') ||
+    product.category.toLowerCase().includes('register') ||
+    product.category.toLowerCase().includes('pen') ||
+    product.category.toLowerCase().includes('craft') ||
+    product.category.toLowerCase().includes('office');
+
   // Check if any variant of this product is in cart
   const totalInCartForProduct = cartQuantities
     ? Object.entries(cartQuantities).reduce((acc, [key, qty]) => {
@@ -89,14 +99,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <>
       <div
         id={`product-card-${product.id}`}
-        className={`group relative flex flex-col justify-between h-full w-full min-w-0 bg-white rounded-2xl border transition-all duration-200 overflow-hidden ${
+        className={`group relative flex flex-col justify-between h-full w-full min-w-0 bg-white rounded-2xl shadow-xs border transition-all duration-200 overflow-hidden ${
           totalInCartForProduct > 0
-            ? 'border-emerald-500 shadow-md ring-1 ring-emerald-500/25'
-            : 'border-stone-200 hover:border-stone-300 hover:shadow-md'
+            ? 'border-emerald-500 shadow-md ring-1 ring-emerald-500/20'
+            : 'border-slate-100 hover:border-slate-200 hover:shadow-md'
         } ${!product.isAvailable ? 'opacity-65' : ''}`}
       >
         {/* Product Image & Badges */}
-        <div className="relative w-full aspect-square bg-stone-50/80 overflow-hidden flex items-center justify-center p-2.5 sm:p-3">
+        <div className="relative w-full aspect-square bg-slate-50/70 overflow-hidden flex items-center justify-center p-2.5 sm:p-3">
           <img
             src={imageError || !product.imageUrl ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice) : product.imageUrl}
             alt={product.name}
@@ -120,13 +130,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </div>
             ) : <span />}
 
-            {/* Vegetarian Green Dot Indicator (FSSAI) */}
-            <div
-              className="w-4 h-4 border border-emerald-600 bg-white/95 rounded-[3px] p-[2px] flex items-center justify-center shadow-2xs"
-              title="100% Vegetarian"
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-            </div>
+            {/* FSSAI Green Veg Dot Indicator (only for food/grocery items) */}
+            {!isStationeryItem && (
+              <div
+                className="w-3.5 h-3.5 border border-emerald-600 bg-white/95 rounded-[3px] p-[2px] flex items-center justify-center shadow-2xs"
+                title="100% Vegetarian"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+              </div>
+            )}
           </div>
 
           {/* Out of stock overlay badge */}
@@ -142,6 +154,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Product Information */}
         <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between min-w-0">
           <div className="min-w-0">
+            {/* Delivery Time Badge: ⚡ 10-20 Min */}
+            <div className="flex items-center gap-1 mb-1">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-extrabold tracking-tight">
+                ⚡ 10-20 Min
+              </span>
+            </div>
+
             {/* Bold Product Title */}
             <h4 className="font-heading font-extrabold text-stone-900 text-xs sm:text-sm leading-snug line-clamp-2 min-h-[1.75rem] sm:min-h-[2.25rem] break-words group-hover:text-emerald-800 transition-colors">
               {product.name}
@@ -192,15 +211,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
 
           {/* Pricing & Green-Bordered "+ ADD" Action Area */}
-          <div className="pt-2.5 mt-2 border-t border-stone-100 flex items-end justify-between gap-1.5 min-w-0">
+          <div className="pt-2 mt-2 border-t border-slate-100 flex items-end justify-between gap-1.5 min-w-0">
             {/* Price Box */}
             <div className="flex flex-col min-w-0 flex-1">
               <div className="flex items-baseline gap-1 flex-wrap">
-                <span className="font-heading font-black text-stone-950 text-sm sm:text-base leading-none">
+                <span className="font-heading font-black text-[#0c831f] text-sm sm:text-base leading-none">
                   ₹{displayPrice}
                 </span>
                 {hasDiscount && (
-                  <span className="text-[10px] sm:text-xs text-stone-400 line-through font-normal leading-none">
+                  <span className="text-[10px] sm:text-xs text-slate-400 line-through font-normal leading-none">
                     ₹{displayMrp}
                   </span>
                 )}
@@ -222,8 +241,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 <button
                   id={`add-btn-${product.id}-${activeVariant?.id || 'base'}`}
                   onClick={handleAdd}
-                  className={`h-7 sm:h-8 px-3 sm:px-3.5 rounded-lg font-heading font-black text-xs sm:text-sm border-2 border-emerald-600 text-emerald-700 bg-white hover:bg-emerald-50 active:scale-95 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer tracking-wider ${
-                    isAdding ? 'bg-emerald-50 scale-95' : ''
+                  className={`h-7 sm:h-8 px-3 sm:px-3.5 rounded-lg font-heading font-black text-xs sm:text-sm border-2 border-[#0c831f] text-[#0c831f] bg-emerald-50/50 hover:bg-[#0c831f] hover:text-white active:scale-95 transition-all shadow-2xs flex items-center justify-center gap-1 cursor-pointer tracking-wider ${
+                    isAdding ? 'bg-emerald-100 scale-95' : ''
                   }`}
                   title={`Add ${displayUnit} to Cart`}
                 >

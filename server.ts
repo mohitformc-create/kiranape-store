@@ -2,12 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Prevent uncaught errors from crashing Cloud Run instance
+process.on('uncaughtException', (err) => {
+  console.error('[Kiranape Server] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Kiranape Server] Unhandled Rejection:', reason);
+});
+
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const rawPort = process.env.PORT || '3000';
+const PORT = parseInt(rawPort, 10) || 3000;
 
 // Enable CORS for all incoming mobile origins and preview domains
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'] }));
@@ -203,9 +211,9 @@ const persistCentralOrders = () => {
   }
 };
 
-// Health check endpoint
-app.get('/api/health', (_req, res) => {
-  res.json({
+// Health check endpoints (Cloud Run, Kubernetes, and API clients)
+app.get(['/api/health', '/health', '/healthz', '/_health'], (_req, res) => {
+  res.status(200).json({
     status: 'ok',
     service: 'Kiranape Express API',
     uptime: process.uptime(),
@@ -695,14 +703,13 @@ async function startServer() {
     app.use(express.static(publicPath));
   }
 
-  const isProduction =
-    process.env.NODE_ENV === 'production' ||
-    Boolean(process.env.RENDER) ||
-    Boolean(process.env.K_SERVICE) ||
-    Boolean(process.env.PORT && process.env.PORT !== '3000') ||
-    hasDist;
+  // Detect Cloud Run, Google Cloud deployment, or production build
+  const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.K_CONFIGURATION);
+  const isExplicitDev = process.env.NODE_ENV === 'development' || process.env.npm_lifecycle_event === 'dev' || process.argv.includes('--port');
+  const isProduction = isCloudRun || process.env.NODE_ENV === 'production' || (!isExplicitDev && hasDist);
 
   if (isProduction && hasDist) {
+    console.log(`[Kiranape Server] Serving production static build from ${distPath}`);
     app.use(express.static(distPath));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) {
@@ -715,6 +722,8 @@ async function startServer() {
       next();
     });
   } else {
+    console.log('[Kiranape Server] Starting in development mode with Vite middleware...');
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

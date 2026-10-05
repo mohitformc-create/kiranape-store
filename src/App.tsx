@@ -70,6 +70,7 @@ import { PromoCarousel } from './components/PromoCarousel';
 import { ProductCard } from './components/ProductCard';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
 import { MostShoppedSlider } from './components/MostShoppedSlider';
+import { StationeryPromoStrip } from './components/StationeryPromoStrip';
 import { CategoryDetailView } from './components/CategoryDetailView';
 import { BottomNavBar } from './components/BottomNavBar';
 import { CartDrawer } from './components/CartDrawer';
@@ -121,6 +122,7 @@ export default function App() {
   const [adminPin, setAdminPinState] = useState<string>(() => getAdminPin());
 
   // Customer UI State
+  const [selectedDepartment, setSelectedDepartment] = useState<'grocery' | 'stationery'>('grocery');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('All');
   const [cartQuantities, setCartQuantities] = useState<Record<string, number>>(() => getSavedCart());
@@ -775,6 +777,11 @@ export default function App() {
         onSearchChange={setSearchQuery}
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
+        selectedDepartment={selectedDepartment}
+        onSelectDepartment={(dept) => {
+          setSelectedDepartment(dept);
+          setSelectedCategory('All');
+        }}
         totalCartItems={totalCartCount}
         cartTotalAmount={cartTotalAmount}
         onOpenCart={() => setIsCartOpen(true)}
@@ -797,8 +804,9 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto w-full px-2.5 sm:px-4 pt-3 sm:pt-4 flex-1">
-        {/* 5 Dedicated Promotional Hero Carousel Banners */}
+        {/* Promotional Hero Carousel Banners */}
         <HeroBanner
+          department={selectedDepartment}
           onOpenParchiModal={() => setIsParchiModalOpen(true)}
           onSelectCategory={(cat) => setSelectedCategory(cat as ProductCategory)}
         />
@@ -905,9 +913,21 @@ export default function App() {
         ) : (
           /* 3. STRICT CATEGORY-FIRST HOME EXPERIENCE (ZERO RAW PRODUCT DUMP) */
           <div className="pb-6">
+            {/* Featured Promotional Strip on Grocery Feed */}
+            {selectedDepartment === 'grocery' && (
+              <StationeryPromoStrip
+                onExploreStationery={() => {
+                  setSelectedDepartment('stationery');
+                  setSelectedCategory('All');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            )}
+
             {/* Bestsellers & Curated Category Hub (4-column pastel cards with 2x2 brand packshots) */}
             <div id="category-grid-section">
               <CategoryTileGrid
+                department={selectedDepartment}
                 categories={customCategories}
                 products={products}
                 onSelectCategory={(catName) => {
@@ -917,8 +937,9 @@ export default function App() {
               />
             </div>
 
-            {/* Most Shopped Essentials (Clean, compact single-row horizontal slider of top 5 items only) */}
+            {/* Most Shopped Essentials (Clean, compact single-row horizontal slider of top items) */}
             <MostShoppedSlider
+              department={selectedDepartment}
               products={products}
               cartQuantities={cartQuantities}
               onAddToCart={handleAddToCart}

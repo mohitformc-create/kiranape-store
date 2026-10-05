@@ -332,10 +332,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         stock: v.stock !== undefined ? Number(v.stock) : 50,
       }));
 
+    const isStationery =
+      category === 'Copies & Registers' ||
+      category === 'Pens, Pencils & Geometry' ||
+      category === 'Art, Craft & Fevicol' ||
+      category === 'Office & Daily Stationery' ||
+      category.toLowerCase().includes('stationery');
+
     onSave({
       name: name.trim(),
       hindiName: hindiName.trim() || undefined,
       category,
+      department: isStationery ? 'stationery' : (editingProduct?.department || 'grocery'),
       unit: unit.trim(),
       originalPrice: numOriginal,
       discountPercent: numDiscount,

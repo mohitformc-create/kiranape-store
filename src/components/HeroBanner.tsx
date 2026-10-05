@@ -67,37 +67,78 @@ export const PROMO_BANNERS: PromoSlide[] = [
   },
 ];
 
+export const STATIONERY_PROMO_BANNERS: PromoSlide[] = [
+  {
+    id: 'stat_banner_1',
+    tag: '🎒 SCHOOL & OFFICE EXPRESS',
+    title: 'School & College Stationery Ab Ghar Baithe!',
+    subtitle: 'Classmate copies, registers, Reynolds pens aur art craft supplies 10-20 min mein ghar mangwaayein.',
+    ctaText: 'Copies & Pens ➔',
+    actionType: 'filterCategory',
+    targetCategory: 'Copies & Registers',
+    themeGradient: 'from-blue-700 via-indigo-600 to-blue-800',
+  },
+  {
+    id: 'stat_banner_2',
+    tag: '🎨 ART & CRAFT SPECIALS',
+    title: 'Fevicol, Chart Paper & Craft Supplies',
+    subtitle: 'Pidilite Fevicol MR, Fevikwik, scissors, cello tape aur coloring kits sabse saste rates par.',
+    ctaText: 'Art & Craft Dekhein ➔',
+    actionType: 'filterCategory',
+    targetCategory: 'Art, Craft & Fevicol',
+    themeGradient: 'from-purple-700 via-pink-600 to-indigo-800',
+  },
+  {
+    id: 'stat_banner_3',
+    tag: '📎 OFFICE ESSENTIALS',
+    title: 'JK Copier A4 Paper Rim, Tape & Staplers',
+    subtitle: 'Office printing paper, document envelopes, staplers aur sticky notes wholesale rates par.',
+    ctaText: 'Office Stationery ➔',
+    actionType: 'filterCategory',
+    targetCategory: 'Office & Daily Stationery',
+    themeGradient: 'from-emerald-700 via-teal-600 to-cyan-800',
+  },
+];
+
 interface HeroBannerProps {
+  department?: 'grocery' | 'stationery';
   onOpenParchiModal?: () => void;
   onSelectCategory?: (category: string) => void;
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({
+  department = 'grocery',
   onOpenParchiModal,
   onSelectCategory,
 }) => {
+  const activeBanners = department === 'stationery' ? STATIONERY_PROMO_BANNERS : PROMO_BANNERS;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
+  // Reset index on department change
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [department]);
+
   // Auto-rotate every 4 seconds
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % PROMO_BANNERS.length);
+      setCurrentIndex((prev) => (prev + 1) % activeBanners.length);
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPaused]);
+  }, [isPaused, activeBanners.length]);
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCurrentIndex((prev) => (prev === 0 ? PROMO_BANNERS.length - 1 : prev - 1));
+    setCurrentIndex((prev) => (prev === 0 ? activeBanners.length - 1 : prev - 1));
   };
 
   const handleNext = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCurrentIndex((prev) => (prev + 1) % PROMO_BANNERS.length);
+    setCurrentIndex((prev) => (prev + 1) % activeBanners.length);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -149,7 +190,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
     }
   };
 
-  const current = PROMO_BANNERS[currentIndex];
+  const current = activeBanners[currentIndex] || activeBanners[0];
 
   return (
     <section
@@ -233,7 +274,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
 
       {/* Pagination Dots */}
       <div className="absolute bottom-2.5 left-0 right-0 z-20 flex items-center justify-center gap-1.5 pointer-events-auto">
-        {PROMO_BANNERS.map((_, idx) => (
+        {activeBanners.map((_, idx) => (
           <button
             key={idx}
             type="button"
