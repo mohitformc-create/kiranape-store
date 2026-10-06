@@ -26,11 +26,16 @@ import {
   createEmojiSvgDataUrl,
   ParsedVoiceItem,
 } from '../utils/voiceInventoryParser';
-import { FMCG_CDN_CATALOG } from '../utils/productImageUtils';
+import { FMCG_CDN_CATALOG, getCategoryEmojiDataUrl } from '../utils/productImageUtils';
 import { playAdminNotificationChime } from '../utils/sound';
 import { saveProductToCentralInventory } from '../services/orderApiService';
 import { supabase } from '../config/supabase';
 import { compressImageFile, dataUrlToFile } from '../utils/imageUtils';
+import {
+  formatSupabasePublicImageUrl,
+  uploadProductImageToSupabase,
+  getValidImageUrl,
+} from '../services/supabaseClient';
 
 interface VoiceInventoryModalProps {
   isOpen: boolean;
@@ -331,34 +336,26 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
-  // Upload image to Supabase Storage with local CDN fallback
+  // Upload image to Supabase Storage with strict public URL enforcement
   const uploadImageToStorage = async (file: File, base64Preview: string): Promise<string> => {
     const cleanFileName = file.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '_');
     const fileName = `${Date.now()}_${cleanFileName || 'product.jpg'}`;
 
-    // 1. Attempt Supabase Storage Upload to 'product-images' bucket
+    // Standard Cloud Public URL (https://sggpbjmxzooxwnwfodxp.supabase.co/storage/v1/object/public/product-images/${fileName})
+    const canonicalPublicUrl = formatSupabasePublicImageUrl(fileName);
+
     try {
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(fileName);
-
-        if (publicUrl) {
-          console.log('[Supabase Storage] Product photo uploaded:', publicUrl);
-          return publicUrl;
-        }
-      } else {
-        console.warn('[Supabase Storage] Upload returned:', uploadError?.message);
+      // 1. Upload to Supabase Storage 'product-images'
+      const uploadRes = await uploadProductImageToSupabase(file, fileName);
+      if (uploadRes.publicUrl) {
+        console.log('[Supabase Storage] Public Cloud URL generated:', uploadRes.publicUrl);
+        return uploadRes.publicUrl;
       }
     } catch (storageErr) {
       console.warn('[Supabase Storage] Storage exception:', storageErr);
     }
 
-    // 2. Fallback: Local Server CDN bucket pattern (/api/upload-image)
+    // 2. Fallback: Local Server CDN bucket pattern
     try {
       const res = await fetch('/api/upload-image', {
         method: 'POST',
@@ -371,16 +368,20 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.publicUrl) {
-          console.log('[Server CDN] Product photo stored on CDN:', json.publicUrl);
-          return json.publicUrl;
+          // Guarantee absolute URL so mobile devices & live deployments never fail
+          const absoluteCdnUrl = json.publicUrl.startsWith('http')
+            ? json.publicUrl
+            : `${window.location.origin}${json.publicUrl}`;
+          console.log('[Server CDN] Product photo stored on CDN:', absoluteCdnUrl);
+          return absoluteCdnUrl;
         }
       }
     } catch (cdnErr) {
       console.warn('[Server CDN] Fallback CDN upload failed:', cdnErr);
     }
 
-    // 3. Fallback: Compact high-res Base64 dataURL
-    return base64Preview;
+    // 3. Fallback: Canonical public cloud URL
+    return canonicalPublicUrl;
   };
 
   // Discount calculation
@@ -947,8 +948,14 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
                   ) : imageFile || (!useEmojiImage && imageUrl) ? (
                     <>
                       <img
-                        src={imageUrl}
+                        src={getValidImageUrl(imageUrl, selectedCategory, name)}
                         alt={name || 'Product Photo'}
+                        onError={(e) => {
+                          const emojiFallback = getCategoryEmojiDataUrl(selectedCategory, name);
+                          if ((e.currentTarget as HTMLImageElement).src !== emojiFallback) {
+                            (e.currentTarget as HTMLImageElement).src = emojiFallback;
+                          }
+                        }}
                         className="w-full h-full object-contain p-1.5 mix-blend-multiply"
                       />
                       {/* Tiny "✕ (हटाएं)" Remove Button */}

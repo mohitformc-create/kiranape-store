@@ -27,8 +27,10 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // ==========================================
 // CENTRAL SERVER ORDERS DATABASE (Blinkit/Zepto Style)
 // ==========================================
-const ORDERS_FILE_PATH = path.join(process.cwd(), 'data', 'central_orders.json');
-const SERVER_ORDERS_PATH = path.join(process.cwd(), 'server', 'data', 'orders.json');
+const APP_ROOT = (import.meta as any).dirname || process.cwd();
+
+const ORDERS_FILE_PATH = path.join(APP_ROOT, 'data', 'central_orders.json');
+const SERVER_ORDERS_PATH = path.join(APP_ROOT, 'server', 'data', 'orders.json');
 
 interface CentralOrder {
   id: string;
@@ -73,11 +75,11 @@ let centralOrders: CentralOrder[] = [];
 // ==========================================
 // CENTRAL SERVER INVENTORY (Persistent 162 Items)
 // ==========================================
-const INVENTORY_FILE_PATH = path.join(process.cwd(), 'data', 'central_inventory.json');
-const SERVER_PRODUCTS_PATH = path.join(process.cwd(), 'server', 'data', 'products.json');
-const DEFAULT_CATALOG_PATH = path.join(process.cwd(), 'src', 'data', 'defaultCatalog.json');
-const BACKUP_INVENTORY_PATH = path.join(process.cwd(), 'data', 'master162Backup.json');
-const STATIC_SEED_PATH = path.join(process.cwd(), 'src', 'data', 'initialProducts.json');
+const INVENTORY_FILE_PATH = path.join(APP_ROOT, 'data', 'central_inventory.json');
+const SERVER_PRODUCTS_PATH = path.join(APP_ROOT, 'server', 'data', 'products.json');
+const DEFAULT_CATALOG_PATH = path.join(APP_ROOT, 'src', 'data', 'defaultCatalog.json');
+const BACKUP_INVENTORY_PATH = path.join(APP_ROOT, 'data', 'master162Backup.json');
+const STATIC_SEED_PATH = path.join(APP_ROOT, 'src', 'data', 'initialProducts.json');
 
 let centralInventory: any[] = [];
 
@@ -150,7 +152,7 @@ if (!fs.existsSync(SERVER_PRODUCTS_PATH) && (!Array.isArray(centralInventory) ||
 // ==========================================
 // CENTRAL CATEGORIES PERSISTENCE
 // ==========================================
-const CATEGORIES_FILE_PATH = path.join(process.cwd(), 'data', 'central_categories.json');
+const CATEGORIES_FILE_PATH = path.join(APP_ROOT, 'data', 'central_categories.json');
 const DEFAULT_CATEGORIES = [
   'All',
   'Snacks & Biscuits',
@@ -225,7 +227,11 @@ app.get(['/api/health', '/health', '/healthz', '/_health'], (_req, res) => {
 // ==========================================
 // STATIC ASSETS & WEB APP MANIFEST
 // ==========================================
-const PUBLIC_DIR = path.join(process.cwd(), 'public');
+const PUBLIC_DIR = [
+  path.join(APP_ROOT, 'public'),
+  path.join(process.cwd(), 'public'),
+  path.resolve('public'),
+].find((p) => fs.existsSync(p)) || path.join(APP_ROOT, 'public');
 
 // Dedicated /manifest.json endpoint ensuring status 200 and application/manifest+json
 app.get('/manifest.json', (_req, res) => {
@@ -726,9 +732,20 @@ app.delete(['/api/inventory/:id', '/api/products/:id'], (req, res) => {
 
 // Setup Vite middleware for dev or static server for production
 async function startServer() {
-  const distPath = path.join(process.cwd(), 'dist');
-  const publicPath = path.join(process.cwd(), 'public');
+  const distCandidates = [
+    path.join(APP_ROOT, 'dist'),
+    path.join(process.cwd(), 'dist'),
+    path.resolve('dist'),
+  ];
+  const distPath = distCandidates.find((p) => fs.existsSync(path.join(p, 'index.html'))) || distCandidates[0];
   const hasDist = fs.existsSync(path.join(distPath, 'index.html'));
+
+  const publicCandidates = [
+    path.join(APP_ROOT, 'public'),
+    path.join(process.cwd(), 'public'),
+    path.resolve('public'),
+  ];
+  const publicPath = publicCandidates.find((p) => fs.existsSync(p)) || publicCandidates[0];
 
   // Always serve public static assets (logos, icons, manifest, etc.)
   if (fs.existsSync(publicPath)) {
@@ -736,23 +753,40 @@ async function startServer() {
   }
 
   // Detect Cloud Run, Google Cloud deployment, or production build
-  const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.K_CONFIGURATION);
-  const isExplicitDev = process.env.NODE_ENV === 'development' || process.env.npm_lifecycle_event === 'dev' || process.argv.includes('--port');
+  const isCloudRun = Boolean(
+    process.env.K_SERVICE ||
+    process.env.K_REVISION ||
+    process.env.K_CONFIGURATION ||
+    (process.env.PORT === '8080' && !process.argv.includes('--port'))
+  );
+  // Explicit dev only when npm run dev is run (npm_lifecycle_event === 'dev') or --port argument is passed
+  const isExplicitDev = !isCloudRun && (process.env.npm_lifecycle_event === 'dev' || process.argv.includes('--port'));
   const isProduction = isCloudRun || process.env.NODE_ENV === 'production' || (!isExplicitDev && hasDist);
 
-  if (isProduction && hasDist) {
-    console.log(`[Kiranape Server] Serving production static build from ${distPath}`);
-    app.use(express.static(distPath));
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'Endpoint not found' });
-      }
-      const indexPath = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        return res.sendFile(indexPath);
-      }
-      next();
-    });
+  if (isProduction) {
+    if (hasDist) {
+      console.log(`[Kiranape Server] Serving production static build from ${distPath}`);
+      app.use(express.static(distPath));
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api')) {
+          return res.status(404).json({ error: 'Endpoint not found' });
+        }
+        const indexPath = path.join(distPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          return res.sendFile(indexPath);
+        }
+        next();
+      });
+    } else {
+      console.warn(`[Kiranape Server] Production mode active but dist folder not found at ${distPath}. Serving API routes.`);
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api')) {
+          return next();
+        }
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(`<!DOCTYPE html><html><head><title>Chaurasia Kirana App</title><meta http-equiv="refresh" content="3"></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>Chaurasia Kirana App</h2><p>Application is initializing, please reload in a moment...</p></body></html>`);
+      });
+    }
   } else {
     console.log('[Kiranape Server] Starting in development mode with Vite middleware...');
     const { createServer: createViteServer } = await import('vite');
@@ -763,9 +797,24 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Kiranape Express server running on port ${PORT} (mode: ${isProduction ? 'production' : 'development'})`);
   });
+
+  const gracefulShutdown = (signal: string) => {
+    console.log(`[Kiranape Server] Received ${signal}, shutting down gracefully...`);
+    server.close(() => {
+      console.log('[Kiranape Server] HTTP server closed.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.error('[Kiranape Server] Forced exit due to shutdown timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 startServer().catch((err) => {

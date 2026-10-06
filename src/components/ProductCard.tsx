@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Minus, Check, ShoppingBag, Sparkles, ChevronDown, X } from 'lucide-react';
 import { Product, ProductVariant } from '../types';
-import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { getCategoryFallbackSvg, getValidImageUrl, getCategoryEmojiDataUrl } from '../utils/productImageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -108,13 +108,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Product Image & Badges */}
         <div className="relative w-full aspect-square bg-slate-50/70 overflow-hidden flex items-center justify-center p-2.5 sm:p-3">
           <img
-            src={imageError || !product.imageUrl ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice) : product.imageUrl}
+            src={
+              imageError
+                ? getCategoryEmojiDataUrl(product.category, product.name)
+                : getValidImageUrl(
+                    product.imageUrl,
+                    product.category,
+                    product.name,
+                    displayUnit,
+                    displayPrice
+                  )
+            }
             alt={product.name}
             onError={(e) => {
               setImageError(true);
-              const fallback = getCategoryFallbackSvg(product.category, product.name, product.unit, product.originalPrice || product.finalPrice);
-              if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                (e.currentTarget as HTMLImageElement).src = fallback;
+              const emojiFallback = getCategoryEmojiDataUrl(product.category, product.name);
+              if ((e.currentTarget as HTMLImageElement).src !== emojiFallback) {
+                (e.currentTarget as HTMLImageElement).src = emojiFallback;
               }
             }}
             loading="lazy"

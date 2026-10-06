@@ -14,9 +14,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Product, ProductVariant } from '../types';
-import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { getCategoryFallbackSvg, getValidImageUrl, getCategoryEmojiDataUrl } from '../utils/productImageUtils';
 import { compressImageFile } from '../utils/imageUtils';
 import { calculateFinalPrice } from '../services/storageService';
+import { uploadProductImageToSupabase } from '../services/supabaseClient';
 
 interface AdminVisualProductCardProps {
   product: Product;
@@ -173,8 +174,10 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
     if (!file) return;
     try {
       setIsUploadingImage(true);
-      const compressedDataUrl = await compressImageFile(file, 600, 600, 0.85);
-      onUpdateProduct(product.id, { imageUrl: compressedDataUrl });
+      const compressedDataUrl = await compressImageFile(file, 800, 800, 0.85);
+      const uploadRes = await uploadProductImageToSupabase(file, `${product.id}_${Date.now()}.jpg`);
+      const finalUrl = uploadRes.publicUrl || compressedDataUrl;
+      onUpdateProduct(product.id, { imageUrl: finalUrl });
       setImageError(false);
     } catch (err) {
       console.error('Failed to compress/upload image:', err);
@@ -220,11 +223,15 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
           </div>
         ) : (
           <img
-            src={imageError || !product.imageUrl ? getCategoryFallbackSvg(product.category, product.name) : product.imageUrl}
+            src={
+              imageError
+                ? getCategoryEmojiDataUrl(product.category, product.name)
+                : getValidImageUrl(product.imageUrl, product.category, product.name)
+            }
             alt={product.name}
             onError={(e) => {
               setImageError(true);
-              const fallback = getCategoryFallbackSvg(product.category, product.name);
+              const fallback = getCategoryEmojiDataUrl(product.category, product.name);
               if ((e.currentTarget as HTMLImageElement).src !== fallback) {
                 (e.currentTarget as HTMLImageElement).src = fallback;
               }

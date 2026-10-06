@@ -789,3 +789,87 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * Returns an authentic grocery or stationery emoji based on category and title keywords
+ */
+export function getCategoryEmoji(category?: string, name?: string): string {
+  const combined = `${category || ''} ${name || ''}`.toLowerCase();
+  if (/roti|bread|bakery|पाव|ब्रेड|bun|toast/i.test(combined)) return '🍞';
+  if (/register|रजिस्टर|copy|कॉपी|notebook|classmate/i.test(combined)) return '📓';
+  if (/pen|पेन|pencil|पेंसिल|reynolds|hauser|apsara|natraj/i.test(combined)) return '🖊️';
+  if (/fevicol|फेविकोल|craft|कला|glue|गोंद|chart|चार्ट/i.test(combined)) return '🎨';
+  if (/tape|टेप|stapler|स्टेपलर|scissor|कैंची|office|a4|rim|रिम|paper/i.test(combined)) return '📎';
+  if (/honey|हनी|शहद|chyawanprash|च्यवनप्राश|health|dabur|zandu/i.test(combined)) return '🍯';
+  if (/oil|तेल|ghee|घी|mustard|sarso|fortune|refined|dhara/i.test(combined)) return '🫒';
+  if (/milk|दूध|curd|दही|paneer|पनीर|amul|butter|मक्खन/i.test(combined)) return '🥛';
+  if (/atta|आटा|flour|maida|sooji|rava|besan|बेसन/i.test(combined)) return '🌾';
+  if (/rice|चावल|dal|दाल|toor|chana|moong|urad|rajma|basmati/i.test(combined)) return '🍚';
+  if (/biscuit|बिस्कुट|chips|चिप्स|maggi|मैगी|snack|namkeen|भुजिया/i.test(combined)) return '🍪';
+  if (/tea|चाय|chai|coffee|कॉफ़ी|nescafe|horlicks|boost/i.test(combined)) return '☕';
+  if (/cold drink|drink|pepsi|coke|sprite|frooti|maaza|juice/i.test(combined)) return '🧃';
+  if (/soap|साबुन|detergent|सर्फ|surf|vim|surf excel|rin|wheel/i.test(combined)) return '🧼';
+  if (/shampoo|शैम्पू|cream|toothpaste|colgate|dettol|lifebuoy/i.test(combined)) return '🧴';
+  if (/veg|sabji|सबजी|aloo|pyaz|tomato|onion|potato|bhindi/i.test(combined)) return '🥔';
+  if (/pooja|puja|agarbatti|अगरबत्ती|dhoop|kapoor/i.test(combined)) return '🕯️';
+  return '📦';
+}
+
+/**
+ * Creates an instant SVG data URL for the item's categorized emoji
+ */
+export function getCategoryEmojiDataUrl(category?: string, name?: string): string {
+  const emoji = getCategoryEmoji(category, name);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" rx="22" fill="#F3F4F6" />
+  <text x="50" y="65" font-size="52" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI Emoji', Roboto, sans-serif">${emoji}</text>
+</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Global URL sanitizer ensuring safe external public CDN rendering on live deployments and mobiles:
+ * Eliminates localhost, 127.0.0.1, /src/assets/, and relative broken paths.
+ */
+export function getValidImageUrl(
+  url?: string | null,
+  category?: string,
+  name?: string,
+  unit?: string,
+  price?: number
+): string {
+  if (url && typeof url === 'string') {
+    const trimmed = url.trim();
+    const lower = trimmed.toLowerCase();
+
+    // Check if the URL is local, relative, or broken for live deployments
+    const isBrokenOrLocal =
+      lower === '' ||
+      lower === 'null' ||
+      lower === 'undefined' ||
+      lower.startsWith('http://localhost') ||
+      lower.startsWith('https://localhost') ||
+      lower.startsWith('http://127.0.0.1') ||
+      lower.startsWith('https://127.0.0.1') ||
+      lower.startsWith('/src/') ||
+      lower.startsWith('src/') ||
+      lower.startsWith('@/') ||
+      lower.startsWith('/uploads/') ||
+      lower.startsWith('uploads/') ||
+      lower.startsWith('./') ||
+      lower.startsWith('../');
+
+    if (!isBrokenOrLocal) {
+      if (
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('data:image/')
+      ) {
+        return trimmed;
+      }
+    }
+  }
+
+  // If broken or empty, generate authentic SVG or categorized emoji fallback
+  return getCategoryFallbackSvg(category || 'General Grocery', name || 'Product', unit, price);
+}
+

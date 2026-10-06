@@ -22,7 +22,8 @@ import { Product, ProductVariant, CustomCategory } from '../types';
 import { CATEGORIES } from '../data/initialProducts';
 import { calculateFinalPrice, getCustomCategories, saveCustomCategories } from '../services/storageService';
 import { compressImageFile } from '../utils/imageUtils';
-import { findBestCdnImage, getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { findBestCdnImage, getCategoryFallbackSvg, getCategoryEmojiDataUrl, getValidImageUrl } from '../utils/productImageUtils';
+import { uploadProductImageToSupabase } from '../services/supabaseClient';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -231,7 +232,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     try {
       const dataUrl = await compressImageFile(file, 800, 800, 0.85);
-      setImageUrl(dataUrl);
+      const uploadRes = await uploadProductImageToSupabase(file, `${name || 'product'}_${Date.now()}.jpg`);
+      const finalUrl = uploadRes.publicUrl || dataUrl;
+      setImageUrl(finalUrl);
       if (errors.imageUrl) {
         setErrors((prev) => {
           const next = { ...prev };
@@ -894,10 +897,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-stone-200">
                 <div className="w-14 h-14 rounded-lg bg-stone-50 border border-stone-200 p-1 flex items-center justify-center flex-shrink-0">
                   <img
-                    src={imageUrl || getCategoryFallbackSvg(category, name)}
+                    src={getValidImageUrl(imageUrl, category, name)}
                     alt="Preview"
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(category, name);
+                      (e.currentTarget as HTMLImageElement).src = getCategoryEmojiDataUrl(category, name);
                     }}
                     className="w-full h-full object-contain mix-blend-multiply"
                   />
