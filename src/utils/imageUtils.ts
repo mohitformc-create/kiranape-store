@@ -89,6 +89,30 @@ export function compressImageFile(
 }
 
 /**
+ * Converts a Base64 data URL into a binary Blob
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(';base64,');
+  const contentType = parts[0]?.split(':')[1] || 'image/jpeg';
+  const base64Data = parts[1] || '';
+  const byteCharacters = atob(base64Data);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: contentType });
+}
+
+/**
+ * Converts a Base64 data URL into a standard File object
+ */
+export function dataUrlToFile(dataUrl: string, filename: string): File {
+  const blob = dataUrlToBlob(dataUrl);
+  return new File([blob], filename, { type: blob.type || 'image/jpeg' });
+}
+
+/**
  * Format phone number for WhatsApp international URL (strictly single country code 91)
  */
 export function formatWhatsAppPhone(phone?: string): string {

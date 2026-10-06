@@ -249,6 +249,38 @@ app.use(
   })
 );
 
+// Public Uploads Directory (Local CDN Bucket Pattern)
+const UPLOADS_DIR = path.join(PUBLIC_DIR, 'uploads');
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (e) {}
+
+// POST /api/upload-image: Storefront / Voice Inventory image upload CDN endpoint
+app.post('/api/upload-image', (req, res) => {
+  try {
+    const { imageBase64, fileName: clientFileName } = req.body || {};
+    if (!imageBase64) {
+      return res.status(400).json({ success: false, error: 'No image data provided' });
+    }
+    const cleanName = (clientFileName || `photo_${Date.now()}.jpg`).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = `${Date.now()}_${cleanName}`;
+    const filePath = path.join(UPLOADS_DIR, fileName);
+
+    const base64Data = imageBase64.includes(';base64,')
+      ? imageBase64.split(';base64,')[1]
+      : imageBase64;
+
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    const publicUrl = `/uploads/${fileName}`;
+    return res.json({ success: true, publicUrl, fileName });
+  } catch (err: any) {
+    console.error('[CDN Upload] Error saving image upload:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // CENTRAL ORDERS API ENDPOINTS
 // ==========================================

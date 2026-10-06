@@ -16,6 +16,7 @@ import {
   Hash,
   HelpCircle,
   Volume2,
+  Camera,
 } from 'lucide-react';
 import { Product, CustomCategory } from '../types';
 import { CATEGORIES } from '../data/initialProducts';
@@ -29,6 +30,7 @@ import { FMCG_CDN_CATALOG } from '../utils/productImageUtils';
 import { playAdminNotificationChime } from '../utils/sound';
 import { saveProductToCentralInventory } from '../services/orderApiService';
 import { supabase } from '../config/supabase';
+import { compressImageFile, dataUrlToFile } from '../utils/imageUtils';
 
 interface VoiceInventoryModalProps {
   isOpen: boolean;
@@ -76,6 +78,16 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
   const [selectedEmoji, setSelectedEmoji] = useState<string>('📦');
   const [imageUrl, setImageUrl] = useState<string>('');
   const [useEmojiImage, setUseEmojiImage] = useState<boolean>(true);
+
+  // Gallery/Camera Photo Upload & Supabase Storage state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState<boolean>(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
+  const [uploadStatusText, setUploadStatusText] = useState<string>('');
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Matching existing product
   const [matchedProduct, setMatchedProduct] = useState<Product | null>(null);
@@ -272,6 +284,7 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
   // Watch emoji change
   const handleEmojiSelect = (emoji: string) => {
     setSelectedEmoji(emoji);
+    setImageFile(null);
     setUseEmojiImage(true);
     setImageUrl(createEmojiSvgDataUrl(emoji));
   };
@@ -279,6 +292,95 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
   // Quick unit pill click
   const handleQuickUnit = (quickUnit: string) => {
     setUnit(quickUnit);
+  };
+
+  // Handle Gallery or Camera photo selection with client-side image compression
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploadError(null);
+    setIsProcessingImage(true);
+
+    try {
+      // Compress image client-side to max 1000x1000px at quality 0.8 (under 500KB)
+      const compressedDataUrl = await compressImageFile(file, 1000, 1000, 0.8);
+      const cleanBaseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const optimizedFile = dataUrlToFile(compressedDataUrl, `${cleanBaseName || 'photo'}.jpg`);
+
+      setImageFile(optimizedFile);
+      setImageUrl(compressedDataUrl);
+      setUseEmojiImage(false);
+    } catch (err: any) {
+      console.warn('Image processing error:', err);
+      setImageUploadError('फ़ोटो प्रोसेस नहीं हो सकी। कृपया दोबारा प्रयास करें।');
+    } finally {
+      setIsProcessingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  };
+
+  // Remove chosen photo and fallback to emoji tag
+  const handleRemoveImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setImageFile(null);
+    setImageUrl(createEmojiSvgDataUrl(selectedEmoji));
+    setUseEmojiImage(true);
+    setImageUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
+
+  // Upload image to Supabase Storage with local CDN fallback
+  const uploadImageToStorage = async (file: File, base64Preview: string): Promise<string> => {
+    const cleanFileName = file.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = `${Date.now()}_${cleanFileName || 'product.jpg'}`;
+
+    // 1. Attempt Supabase Storage Upload to 'product-images' bucket
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+      if (!uploadError && uploadData) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+
+        if (publicUrl) {
+          console.log('[Supabase Storage] Product photo uploaded:', publicUrl);
+          return publicUrl;
+        }
+      } else {
+        console.warn('[Supabase Storage] Upload returned:', uploadError?.message);
+      }
+    } catch (storageErr) {
+      console.warn('[Supabase Storage] Storage exception:', storageErr);
+    }
+
+    // 2. Fallback: Local Server CDN bucket pattern (/api/upload-image)
+    try {
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Preview,
+          fileName,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.publicUrl) {
+          console.log('[Server CDN] Product photo stored on CDN:', json.publicUrl);
+          return json.publicUrl;
+        }
+      }
+    } catch (cdnErr) {
+      console.warn('[Server CDN] Fallback CDN upload failed:', cdnErr);
+    }
+
+    // 3. Fallback: Compact high-res Base64 dataURL
+    return base64Preview;
   };
 
   // Discount calculation
@@ -298,12 +400,6 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
     const finalSp = Math.max(1, Number(sellingPrice) || Math.round(finalMrp * 0.9));
     const finalStock = Math.max(0, Number(stock) || 50);
 
-    // Final image URL (either CDN photo, uploaded base64, or emoji SVG)
-    const finalImage =
-      useEmojiImage || !imageUrl
-        ? createEmojiSvgDataUrl(selectedEmoji)
-        : imageUrl;
-
     const isStationery =
       selectedCategory === 'Copies & Registers' ||
       selectedCategory === 'Pens, Pencils & Geometry' ||
@@ -312,6 +408,24 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
       selectedCategory.toLowerCase().includes('stationery');
 
     setIsSaving(true);
+    let finalImage = imageUrl;
+
+    // Handle Supabase Storage photo upload if user uploaded a file
+    if (imageFile) {
+      setIsUploadingPhoto(true);
+      setUploadStatusText('फ़ोटो अपलोड हो रही है, कृपया रुकें...');
+      try {
+        finalImage = await uploadImageToStorage(imageFile, imageUrl);
+      } catch (uploadErr) {
+        console.warn('Error during image upload, using base64 preview:', uploadErr);
+      } finally {
+        setIsUploadingPhoto(false);
+        setUploadStatusText('');
+      }
+    } else if (useEmojiImage || !finalImage) {
+      finalImage = createEmojiSvgDataUrl(selectedEmoji);
+    }
+
     try {
       if (isUpdatingExisting && matchedProduct) {
         // UPDATE EXISTING PRODUCT
@@ -397,6 +511,9 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
 
       setTimeout(() => {
         setIsSaving(false);
+        setIsUploadingPhoto(false);
+        setImageFile(null);
+        setImageUploadError(null);
         onClose();
         // Reset form
         setTranscript('');
@@ -776,60 +893,167 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
               </div>
             </div>
 
-            {/* Row 4: Visual Icon & Emoji Quick-Picker */}
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block flex items-center gap-1">
-                  <span>Photo / Emoji Tag (आइकॉन चुनें):</span>
-                  <span className="text-base">{selectedEmoji}</span>
+            {/* Row 4: Dedicated High-Fidelity Photo Upload Block (Gallery/Camera & Supabase Storage) */}
+            <div className="space-y-3 pt-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                <label className="text-xs font-heading font-black text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-emerald-700" />
+                  <span>सामान की फ़ोटो (Product Photo Upload)</span>
                 </label>
                 <span className="text-[10px] text-stone-500 font-medium">
-                  {useEmojiImage ? 'Using Quick Emoji Tag' : 'Using Product Image Photo'}
+                  {imageFile ? 'फ़ोटो तैयार (Ready to upload)' : (!useEmojiImage && imageUrl ? 'CDN/कस्टम फ़ोटो' : 'गैलरी/कैमरा फ़ोटो जोड़ें')}
                 </span>
               </div>
 
-              {/* Emoji Grid */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5">
-                {GROCERY_EMOJI_PALETTE.map(({ emoji, label }) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => handleEmojiSelect(emoji)}
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-transform active:scale-90 cursor-pointer flex-shrink-0 ${
-                      selectedEmoji === emoji && useEmojiImage
-                        ? 'bg-amber-100 border-2 border-amber-500 scale-110 shadow-xs'
-                        : 'bg-white border border-stone-200 hover:bg-stone-100'
-                    }`}
-                    title={label}
-                  >
-                    {emoji}
-                  </button>
-                ))}
+              {/* Hidden File Inputs for Gallery & Camera */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                id="gallery-image-input"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                id="camera-image-input"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {/* 1:1 Preview Container */}
+                <div
+                  onClick={() => {
+                    if (!imageFile && useEmojiImage) {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 overflow-hidden flex items-center justify-center flex-shrink-0 transition-all ${
+                    imageFile || (!useEmojiImage && imageUrl)
+                      ? 'border-emerald-500 bg-emerald-50/20 shadow-xs'
+                      : 'border-dashed border-stone-300 hover:border-emerald-500 hover:bg-emerald-50/30 cursor-pointer bg-stone-50'
+                  }`}
+                  title={imageFile || (!useEmojiImage && imageUrl) ? 'Product Photo Preview' : 'फ़ोटो जोड़ने के लिए क्लिक करें'}
+                >
+                  {isProcessingImage ? (
+                    <div className="flex flex-col items-center justify-center p-2 text-center">
+                      <RefreshCw className="w-5 h-5 text-emerald-600 animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-emerald-800">कंप्रेस हो रहा है...</span>
+                    </div>
+                  ) : imageFile || (!useEmojiImage && imageUrl) ? (
+                    <>
+                      <img
+                        src={imageUrl}
+                        alt={name || 'Product Photo'}
+                        className="w-full h-full object-contain p-1.5 mix-blend-multiply"
+                      />
+                      {/* Tiny "✕ (हटाएं)" Remove Button */}
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md transition-transform active:scale-90 cursor-pointer"
+                        title="✕ हटाएं (Remove Photo)"
+                        aria-label="Remove Photo"
+                      >
+                        <X className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                    </>
+                  ) : (
+                    /* Placeholder: "🖼️ फ़ोटो जोड़ें (गैलरी/कैमरा)" */
+                    <div className="flex flex-col items-center justify-center p-2 text-center group-hover:scale-105 transition-transform">
+                      <span className="text-2xl mb-1">🖼️</span>
+                      <span className="text-[11px] font-heading font-black text-stone-800 leading-tight">
+                        फ़ोटो जोड़ें
+                      </span>
+                      <span className="text-[9px] text-stone-500 font-medium">
+                        (गैलरी/कैमरा)
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Controls & Triggers */}
+                <div className="flex-1 w-full space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {/* Trigger Button: "🖼️ गैलरी से फ़ोटो चुनें (Choose from Gallery)" */}
+                    <button
+                      type="button"
+                      id="gallery-image-trigger-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isProcessingImage || isUploadingPhoto}
+                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-heading font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <span>🖼️</span>
+                      <span>गैलरी से फ़ोटो चुनें (Choose from Gallery)</span>
+                    </button>
+
+                    {/* Camera Trigger Button */}
+                    <button
+                      type="button"
+                      id="camera-image-trigger-btn"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isProcessingImage || isUploadingPhoto}
+                      className="py-2 px-3 rounded-xl bg-white hover:bg-stone-100 active:scale-95 text-stone-800 border border-stone-300 font-heading font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Camera className="w-4 h-4 text-emerald-600" />
+                      <span>कैमरा (Camera)</span>
+                    </button>
+                  </div>
+
+                  <p className="text-[10px] text-stone-500 font-medium leading-relaxed">
+                    💡 <strong>क्लाइंट-साइड कंप्रेस:</strong> बड़ी से बड़ी 5MB-10MB फ़ोटो भी ऑटो कंप्रेस होकर 500KB से कम साइज़ में Supabase Storage में सुरक्षित सेव हो जाती है।
+                  </p>
+
+                  {imageFile && (
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                      <span className="truncate">
+                        फ़ोटो तैयार: {imageFile.name} ({(imageFile.size / 1024).toFixed(0)} KB)
+                      </span>
+                    </div>
+                  )}
+
+                  {imageUploadError && (
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                      <span>{imageUploadError}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Image Preview & URL input */}
-              <div className="flex items-center gap-3 pt-2">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-stone-200 overflow-hidden flex items-center justify-center flex-shrink-0 p-1 shadow-2xs">
-                  <img
-                    src={imageUrl || createEmojiSvgDataUrl(selectedEmoji)}
-                    alt="Preview"
-                    className="w-full h-full object-contain mix-blend-multiply"
-                  />
+              {/* Optional Secondary Palette: Quick Emoji Tags */}
+              <div className="pt-2 border-t border-stone-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                    या तुरंत इमोजी टैग चुनें (Optional Quick Emoji Tag):
+                  </span>
+                  {useEmojiImage && (
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
+                      टैग: {selectedEmoji}
+                    </span>
+                  )}
                 </div>
-                <div className="flex-1 space-y-1">
-                  <input
-                    type="text"
-                    value={imageUrl}
-                    onChange={(e) => {
-                      setImageUrl(e.target.value);
-                      setUseEmojiImage(false);
-                    }}
-                    placeholder="Or paste custom image link (optional)"
-                    className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  <p className="text-[10px] text-stone-500">
-                    Auto-generated SVG emoji will be used if left as default.
-                  </p>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  {GROCERY_EMOJI_PALETTE.map(({ emoji, label }) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => handleEmojiSelect(emoji)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-transform active:scale-90 cursor-pointer flex-shrink-0 ${
+                        selectedEmoji === emoji && useEmojiImage
+                          ? 'bg-amber-100 border-2 border-amber-500 scale-110 shadow-xs'
+                          : 'bg-stone-50 border border-stone-200 hover:bg-stone-100'
+                      }`}
+                      title={label}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -849,7 +1073,8 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-stone-700 bg-white border border-stone-300 hover:bg-stone-100 text-xs font-bold transition-colors cursor-pointer"
+            disabled={isSaving || isUploadingPhoto}
+            className="px-4 py-2 rounded-xl text-stone-700 bg-white border border-stone-300 hover:bg-stone-100 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -857,10 +1082,15 @@ export const VoiceInventoryModal: React.FC<VoiceInventoryModalProps> = ({
           <button
             type="button"
             onClick={handleSaveProduct}
-            disabled={!name.trim() || isSaving}
+            disabled={!name.trim() || isSaving || isUploadingPhoto || isProcessingImage}
             className="px-6 py-2.5 rounded-xl font-heading font-black text-xs text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md transition-all flex items-center gap-2 cursor-pointer"
           >
-            {isSaving ? (
+            {isUploadingPhoto ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>फ़ोटो अपलोड हो रही है, कृपया रुकें...</span>
+              </>
+            ) : isSaving ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 <span>Saving to Store...</span>
