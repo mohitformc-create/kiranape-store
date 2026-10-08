@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.kiranape.app",
+        "sha256_cert_fingerprints": ["BD:AE:41:9D:7A:6B:BF:B1:DE:8F:CF:04:95:EF:12:44:67:21:CB:C3:0E:BD:82:49:3A:EF:79:7E:3D:D0:39:F8"]
+      }
+    }]
