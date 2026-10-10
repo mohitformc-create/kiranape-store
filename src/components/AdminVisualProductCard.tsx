@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Product, ProductVariant } from '../types';
 import { getCategoryFallbackSvg, getValidImageUrl, getCategoryEmojiDataUrl } from '../utils/productImageUtils';
-import { compressImageFile } from '../utils/imageUtils';
+import { compressImageFile, dataUrlToFile } from '../utils/imageUtils';
 import { calculateFinalPrice } from '../services/storageService';
 import { uploadProductImageToSupabase } from '../services/supabaseClient';
 
@@ -174,8 +174,15 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
     if (!file) return;
     try {
       setIsUploadingImage(true);
-      const compressedDataUrl = await compressImageFile(file, 800, 800, 0.85);
-      const uploadRes = await uploadProductImageToSupabase(file, `${product.id}_${Date.now()}.jpg`);
+      const compressedDataUrl = await compressImageFile(file, 800, 800, 0.75);
+      const cleanName = (product.name || 'product')
+        .replace(/\.[^/.]+$/, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `${Date.now()}_${cleanName || 'item'}.jpg`;
+      const compressedFile = dataUrlToFile(compressedDataUrl, fileName);
+
+      const uploadRes = await uploadProductImageToSupabase(compressedFile, fileName);
       const finalUrl = uploadRes.publicUrl || compressedDataUrl;
       onUpdateProduct(product.id, { imageUrl: finalUrl });
       setImageError(false);

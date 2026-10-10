@@ -18,6 +18,7 @@ import {
   Search,
   Filter,
   MessageCircle,
+  Key,
 } from 'lucide-react';
 import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
 import {
@@ -51,7 +52,14 @@ import {
   updateCentralOrderStatus,
   saveProductToCentralInventory,
   deleteProductFromCentralInventory,
+  clearAllProductsFromCentralServer,
 } from './services/orderApiService';
+import {
+  insertProductToSupabase,
+  updateProductInSupabase,
+  deleteProductFromSupabase,
+  wipeAllProductsFromSupabase,
+} from './services/supabaseClient';
 import { dispatchOrderInBackground } from './services/orderQueueService';
 import {
   isFirebaseConfigured,
@@ -625,12 +633,17 @@ export default function App() {
     [cartItems, totalCartCount, storeSettings]
   );
 
-  // Admin Operations with Central Server synchronization
+  // Admin Operations with Central Server and Supabase synchronization
   const handleAddProduct = useCallback((data: any) => {
     const created = addProduct(data);
     setProducts(getProducts());
+    // Sync to Central Express Server
     saveProductToCentralInventory(created).catch((err) => {
       console.warn('Could not add product to central inventory:', err);
+    });
+    // Sync to Supabase Database
+    insertProductToSupabase(created).catch((err) => {
+      console.warn('Could not add product to Supabase:', err);
     });
   }, []);
 
@@ -657,14 +670,22 @@ export default function App() {
       saveProductToCentralInventory(updatedItem).catch((err) => {
         console.warn('Could not update product in central inventory:', err);
       });
+      updateProductInSupabase(id, updates).catch((err) => {
+        console.warn('Could not update product in Supabase:', err);
+      });
     }
   }, []);
 
   const handleDeleteProduct = useCallback((id: string) => {
     deleteProduct(id);
     setProducts(getProducts());
+    // Delete from Central Server
     deleteProductFromCentralInventory(id).catch((err) => {
       console.warn('Could not delete product from central inventory:', err);
+    });
+    // Delete from Supabase Database
+    deleteProductFromSupabase(id).catch((err) => {
+      console.warn('Could not delete product from Supabase:', err);
     });
 
     // Also remove from cart if present
@@ -682,9 +703,13 @@ export default function App() {
     try {
       localStorage.removeItem('kirana_products');
       localStorage.removeItem('chaurasia_kirana_products_v1');
+      localStorage.removeItem('chaurasia_custom_products');
       clearAllProducts();
       setProducts([]);
       setCartQuantities({});
+      // Wipe all products from Supabase and Central Server
+      await wipeAllProductsFromSupabase();
+      await clearAllProductsFromCentralServer();
     } catch (err) {
       console.warn('Error wiping catalog:', err);
     }
@@ -1031,6 +1056,17 @@ export default function App() {
             >
               Support: {storeSettings.phone || '9424316081'}
             </a>
+            <span>•</span>
+            <button
+              id="footer-store-admin-btn"
+              type="button"
+              onClick={() => setIsAdminPinModalOpen(true)}
+              className="inline-flex items-center gap-1 text-stone-600 hover:text-emerald-700 font-bold transition-colors cursor-pointer"
+              title="Store Owner Admin PIN Login"
+            >
+              <Key className="w-3 h-3 text-amber-600" />
+              <span>🔐 स्टोर एडमिन पोर्टल (Store Admin)</span>
+            </button>
           </div>
         </div>
 

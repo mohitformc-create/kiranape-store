@@ -182,6 +182,8 @@ export function resetCatalogToCleanSlate(): void {
     localStorage.removeItem('kirana_products');
     localStorage.removeItem('chaurasia_kirana_products_v1');
     localStorage.removeItem('chaurasia_kirana_products_v2');
+    localStorage.removeItem('chaurasia_custom_products');
+    localStorage.removeItem('kirana_custom_products');
     localStorage.removeItem(WHOLESALE_INJECTED_FLAG);
     notifySync();
   } catch (e) {

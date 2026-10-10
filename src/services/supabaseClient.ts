@@ -148,3 +148,108 @@ export async function syncProductsFromSupabase(): Promise<any[] | null> {
     return null;
   }
 }
+
+/**
+ * Insert or upsert single product into Supabase table 'products'
+ */
+export async function insertProductToSupabase(product: any): Promise<boolean> {
+  try {
+    const payload = {
+      id: product.id,
+      name: product.name,
+      hindi_name: product.hindiName || product.hindi_name || null,
+      category: product.category || 'General Grocery',
+      department: product.department || 'grocery',
+      unit: product.unit || '1 pc',
+      original_price: Number(product.originalPrice ?? product.original_price ?? 0),
+      final_price: Number(product.finalPrice ?? product.final_price ?? 0),
+      discount_percent: Number(product.discountPercent ?? product.discount_percent ?? 0),
+      image_url: product.imageUrl || product.image_url || null,
+      stock: Number(product.stock ?? 50),
+      is_available: product.isAvailable !== false,
+    };
+    const { error } = await supabase.from('products').upsert([payload]);
+    if (error) {
+      console.warn('[Supabase] Failed upserting product:', error.message);
+      return false;
+    }
+    console.log('[Supabase] Product saved successfully:', product.id);
+    return true;
+  } catch (err) {
+    console.warn('[Supabase] Exception upserting product:', err);
+    return false;
+  }
+}
+
+/**
+ * Update single product in Supabase table 'products'
+ */
+export async function updateProductInSupabase(id: string, updates: any): Promise<boolean> {
+  try {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.hindiName !== undefined) payload.hindi_name = updates.hindiName;
+    if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.department !== undefined) payload.department = updates.department;
+    if (updates.unit !== undefined) payload.unit = updates.unit;
+    if (updates.originalPrice !== undefined) payload.original_price = Number(updates.originalPrice);
+    if (updates.finalPrice !== undefined) payload.final_price = Number(updates.finalPrice);
+    if (updates.discountPercent !== undefined) payload.discount_percent = Number(updates.discountPercent);
+    if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
+    if (updates.stock !== undefined) payload.stock = Number(updates.stock);
+    if (updates.isAvailable !== undefined) payload.is_available = Boolean(updates.isAvailable);
+
+    const { error } = await supabase.from('products').update(payload).eq('id', id);
+    if (error) {
+      console.warn('[Supabase] Failed updating product:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Supabase] Exception updating product:', err);
+    return false;
+  }
+}
+
+/**
+ * Delete single product from Supabase table 'products'
+ */
+export async function deleteProductFromSupabase(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      console.warn('[Supabase] Failed deleting product:', error.message);
+      return false;
+    }
+    console.log('[Supabase] Product deleted from table:', id);
+    return true;
+  } catch (err) {
+    console.warn('[Supabase] Exception deleting product:', err);
+    return false;
+  }
+}
+
+/**
+ * Wipe all products from Supabase table 'products' in 1-click
+ */
+export async function wipeAllProductsFromSupabase(): Promise<{ success: boolean; count?: number; error?: string }> {
+  try {
+    // In PostgREST / Supabase, deleting with .neq('id', '___safe_guard___') deletes all rows
+    const { data, error } = await supabase
+      .from('products')
+      .delete()
+      .neq('id', '___non_existent_safe_id___')
+      .select('id');
+
+    if (error) {
+      console.warn('[Supabase] Failed wiping all products:', error.message);
+      return { success: false, error: error.message };
+    }
+    const count = Array.isArray(data) ? data.length : 0;
+    console.log(`[Supabase] Wiped ${count} products from database.`);
+    return { success: true, count };
+  } catch (err: any) {
+    console.warn('[Supabase] Exception wiping products:', err);
+    return { success: false, error: err?.message || 'Wipe failed' };
+  }
+}

@@ -364,6 +364,27 @@ export async function deleteProductFromCentralInventory(productId: string): Prom
 }
 
 /**
+ * Wipe all products from Central Server Inventory (DELETE /api/inventory/all)
+ */
+export async function clearAllProductsFromCentralServer(): Promise<{ success: boolean; count?: number }> {
+  const endpoints = ['/api/inventory/all', '/api/products/all'];
+  for (const ep of endpoints) {
+    try {
+      const url = API_BASE_URL ? `${API_BASE_URL}${ep}` : ep;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({ count: 0 }));
+        return { success: true, count: data.count };
+      }
+    } catch {}
+  }
+  return { success: false };
+}
+
+/**
  * Delete single order from Central Server (DELETE /api/orders/:id)
  */
 export async function deleteOrderFromCentralServer(orderId: string): Promise<boolean> {

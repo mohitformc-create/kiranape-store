@@ -17,11 +17,12 @@ import {
   Languages,
   Check,
   Package,
+  AlertCircle,
 } from 'lucide-react';
 import { Product, ProductVariant, CustomCategory } from '../types';
 import { CATEGORIES } from '../data/initialProducts';
 import { calculateFinalPrice, getCustomCategories, saveCustomCategories } from '../services/storageService';
-import { compressImageFile } from '../utils/imageUtils';
+import { compressImageFile, dataUrlToFile } from '../utils/imageUtils';
 import { findBestCdnImage, getCategoryFallbackSvg, getCategoryEmojiDataUrl, getValidImageUrl } from '../utils/productImageUtils';
 import { uploadProductImageToSupabase } from '../services/supabaseClient';
 
@@ -71,6 +72,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [uploadSuccessNotice, setUploadSuccessNotice] = useState<string | null>(null);
   const [cdnMatchNotice, setCdnMatchNotice] = useState<string | null>(null);
 
   // Custom Category Inline Creation State
@@ -224,17 +226,34 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  // Layer 2: Device Camera or Gallery Photo Upload
+  // Layer 2: Device Camera or Gallery Photo Upload (Compressed < 300KB -> Supabase Storage)
   const handleDeviceImageUpload = async (file: File) => {
     if (!file) return;
     setImageUploadError(null);
+    setUploadSuccessNotice(null);
     setIsProcessingImage(true);
 
     try {
-      const dataUrl = await compressImageFile(file, 800, 800, 0.85);
-      const uploadRes = await uploadProductImageToSupabase(file, `${name || 'product'}_${Date.now()}.jpg`);
+      // 1. Client-side compression using HTML5 canvas (target under 300KB)
+      const dataUrl = await compressImageFile(file, 800, 800, 0.75);
+      
+      // 2. Convert compressed dataUrl to optimized JPEG File object
+      const cleanBase = (name || file.name || 'product')
+        .replace(/\.[^/.]+$/, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `${Date.now()}_${cleanBase || 'item'}.jpg`;
+      const compressedFile = dataUrlToFile(dataUrl, fileName);
+
+      // 3. Upload COMPRESSED file directly to Supabase Storage ('product-images' bucket)
+      const uploadRes = await uploadProductImageToSupabase(compressedFile, fileName);
       const finalUrl = uploadRes.publicUrl || dataUrl;
+
       setImageUrl(finalUrl);
+      const kbSize = (compressedFile.size / 1024).toFixed(0);
+      setUploadSuccessNotice(`✓ फ़ोटो Supabase Storage में अपलोड हो गई (${kbSize} KB)`);
+      setTimeout(() => setUploadSuccessNotice(null), 4000);
+
       if (errors.imageUrl) {
         setErrors((prev) => {
           const next = { ...prev };
@@ -243,7 +262,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         });
       }
     } catch (err: any) {
-      setImageUploadError(err?.message || 'Could not process selected image');
+      console.warn('Image processing/upload error:', err);
+      setImageUploadError(err?.message || 'फ़ोटो प्रोसेस या अपलोड नहीं हो सकी। कृपया दोबारा प्रयास करें।');
     } finally {
       setIsProcessingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -783,100 +803,169 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             )}
           </div>
 
-          {/* Triple-Layer Smart Image Handling */}
-          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
-            <div className="flex items-center justify-between">
+          {/* High-Fidelity Photo Upload & Supabase Storage Integration */}
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3.5">
+            <div className="flex items-center justify-between border-b border-stone-200/80 pb-2">
               <div>
                 <h4 className="text-xs font-bold text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
                   <ImageIcon className="w-4 h-4 text-emerald-700" />
-                  Triple-Layer Smart Image Handling
+                  Product Photo Upload (गैलरी / कैमरा फ़ोटो)
                 </h4>
-                <p className="text-[11px] text-stone-500">
-                  Layer 1: Auto CDN Match • Layer 2: Camera/Gallery • Layer 3: Category Artwork
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Auto-compressed under 300KB &amp; saved to Supabase Storage ('product-images' bucket)
                 </p>
               </div>
+              {uploadSuccessNotice && (
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  {uploadSuccessNotice}
+                </span>
+              )}
             </div>
 
-            {/* Hidden Inputs */}
+            {/* Hidden File Inputs for Gallery and Camera */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,image/*"
               onChange={(e) => e.target.files?.[0] && handleDeviceImageUpload(e.target.files[0])}
               className="hidden"
             />
             <input
               ref={cameraInputRef}
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,image/*"
               capture="environment"
               onChange={(e) => e.target.files?.[0] && handleDeviceImageUpload(e.target.files[0])}
               className="hidden"
             />
 
-            {/* Three Multi-source Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={handleAutoCdnMatch}
-                className="px-3 py-2 rounded-xl bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-300 text-stone-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
+            {/* Visual 1:1 Preview and Multi-Action Controls */}
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              {/* 1:1 Preview Box */}
+              <div
+                onClick={() => {
+                  if (!imageUrl || imageUrl.includes('data:image/svg')) {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 overflow-hidden flex items-center justify-center flex-shrink-0 transition-all ${
+                  imageUrl
+                    ? 'border-emerald-500 bg-white shadow-xs'
+                    : 'border-dashed border-stone-300 hover:border-emerald-500 hover:bg-emerald-50/30 cursor-pointer bg-white'
+                }`}
+                title="Click to select image file"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>1. Auto Brand Match</span>
-              </button>
+                {isProcessingImage ? (
+                  <div className="flex flex-col items-center justify-center p-2 text-center">
+                    <RefreshCw className="w-6 h-6 text-emerald-600 animate-spin mb-1" />
+                    <span className="text-[10px] font-bold text-emerald-800">
+                      कंप्रेस व अपलोड हो रहा है...
+                    </span>
+                  </div>
+                ) : imageUrl ? (
+                  <>
+                    <img
+                      src={getValidImageUrl(imageUrl, category, name)}
+                      alt={name || 'Product'}
+                      onError={(e) => {
+                        const fallback = getCategoryEmojiDataUrl(category, name);
+                        if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                          (e.currentTarget as HTMLImageElement).src = fallback;
+                        }
+                      }}
+                      className="w-full h-full object-contain p-2 mix-blend-multiply"
+                    />
+                    {/* Remove photo button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImageUrl('');
+                        setUploadSuccessNotice(null);
+                        setImageUploadError(null);
+                      }}
+                      className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md transition-transform active:scale-90 cursor-pointer"
+                      title="✕ हटाएं (Remove Photo)"
+                    >
+                      <X className="w-3.5 h-3.5 stroke-[3]" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-2 text-center group-hover:scale-105 transition-transform">
+                    <span className="text-2xl mb-1">🖼️</span>
+                    <span className="text-[11px] font-heading font-black text-stone-800 leading-tight">
+                      फ़ोटो जोड़ें
+                    </span>
+                    <span className="text-[9px] text-stone-500 font-medium">
+                      (गैलरी/कैमरा)
+                    </span>
+                  </div>
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-stone-200 hover:border-emerald-300 text-stone-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
-              >
-                <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                <span>2. Take Live Photo</span>
-              </button>
+              {/* Upload Action Triggers */}
+              <div className="flex-1 w-full space-y-2">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isProcessingImage}
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-heading font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <span>🖼️</span>
+                    <span>गैलरी से फ़ोटो चुनें (Gallery File)</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-stone-200 hover:border-emerald-300 text-stone-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
-              >
-                <Upload className="w-3.5 h-3.5 text-emerald-600" />
-                <span>3. Upload Gallery File</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={isProcessingImage}
+                    className="py-2 px-3 rounded-xl bg-white hover:bg-stone-100 active:scale-95 text-stone-800 border border-stone-300 font-heading font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Camera className="w-4 h-4 text-emerald-600" />
+                    <span>कैमरा (Camera)</span>
+                  </button>
+                </div>
 
-            {/* Direct Image URL Input */}
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="url"
-                value={directImageUrlInput}
-                onChange={(e) => setDirectImageUrlInput(e.target.value)}
-                placeholder="Or paste Direct Image URL (https://...)"
-                className="flex-1 px-3 py-1.5 bg-white text-stone-900 rounded-xl border border-stone-200 text-xs focus:ring-1 focus:ring-emerald-500"
-              />
-              <button
-                type="button"
-                onClick={handleApplyDirectImageUrl}
-                className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all cursor-pointer"
-              >
-                Apply URL
-              </button>
-            </div>
+                {/* Direct Image URL input */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <input
+                    type="url"
+                    value={directImageUrlInput}
+                    onChange={(e) => setDirectImageUrlInput(e.target.value)}
+                    placeholder="या Direct Image Web Link paste करें (https://...)"
+                    className="flex-1 px-3 py-1.5 bg-white text-stone-900 rounded-xl border border-stone-200 text-xs focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyDirectImageUrl}
+                    className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    Apply Link
+                  </button>
+                </div>
 
-            {/* Quick Button for Layer 3 Category Fallback */}
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={handleApplyCategoryFallback}
-                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Layer 3: Use Category Illustrated Graphic ({category})</span>
-              </button>
-              {isProcessingImage && (
-                <span className="text-[10px] text-amber-700 font-semibold animate-pulse">
-                  Compressing image...
-                </span>
-              )}
+                {/* Secondary Option: Auto CDN match or Illustrated Graphic */}
+                <div className="flex items-center justify-between gap-2 pt-0.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleAutoCdnMatch}
+                    className="text-[11px] font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    <span>FMCG Brand Auto-Match</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyCategoryFallback}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Use Category Graphic</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {cdnMatchNotice && (
@@ -887,36 +976,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             )}
 
             {imageUploadError && (
-              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-                {imageUploadError}
-              </div>
-            )}
-
-            {/* Active Image Thumbnail Preview */}
-            {imageUrl && (
-              <div className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-stone-200">
-                <div className="w-14 h-14 rounded-lg bg-stone-50 border border-stone-200 p-1 flex items-center justify-center flex-shrink-0">
-                  <img
-                    src={getValidImageUrl(imageUrl, category, name)}
-                    alt="Preview"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = getCategoryEmojiDataUrl(category, name);
-                    }}
-                    className="w-full h-full object-contain mix-blend-multiply"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-bold text-stone-800 block truncate">
-                    {name || 'Grocery Item'}
-                  </span>
-                  <span className="text-[10px] text-stone-500 block truncate">
-                    {imageUrl.startsWith('data:image/svg')
-                      ? 'Category Illustrated Fallback Graphic'
-                      : imageUrl.startsWith('data:image/jpeg')
-                      ? 'Locally Uploaded Device Photo'
-                      : 'CDN FMCG Verified White-Background Image'}
-                  </span>
-                </div>
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>{imageUploadError}</span>
               </div>
             )}
           </div>

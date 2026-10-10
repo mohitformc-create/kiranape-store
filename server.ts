@@ -716,7 +716,16 @@ app.all(
   }
 );
 
-// 10. DELETE /api/inventory/:id: Delete product
+// 10a. DELETE /api/inventory/all & /api/products/all: Wipe all products from central inventory
+app.delete(['/api/inventory/all', '/api/products/all'], (_req, res) => {
+  const count = centralInventory.length;
+  centralInventory = [];
+  persistCentralInventory();
+  console.log(`[Central DB] Wiped all ${count} products from central inventory.`);
+  return res.json({ success: true, count, message: 'All inventory products wiped from central server.' });
+});
+
+// 10b. DELETE /api/inventory/:id: Delete product
 app.delete(['/api/inventory/:id', '/api/products/:id'], (req, res) => {
   const { id } = req.params;
   const prevLen = centralInventory.length;

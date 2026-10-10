@@ -64,6 +64,7 @@ import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 import { API_BASE_URL } from '../config/api';
 import { matchesUniversalSearch } from '../utils/universalSearch';
 import { supabase } from '../config/supabase';
+import { wipeAllProductsFromSupabase } from '../services/supabaseClient';
 import {
   mapSupabaseRowToOrder,
   fetchSupabaseOrders,
@@ -78,6 +79,7 @@ import {
   deleteOrderFromCentralServer,
   clearCompletedOrCancelledOrdersFromCentralServer,
   clearAllOrdersFromCentralServer,
+  clearAllProductsFromCentralServer,
   saveBulkProductsToCentralInventory,
 } from '../services/orderApiService';
 import {
@@ -646,6 +648,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       onUpdateProduct(editingProduct.id, formData);
     } else {
       onAddProduct(formData);
+    }
+  };
+
+  const [showWipeCatalogModal, setShowWipeCatalogModal] = useState(false);
+  const [isWipingAllProducts, setIsWipingAllProducts] = useState(false);
+  const [wipeNotification, setWipeNotification] = useState<string | null>(null);
+
+  const handleExecuteWipeCatalog = async () => {
+    setIsWipingAllProducts(true);
+    try {
+      // 1. Wipe Supabase table 'products'
+      await wipeAllProductsFromSupabase();
+      // 2. Wipe Central Express Server inventory
+      await clearAllProductsFromCentralServer();
+      // 3. Wipe local storage and reset state
+      onResetDefaultProducts();
+      setShowWipeCatalogModal(false);
+      setWipeNotification('✓ Saare purane/dummy products Supabase database aur catalog se safalta-purvak clean ho gaye! Ab aap naye products fresh add kar sakte hain.');
+      setTimeout(() => setWipeNotification(null), 5000);
+    } catch (err: any) {
+      console.warn('Error wiping products:', err);
+      alert('Wipe error: ' + (err?.message || 'Could not clean catalog'));
+    } finally {
+      setIsWipingAllProducts(false);
     }
   };
 
@@ -1361,6 +1387,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <span>🎙️ बोलकर जोड़ें (Voice Add)</span>
                   </button>
 
+                  {/* Clean/Wipe Old Broken Products from Supabase & Store */}
+                  <button
+                    type="button"
+                    id="admin-wipe-inventory-btn"
+                    onClick={() => setShowWipeCatalogModal(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-800 border border-rose-300 text-xs font-heading font-extrabold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                    title="Purane ya broken dummy products ko Supabase database se ek click mein wipe/delete karein"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>🗑️ Purane Products Wipe Karein</span>
+                  </button>
+
                   {/* Manual Add Item */}
                   <button
                     id="admin-add-product-btn"
@@ -1382,6 +1420,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Notification Banner when products are wiped */}
+              {wipeNotification && (
+                <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl p-3.5 flex items-center justify-between shadow-xs animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>{wipeNotification}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWipeNotification(null)}
+                    className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
               {/* Sticky Category Quick Filter Pills & 1-Second Search Bar */}
               <div className="sticky top-[58px] z-30 bg-white/95 backdrop-blur-md shadow-sm border border-stone-200/90 rounded-2xl p-3 space-y-2.5">
@@ -3148,6 +3203,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="flex-1 py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe/Clean All Products from Supabase & Store Confirmation Modal */}
+      {showWipeCatalogModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/75 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-rose-200 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-heading font-black text-stone-900 text-lg">
+                Purane / Dummy Products Wipe Karein?
+              </h4>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Kya aap sach mein saare purane, dummy ya broken products ko <strong>Supabase Database</strong> aur <strong>Kiranape Catalog</strong> se ek click mein wipe/delete karna chahte hain?
+              </p>
+            </div>
+            
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[11px] text-rose-800 text-left space-y-1">
+              <p className="font-bold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                <span>Wipe karne ke baad:</span>
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5 text-rose-700">
+                <li>Database ke saare {products.length} products delete ho jayenge.</li>
+                <li>Aap seedhe <strong>&apos;+ Add New Grocery Item&apos;</strong> se apne genuine items fresh upload kar sakenge.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowWipeCatalogModal(false)}
+                disabled={isWipingAllProducts}
+                className="flex-1 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel (रद्द करें)
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteWipeCatalog}
+                disabled={isWipingAllProducts}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-heading font-black transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isWipingAllProducts ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Wiping Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Haan, Wipe Karein</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
