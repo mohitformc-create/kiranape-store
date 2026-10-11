@@ -866,10 +866,22 @@ export function getValidImageUrl(
       ) {
         return trimmed;
       }
+
+      // Check if it's a Supabase storage relative path or file key
+      let cleanPath = trimmed.replace(/^\/+/, '');
+      if (cleanPath.startsWith('storage/v1/object/public/product-images/')) {
+        cleanPath = cleanPath.replace('storage/v1/object/public/product-images/', '');
+      } else if (cleanPath.startsWith('product-images/')) {
+        cleanPath = cleanPath.replace('product-images/', '');
+      }
+
+      if (cleanPath.length > 0 && /\.(jpe?g|png|webp|svg|gif|avif)$/i.test(cleanPath)) {
+        return `https://sggpbjmxzooxwnwfodxp.supabase.co/storage/v1/object/public/product-images/${cleanPath}`;
+      }
     }
   }
 
-  // If broken or empty, generate authentic SVG or categorized emoji fallback
+  // If broken or empty, generate authentic SVG retail packshot fallback
   return getCategoryFallbackSvg(category || 'General Grocery', name || 'Product', unit, price);
 }
 

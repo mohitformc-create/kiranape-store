@@ -110,7 +110,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <img
             src={
               imageError
-                ? getCategoryEmojiDataUrl(product.category, product.name)
+                ? getCategoryFallbackSvg(
+                    product.category,
+                    product.name,
+                    displayUnit,
+                    displayPrice
+                  )
                 : getValidImageUrl(
                     product.imageUrl,
                     product.category,
@@ -122,9 +127,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             alt={product.name}
             onError={(e) => {
               setImageError(true);
-              const emojiFallback = getCategoryEmojiDataUrl(product.category, product.name);
-              if ((e.currentTarget as HTMLImageElement).src !== emojiFallback) {
-                (e.currentTarget as HTMLImageElement).src = emojiFallback;
+              const fallback = getCategoryFallbackSvg(
+                product.category,
+                product.name,
+                displayUnit,
+                displayPrice
+              );
+              if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                (e.currentTarget as HTMLImageElement).src = fallback;
               }
             }}
             loading="lazy"

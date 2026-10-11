@@ -59,6 +59,7 @@ import {
   updateProductInSupabase,
   deleteProductFromSupabase,
   wipeAllProductsFromSupabase,
+  syncProductsFromSupabase,
 } from './services/supabaseClient';
 import { dispatchOrderInBackground } from './services/orderQueueService';
 import {
@@ -377,39 +378,57 @@ export default function App() {
       }
     }).catch(console.warn);
 
-    fetchCentralInventory().then((serverInventory) => {
-      // Check for persistent client-side custom edits backup
-      let localCustomProducts: Record<string, Partial<Product>> = {};
-      try {
-        const storedCustom = localStorage.getItem('chaurasia_custom_products');
-        if (storedCustom) {
-          localCustomProducts = JSON.parse(storedCustom) || {};
+    // 3. Initial load: Live fetch products from Supabase 'products' table
+    syncProductsFromSupabase()
+      .then((supabaseProducts) => {
+        if (Array.isArray(supabaseProducts) && supabaseProducts.length > 0) {
+          console.log(`[Kiranape] Loaded ${supabaseProducts.length} live products directly from Supabase`);
+          setProducts(supabaseProducts);
+          saveProducts(supabaseProducts);
+          return;
         }
-      } catch {}
 
-      const baseList = (Array.isArray(serverInventory) && serverInventory.length > 0)
-        ? serverInventory
-        : getProducts();
+        // Fallback to central server database if Supabase has not been seeded yet
+        fetchCentralInventory()
+          .then((serverInventory) => {
+            let localCustomProducts: Record<string, Partial<Product>> = {};
+            try {
+              const storedCustom = localStorage.getItem('chaurasia_custom_products');
+              if (storedCustom) {
+                localCustomProducts = JSON.parse(storedCustom) || {};
+              }
+            } catch {}
 
-      // Merge: Custom uploaded image and fields always take top priority
-      const merged = baseList.map((p) => {
-        const customOverride = localCustomProducts[p.id];
-        if (customOverride) {
-          return {
-            ...p,
-            ...customOverride,
-            imageUrl: customOverride.imageUrl || p.imageUrl,
-          };
-        }
-        return p;
+            const baseList =
+              Array.isArray(serverInventory) && serverInventory.length > 0
+                ? serverInventory
+                : getProducts();
+
+            const merged = baseList.map((p) => {
+              const customOverride = localCustomProducts[p.id];
+              if (customOverride) {
+                return {
+                  ...p,
+                  ...customOverride,
+                  imageUrl: customOverride.imageUrl || p.imageUrl,
+                };
+              }
+              return p;
+            });
+
+            setProducts(merged);
+            saveProducts(merged);
+          })
+          .catch(() => {
+            const current = getProducts();
+            setProducts(current);
+          });
+      })
+      .catch((err) => {
+        console.warn('Supabase fetch notice:', err);
+        const current = getProducts();
+        setProducts(current);
       });
-
-      setProducts(merged);
-      saveProducts(merged);
-    }).catch(() => {
-      const current = getProducts();
-      setProducts(current);
-    });
 
     const handleOrdersUpdated = () => {
       setOrders(getOrders());
@@ -789,6 +808,10 @@ export default function App() {
         banners={banners}
         onSaveSettings={handleSaveStoreSettings}
         onSaveBanners={handleSaveBanners}
+        onRefreshProducts={(newProds) => {
+          setProducts(newProds);
+          saveProducts(newProds);
+        }}
       />
     );
   }

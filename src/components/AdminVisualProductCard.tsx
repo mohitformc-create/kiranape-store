@@ -232,13 +232,13 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
           <img
             src={
               imageError
-                ? getCategoryEmojiDataUrl(product.category, product.name)
-                : getValidImageUrl(product.imageUrl, product.category, product.name)
+                ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice)
+                : getValidImageUrl(product.imageUrl, product.category, product.name, product.unit, product.finalPrice)
             }
             alt={product.name}
             onError={(e) => {
               setImageError(true);
-              const fallback = getCategoryEmojiDataUrl(product.category, product.name);
+              const fallback = getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice);
               if ((e.currentTarget as HTMLImageElement).src !== fallback) {
                 (e.currentTarget as HTMLImageElement).src = fallback;
               }

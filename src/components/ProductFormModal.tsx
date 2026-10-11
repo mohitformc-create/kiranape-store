@@ -869,7 +869,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       src={getValidImageUrl(imageUrl, category, name)}
                       alt={name || 'Product'}
                       onError={(e) => {
-                        const fallback = getCategoryEmojiDataUrl(category, name);
+                        const fallback = getCategoryFallbackSvg(category, name, unit, Number(sellingPriceInput || 0));
                         if ((e.currentTarget as HTMLImageElement).src !== fallback) {
                           (e.currentTarget as HTMLImageElement).src = fallback;
                         }

@@ -64,7 +64,11 @@ import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 import { API_BASE_URL } from '../config/api';
 import { matchesUniversalSearch } from '../utils/universalSearch';
 import { supabase } from '../config/supabase';
-import { wipeAllProductsFromSupabase } from '../services/supabaseClient';
+import {
+  wipeAllProductsFromSupabase,
+  syncDefaultCatalogToSupabase,
+  syncProductsFromSupabase,
+} from '../services/supabaseClient';
 import {
   mapSupabaseRowToOrder,
   fetchSupabaseOrders,
@@ -119,6 +123,7 @@ interface AdminPanelProps {
   banners: PromoBanner[];
   onSaveSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   onSaveBanners: (banners: PromoBanner[]) => Promise<void>;
+  onRefreshProducts?: (products: Product[]) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -140,6 +145,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   banners,
   onSaveSettings,
   onSaveBanners,
+  onRefreshProducts,
 }) => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'parchi_orders' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
@@ -664,6 +670,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await clearAllProductsFromCentralServer();
       // 3. Wipe local storage and reset state
       onResetDefaultProducts();
+      if (onRefreshProducts) {
+        onRefreshProducts([]);
+      }
       setShowWipeCatalogModal(false);
       setWipeNotification('✓ Saare purane/dummy products Supabase database aur catalog se safalta-purvak clean ho gaye! Ab aap naye products fresh add kar sakte hain.');
       setTimeout(() => setWipeNotification(null), 5000);
@@ -672,6 +681,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       alert('Wipe error: ' + (err?.message || 'Could not clean catalog'));
     } finally {
       setIsWipingAllProducts(false);
+    }
+  };
+
+  const [isSyncingDefaultCatalog, setIsSyncingDefaultCatalog] = useState(false);
+  const [syncDefaultCatalogNotice, setSyncDefaultCatalogNotice] = useState<string | null>(null);
+
+  const handleSyncDefaultCatalog = async () => {
+    setIsSyncingDefaultCatalog(true);
+    setSyncDefaultCatalogNotice(null);
+    try {
+      const res = await syncDefaultCatalogToSupabase();
+      if (!res.success) {
+        alert('Sync error: ' + (res.message || res.error || 'Failed to sync catalog'));
+        return;
+      }
+      
+      // Immediately live fetch updated products directly from Supabase
+      const liveItems = await syncProductsFromSupabase();
+      if (liveItems && liveItems.length > 0) {
+        saveProducts(liveItems);
+        if (onRefreshProducts) {
+          onRefreshProducts(liveItems);
+        }
+      }
+
+      setSyncDefaultCatalogNotice(res.message);
+      setTimeout(() => setSyncDefaultCatalogNotice(null), 6000);
+    } catch (err: any) {
+      console.warn('Error syncing catalog to Supabase:', err);
+      alert('Sync error: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setIsSyncingDefaultCatalog(false);
     }
   };
 
@@ -1387,6 +1428,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <span>🎙️ बोलकर जोड़ें (Voice Add)</span>
                   </button>
 
+                  {/* Sync Default Catalog to Supabase */}
+                  <button
+                    type="button"
+                    id="admin-sync-default-catalog-btn"
+                    onClick={handleSyncDefaultCatalog}
+                    disabled={isSyncingDefaultCatalog}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-heading font-extrabold shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
+                    title="Source code ke default catalog ko Supabase 'products' table mein insert aur live sync karein"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-blue-200 ${isSyncingDefaultCatalog ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingDefaultCatalog ? 'Syncing to Supabase...' : '⚡ Sync Default Catalog to Supabase'}</span>
+                  </button>
+
                   {/* Clean/Wipe Old Broken Products from Supabase & Store */}
                   <button
                     type="button"
@@ -1420,6 +1474,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Notification Banner when Default Catalog is synced to Supabase */}
+              {syncDefaultCatalogNotice && (
+                <div className="bg-blue-50 border border-blue-300 text-blue-900 rounded-2xl p-3.5 flex items-center justify-between shadow-xs animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    <span>{syncDefaultCatalogNotice}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSyncDefaultCatalogNotice(null)}
+                    className="text-blue-700 hover:text-blue-900 p-1 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
               {/* Notification Banner when products are wiped */}
               {wipeNotification && (
