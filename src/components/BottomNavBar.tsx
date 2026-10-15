@@ -36,72 +36,107 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   // Up to 3 preview thumbnails of items in cart
   const previewThumbnails = cartItems.slice(0, 3);
 
+  // Free delivery threshold (₹199 standard for Kirana stores)
+  const freeDeliveryThreshold = 199;
+  const remainingForFree = Math.max(0, freeDeliveryThreshold - cartTotalAmount);
+  const progressPercent = Math.min(100, Math.round((cartTotalAmount / freeDeliveryThreshold) * 100));
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-      {/* Floating Quick-Commerce Cart Bar: Sticky pill with overlapping thumbnails right above nav */}
+      {/* Floating Amazon Fresh Style Delivery Bar: Sticky pill with Free Delivery progress & Cart Summary */}
       {cartItemCount > 0 && (
         <div className="max-w-md sm:max-w-lg mx-auto px-3 pb-2 pointer-events-auto animate-in slide-in-from-bottom-2 duration-200">
-          <button
-            type="button"
-            id="floating-cart-pill-btn"
-            onClick={onOpenCart}
-            className="w-full bg-[#0c831f] hover:bg-[#096b18] text-white rounded-2xl p-2 sm:p-2.5 shadow-2xl border border-emerald-400/40 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all ring-2 ring-emerald-500/20"
-          >
-            {/* Left: 2-3 overlapping micro-thumbnails + Item count & Live Total */}
-            <div className="flex items-center gap-2 sm:gap-2.5 pl-1 min-w-0">
-              {/* Overlapping Thumbnails */}
-              <div className="flex items-center -space-x-2.5 flex-shrink-0">
-                {previewThumbnails.length > 0 ? (
-                  previewThumbnails.map((item, idx) => (
-                    <div
-                      key={item.id || idx}
-                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white p-0.5 border-2 border-[#0c831f] shadow-md overflow-hidden flex items-center justify-center relative"
-                      style={{ zIndex: 3 - idx }}
-                    >
-                      <img
-                        src={item.imageUrl || getCategoryFallbackSvg(item.category || '', item.name)}
-                        alt={item.name}
-                        className="w-full h-full object-contain mix-blend-multiply"
-                        onError={(e) => {
-                          const fallback = getCategoryFallbackSvg(item.category || '', item.name);
-                          if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                            (e.currentTarget as HTMLImageElement).src = fallback;
-                          }
-                        }}
-                      />
-                    </div>
-                  ))
+          <div className="bg-[#0c831f] text-white rounded-2xl shadow-2xl border border-emerald-400/40 overflow-hidden ring-2 ring-emerald-500/20">
+            {/* Amazon Fresh Free Delivery Alert Strip */}
+            <div className="bg-[#085a15] px-3.5 py-1 flex items-center justify-between text-[11px] font-bold">
+              <span className="flex items-center gap-1.5 text-emerald-100">
+                <Zap className="w-3 h-3 text-amber-300 fill-amber-300" />
+                {remainingForFree > 0 ? (
+                  <span>
+                    Shop for <strong className="text-white">₹{remainingForFree} more</strong> for <strong className="text-amber-300">Free Delivery</strong>
+                  </span>
                 ) : (
-                  <div className="w-8 h-8 rounded-xl bg-white text-[#0c831f] flex items-center justify-center font-bold shadow-2xs">
-                    <ShoppingBag className="w-4 h-4" />
-                  </div>
+                  <span className="text-emerald-200 font-extrabold flex items-center gap-1">
+                    <span>🎉</span> Free Delivery Unlocked!
+                  </span>
                 )}
-              </div>
+              </span>
 
-              {/* Count & Live Total */}
-              <div className="text-left leading-tight min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-heading font-black text-sm sm:text-base text-white truncate">
-                    {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'}
-                  </span>
-                  <span className="text-emerald-200 font-normal">|</span>
-                  <span className="font-heading font-black text-sm sm:text-base text-white">
-                    ₹{cartTotalAmount}
-                  </span>
-                </div>
-                <div className="text-[10px] sm:text-[11px] text-emerald-100 font-bold flex items-center gap-1 mt-0.5">
-                  <Zap className="w-2.5 h-2.5 fill-amber-300 text-amber-300" />
-                  <span>Express Doorstep Delivery</span>
-                </div>
-              </div>
+              <span className="text-[10px] text-emerald-300 font-mono">
+                {progressPercent}%
+              </span>
             </div>
 
-            {/* Right: Prominent "View Cart →" button */}
-            <div className="flex items-center gap-1.5 bg-white hover:bg-stone-100 text-[#0c831f] text-xs sm:text-sm font-heading font-black px-3.5 sm:px-4 py-2 rounded-xl shadow-md flex-shrink-0 transition-transform active:scale-95">
-              <span>View Cart</span>
-              <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+            {/* Micro Progress Bar */}
+            <div className="w-full bg-emerald-950/60 h-1">
+              <div
+                className="bg-amber-300 h-1 transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
-          </button>
+
+            {/* Interactive Cart Button */}
+            <button
+              type="button"
+              id="floating-cart-pill-btn"
+              onClick={onOpenCart}
+              className="w-full p-2 sm:p-2.5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all hover:bg-[#0a701a]"
+            >
+              {/* Left: Overlapping micro-thumbnails + Item count & Live Total */}
+              <div className="flex items-center gap-2 sm:gap-2.5 pl-1 min-w-0">
+                {/* Overlapping Thumbnails */}
+                <div className="flex items-center -space-x-2.5 flex-shrink-0">
+                  {previewThumbnails.length > 0 ? (
+                    previewThumbnails.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white p-0.5 border-2 border-[#0c831f] shadow-md overflow-hidden flex items-center justify-center relative"
+                        style={{ zIndex: 3 - idx }}
+                      >
+                        <img
+                          src={item.imageUrl || getCategoryFallbackSvg(item.category || '', item.name)}
+                          alt={item.name}
+                          className="w-full h-full object-contain mix-blend-multiply"
+                          onError={(e) => {
+                            const fallback = getCategoryFallbackSvg(item.category || '', item.name);
+                            if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                              (e.currentTarget as HTMLImageElement).src = fallback;
+                            }
+                          }}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="w-8 h-8 rounded-xl bg-white text-[#0c831f] flex items-center justify-center font-bold shadow-2xs">
+                      <ShoppingBag className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Count & Live Total */}
+                <div className="text-left leading-tight min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-heading font-black text-sm sm:text-base text-white truncate">
+                      {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'}
+                    </span>
+                    <span className="text-emerald-200 font-normal">|</span>
+                    <span className="font-heading font-black text-sm sm:text-base text-white">
+                      ₹{cartTotalAmount}
+                    </span>
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] text-emerald-100 font-medium truncate mt-0.5">
+                    Tap to review items & address
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Prominent "View Cart →" button */}
+              <div className="flex items-center gap-1.5 bg-[#ffc200] hover:bg-[#e6af00] text-stone-950 text-xs sm:text-sm font-heading font-black px-3.5 sm:px-4 py-2 rounded-xl shadow-md flex-shrink-0 transition-transform active:scale-95">
+                <span>View Cart</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              </div>
+            </button>
+          </div>
         </div>
       )}
 

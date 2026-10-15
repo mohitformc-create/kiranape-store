@@ -190,8 +190,8 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
             </button>
           </div>
 
-          {/* Horizontal Category Pills Strip: Scrollable rounded pills with icons and active highlights */}
-          <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar">
+          {/* Top Horizontal Category Tabs (Amazon Fresh Style): Smoothly scrollable with clear icons & soft mint highlight */}
+          <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar touch-pan-x scroll-smooth">
             {filteredCategories.map((cat) => {
               const isSelected = selectedCategory === cat.name;
               return (
@@ -199,14 +199,17 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
                   key={cat.id || cat.name}
                   type="button"
                   onClick={() => onSelectCategory(cat.name as ProductCategory)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 active:scale-95 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 active:scale-95 ${
                     isSelected
-                      ? 'bg-[#0c831f] text-white shadow-xs font-black'
-                      : 'bg-white hover:bg-stone-50 text-stone-800 border border-stone-200/90 shadow-2xs'
+                      ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-600 font-black shadow-xs ring-1 ring-emerald-600/30'
+                      : 'bg-white hover:bg-emerald-50/50 text-stone-800 border border-stone-200 shadow-2xs font-semibold'
                   }`}
                 >
                   <span className="text-sm leading-none">{cat.icon || '🏷️'}</span>
                   <span>{cat.name}</span>
+                  {isSelected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse ml-0.5" />
+                  )}
                 </button>
               );
             })}
