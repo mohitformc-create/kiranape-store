@@ -605,22 +605,42 @@ export function BarcodeScannerModal({
               </div>
 
               {/* Quick Barcode Test Hints */}
-              <div className="mt-3 flex items-center gap-2 text-stone-400 text-[11px]">
-                <span>Sample Kirana Barcodes:</span>
+              <div className="mt-3 flex items-center justify-center flex-wrap gap-2 text-stone-400 text-[11px]">
+                <span className="font-semibold text-stone-300">Quick Test:</span>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeDecoded('8901396340013')}
+                  className="bg-stone-800 hover:bg-stone-700 text-cyan-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                >
+                  Harpic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeDecoded('8901396001112')}
+                  className="bg-stone-800 hover:bg-stone-700 text-pink-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                >
+                  Dettol
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeDecoded('8901030010180')}
+                  className="bg-stone-800 hover:bg-stone-700 text-blue-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                >
+                  Surf Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeDecoded('8901396320015')}
+                  className="bg-stone-800 hover:bg-stone-700 text-amber-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                >
+                  Lizol
+                </button>
                 <button
                   type="button"
                   onClick={() => handleBarcodeDecoded('8901058863673')}
-                  className="underline hover:text-emerald-400 cursor-pointer"
+                  className="bg-stone-800 hover:bg-stone-700 text-emerald-300 px-2 py-0.5 rounded cursor-pointer transition-colors"
                 >
-                  Maggi Noodles
-                </button>
-                •
-                <button
-                  type="button"
-                  onClick={() => handleBarcodeDecoded('8901030010173')}
-                  className="underline hover:text-emerald-400 cursor-pointer"
-                >
-                  Tata Salt
+                  Maggi
                 </button>
               </div>
             </div>
@@ -639,7 +659,7 @@ export function BarcodeScannerModal({
                     inputMode="numeric"
                     value={manualBarcodeInput}
                     onChange={(e) => setManualBarcodeInput(e.target.value)}
-                    placeholder="e.g. 8901058863673"
+                    placeholder="e.g. 8901396340013 (Harpic) / 8901396001112 (Dettol)"
                     className="flex-1 bg-stone-800 border border-stone-700 text-white rounded-xl px-3.5 py-2.5 text-sm font-mono tracking-wider focus:outline-none focus:border-emerald-500"
                     autoFocus
                   />
@@ -653,7 +673,7 @@ export function BarcodeScannerModal({
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    <span>Fetch Details</span>
+                    <span>Universal Lookup</span>
                   </button>
                 </div>
               </form>
@@ -661,52 +681,74 @@ export function BarcodeScannerModal({
               {/* Popular Instant Test Barcodes for Dukandar */}
               <div className="p-3 bg-stone-950/60 rounded-2xl border border-stone-800/80 space-y-2">
                 <p className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                  Test With Common Kirana Barcodes:
+                  Test Indian Household, Personal Care & Grocery Barcodes:
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <button
                     type="button"
                     onClick={() => {
-                      setManualBarcodeInput('8901058863673');
-                      handleBarcodeDecoded('8901058863673');
+                      setManualBarcodeInput('8901396340013');
+                      handleBarcodeDecoded('8901396340013');
                     }}
                     className="p-2 text-left bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-emerald-400">Maggi 2-Min Noodles</div>
-                    <div className="text-[10px] text-stone-500 font-mono">8901058863673</div>
+                    <div className="font-bold text-cyan-400">Harpic Toilet Cleaner</div>
+                    <div className="text-[10px] text-stone-500 font-mono">8901396340013 • Household</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setManualBarcodeInput('8901030010173');
-                      handleBarcodeDecoded('8901030010173');
+                      setManualBarcodeInput('8901396001112');
+                      handleBarcodeDecoded('8901396001112');
                     }}
                     className="p-2 text-left bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-emerald-400">Tata Salt (1 kg)</div>
-                    <div className="text-[10px] text-stone-500 font-mono">8901030010173</div>
+                    <div className="font-bold text-pink-400">Dettol Original Soap</div>
+                    <div className="text-[10px] text-stone-500 font-mono">8901396001112 • Personal</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setManualBarcodeInput('8901030010210');
-                      handleBarcodeDecoded('8901030010210');
+                      setManualBarcodeInput('8901030010180');
+                      handleBarcodeDecoded('8901030010180');
                     }}
                     className="p-2 text-left bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-emerald-400">Tata Tea Gold</div>
-                    <div className="text-[10px] text-stone-500 font-mono">8901030010210</div>
+                    <div className="font-bold text-blue-400">Surf Excel Detergent</div>
+                    <div className="text-[10px] text-stone-500 font-mono">8901030010180 • Laundry</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setManualBarcodeInput('8901491101837');
-                      handleBarcodeDecoded('8901491101837');
+                      setManualBarcodeInput('8901396320015');
+                      handleBarcodeDecoded('8901396320015');
                     }}
                     className="p-2 text-left bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-emerald-400">Kurkure Masala Munch</div>
-                    <div className="text-[10px] text-stone-500 font-mono">8901491101837</div>
+                    <div className="font-bold text-amber-400">Lizol Floor Cleaner</div>
+                    <div className="text-[10px] text-stone-500 font-mono">8901396320015 • Cleaners</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualBarcodeInput('8901213001015');
+                      handleBarcodeDecoded('8901213001015');
+                    }}
+                    className="p-2 text-left bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-purple-400">Whisper Sanitary Pads</div>
+                    <div className="text-[10px] text-stone-500 font-mono">8901213001015 • Hygiene</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualBarcodeInput('8906007280145');
+                      handleBarcodeDecoded('8906007280145');
+                    }}
+                    className="p-2 text-left bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-red-400">Ching's Soy Sauce</div>
+                    <div className="text-[10px] text-stone-500 font-mono">8906007280145 • Sauces</div>
                   </button>
                 </div>
               </div>
@@ -716,13 +758,16 @@ export function BarcodeScannerModal({
           {/* Loading Indicator */}
           {isFetching && (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-spin border border-emerald-500/40">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500/20 via-blue-500/20 to-purple-500/20 text-emerald-400 flex items-center justify-center animate-spin border border-emerald-500/40">
                 <RefreshCw className="w-6 h-6" />
               </div>
               <p className="text-sm font-bold text-stone-200">
-                Open Food Facts database se product details fetch ho rahi hain...
+                Multi-Source Chain (Food, Personal Care, Household & Gemini AI) se details fetch ho rahi hain...
               </p>
-              <p className="text-xs font-mono text-stone-400">Barcode: {scannedBarcode}</p>
+              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-stone-900 px-3 py-1 rounded-full border border-stone-800">
+                <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-300" />
+                <span>Barcode: {scannedBarcode}</span>
+              </div>
             </div>
           )}
 
@@ -748,12 +793,39 @@ export function BarcodeScannerModal({
 
                 {/* Details */}
                 <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center flex-wrap gap-1.5">
                     <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded-full">
                       Barcode: {scannedProduct.barcode}
                     </span>
+
+                    {scannedProduct.source === 'gemini-ai' && (
+                      <span className="text-[10px] font-bold text-violet-300 bg-violet-950/80 border border-violet-700/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-300" /> Gemini AI
+                      </span>
+                    )}
+                    {scannedProduct.source === 'openbeautyfacts' && (
+                      <span className="text-[10px] font-bold text-pink-300 bg-pink-950/80 border border-pink-700/60 px-2 py-0.5 rounded-full">
+                        🧴 Personal Care
+                      </span>
+                    )}
+                    {scannedProduct.source === 'openproductsfacts' && (
+                      <span className="text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-700/60 px-2 py-0.5 rounded-full">
+                        🏠 Household
+                      </span>
+                    )}
+                    {scannedProduct.source === 'fmcg-catalog' && (
+                      <span className="text-[10px] font-bold text-blue-300 bg-blue-950/80 border border-blue-700/60 px-2 py-0.5 rounded-full">
+                        ⚡ FMCG Fast-Track
+                      </span>
+                    )}
+                    {scannedProduct.source === 'openfoodfacts' && (
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2 py-0.5 rounded-full">
+                        🥗 Food Facts
+                      </span>
+                    )}
+
                     {scannedProduct.brand && (
-                      <span className="text-[10px] font-bold text-stone-400 bg-stone-900 px-2 py-0.5 rounded-full border border-stone-800">
+                      <span className="text-[10px] font-bold text-stone-300 bg-stone-900 px-2 py-0.5 rounded-full border border-stone-800">
                         {scannedProduct.brand}
                       </span>
                     )}
