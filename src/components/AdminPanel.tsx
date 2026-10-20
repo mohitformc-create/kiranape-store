@@ -46,11 +46,13 @@ import {
   Upload,
   FileSpreadsheet,
   Mic,
+  ScanLine,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
 import { ProductFormModal } from './ProductFormModal';
 import { VoiceInventoryModal } from './VoiceInventoryModal';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { AdminStoreSettings } from './AdminStoreSettings';
 import { AdminOffersAndSettings } from './AdminOffersAndSettings';
 import { AdminVisualProductCard } from './AdminVisualProductCard';
@@ -390,6 +392,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Modal & Sync states
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isVoiceInventoryOpen, setIsVoiceInventoryOpen] = useState(false);
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
   const [catalogSyncNotice, setCatalogSyncNotice] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -1414,6 +1417,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600" />
                     <span>Download Sample CSV Template</span>
+                  </button>
+
+                  {/* Smart Barcode / QR Scanner Button */}
+                  <button
+                    type="button"
+                    id="admin-inventory-barcode-scan-btn"
+                    onClick={() => setIsBarcodeScannerOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-heading font-extrabold shadow-sm transition-all cursor-pointer border border-blue-400/30"
+                    title="Camera se Barcode/QR scan karke bina manual typing product add karein"
+                  >
+                    <ScanLine className="w-4 h-4 text-cyan-300 animate-pulse" />
+                    <span>📷 Scan to Add Product</span>
                   </button>
 
                   {/* AI Voice Add Item */}
@@ -3217,21 +3232,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         onUpdateProduct={onUpdateProduct}
       />
 
-      {/* Floating AI Voice Inventory Mic Button */}
-      <button
-        type="button"
-        id="admin-floating-voice-inventory-btn"
-        onClick={() => setIsVoiceInventoryOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-3 rounded-full shadow-2xl hover:shadow-emerald-500/50 border-2 border-white/30 transition-all transform hover:scale-105 active:scale-95 cursor-pointer group"
-        title="बोलकर सामान जोड़ें (AI Voice Add)"
-      >
-        <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-          <Mic className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-        </div>
-        <span className="font-heading font-black text-xs sm:text-sm tracking-tight pr-1">
-          बोलकर सामान जोड़ें (Voice Add)
-        </span>
-      </button>
+      {/* Floating Action Buttons: AI Voice Add & Camera Barcode Scanner */}
+      <div className="fixed bottom-6 right-5 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-2.5">
+        {/* Floating Barcode Scanner Button */}
+        <button
+          type="button"
+          id="admin-floating-barcode-scan-btn"
+          onClick={() => setIsBarcodeScannerOpen(true)}
+          className="flex items-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-indigo-500 text-white px-3.5 py-2.5 rounded-full shadow-2xl hover:shadow-indigo-500/50 border-2 border-white/30 transition-all transform hover:scale-105 active:scale-95 cursor-pointer group"
+          title="📷 Barcode / QR Scan Karein"
+        >
+          <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+            <ScanLine className="w-3.5 h-3.5 text-cyan-200 group-hover:scale-110 transition-transform" />
+          </div>
+          <span className="font-heading font-black text-xs sm:text-sm tracking-tight pr-1">
+            📷 Scan Barcode
+          </span>
+        </button>
+
+        {/* Floating AI Voice Inventory Mic Button */}
+        <button
+          type="button"
+          id="admin-floating-voice-inventory-btn"
+          onClick={() => setIsVoiceInventoryOpen(true)}
+          className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3.5 py-2.5 rounded-full shadow-2xl hover:shadow-emerald-500/50 border-2 border-white/30 transition-all transform hover:scale-105 active:scale-95 cursor-pointer group"
+          title="बोलकर सामान जोड़ें (AI Voice Add)"
+        >
+          <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+            <Mic className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+          </div>
+          <span className="font-heading font-black text-xs sm:text-sm tracking-tight pr-1">
+            बोलकर जोड़ें (Voice)
+          </span>
+        </button>
+      </div>
+
+      {/* Smart Barcode / QR Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={isBarcodeScannerOpen}
+        onClose={() => setIsBarcodeScannerOpen(false)}
+        onProductAdded={onAddProduct}
+        existingProducts={products}
+      />
 
       {/* Product Add/Edit Modal */}
       <ProductFormModal

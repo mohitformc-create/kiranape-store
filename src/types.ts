@@ -27,6 +27,7 @@ export interface Product {
   stock?: number; // In-stock unit count
   stockCount?: number; // Alias for inventory count
   description?: string;
+  barcode?: string;
   variants?: ProductVariant[];
   updatedAt: number;
 }

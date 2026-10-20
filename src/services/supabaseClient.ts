@@ -311,12 +311,25 @@ export async function insertProductToSupabase(product: any): Promise<{ success: 
       in_stock: product.in_stock !== undefined ? Boolean(product.in_stock) : product.isAvailable !== false,
     };
 
+    if (product.barcode) {
+      payload.barcode = product.barcode;
+    }
+
     // Include id if UUID format
     if (product.id && typeof product.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(product.id)) {
       payload.id = product.id;
     }
 
-    const { data, error } = await supabase.from('products').insert([payload]).select();
+    let { data, error } = await supabase.from('products').insert([payload]).select();
+    
+    // If failed because 'barcode' column doesn't exist in Supabase schema, retry without barcode
+    if (error && error.message?.toLowerCase().includes('barcode')) {
+      delete payload.barcode;
+      const retryResult = await supabase.from('products').insert([payload]).select();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
+
     if (error) {
       console.warn('[Supabase] Failed inserting product:', error.message);
       return { success: false, error: error.message };
