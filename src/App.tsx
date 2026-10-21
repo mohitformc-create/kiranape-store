@@ -74,12 +74,8 @@ import {
 } from './services/firebase';
 import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
 import { CustomerHeader } from './components/CustomerHeader';
-import { HeroBanner } from './components/HeroBanner';
-import { PromoCarousel } from './components/PromoCarousel';
 import { ProductCard } from './components/ProductCard';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
-import { MostShoppedSlider } from './components/MostShoppedSlider';
-import { StationeryPromoStrip } from './components/StationeryPromoStrip';
 import { CategoryDetailView } from './components/CategoryDetailView';
 import { BottomNavBar } from './components/BottomNavBar';
 import { CartDrawer } from './components/CartDrawer';
@@ -852,13 +848,6 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto w-full px-2.5 sm:px-4 pt-3 sm:pt-4 flex-1">
-        {/* Promotional Hero Carousel Banners */}
-        <HeroBanner
-          department={selectedDepartment}
-          onOpenParchiModal={() => setIsParchiModalOpen(true)}
-          onSelectCategory={(cat) => setSelectedCategory(cat as ProductCategory)}
-        />
-
         {/* CONSOLIDATED MASTER ACTION BAR: 📸 Parchi Ki Photo Bhejo & 🎙️ Bol Kar Saman Likhein */}
         <QuickOrderActionBar
           onOpenParchiModal={() => setIsParchiModalOpen(true)}
@@ -959,20 +948,9 @@ export default function App() {
             onSelectCategory={(cat) => setSelectedCategory(cat as ProductCategory)}
           />
         ) : (
-          /* 3. STRICT CATEGORY-FIRST HOME EXPERIENCE (ZERO RAW PRODUCT DUMP) */
-          <div className="pb-6">
-            {/* Featured Promotional Strip on Grocery Feed */}
-            {selectedDepartment === 'grocery' && (
-              <StationeryPromoStrip
-                onExploreStationery={() => {
-                  setSelectedDepartment('stationery');
-                  setSelectedCategory('All');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              />
-            )}
-
-            {/* Bestsellers & Curated Category Hub (4-column pastel cards with 2x2 brand packshots) */}
+          /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
+          <div className="pb-8 space-y-6">
+            {/* Category Hub (Cards with icons) */}
             <div id="category-grid-section">
               <CategoryTileGrid
                 department={selectedDepartment}
@@ -985,14 +963,35 @@ export default function App() {
               />
             </div>
 
-            {/* Most Shopped Essentials (Clean, compact single-row horizontal slider of top items) */}
-            <MostShoppedSlider
-              department={selectedDepartment}
-              products={products}
-              cartQuantities={cartQuantities}
-              onAddToCart={handleAddToCart}
-              onUpdateQuantity={handleUpdateQuantity}
-            />
+            {/* Direct Products Grid (Amazon Fresh / Zepto Style) */}
+            <div>
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div>
+                  <h3 className="font-heading font-black text-base sm:text-lg text-stone-900 tracking-tight">
+                    Taaza Samaan & Daily Essentials
+                  </h3>
+                  <p className="text-xs text-stone-500 font-medium">
+                    Shuddh kirana, seedhe aapke ghar tak
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                  {products.length} Products
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    quantityInCart={cartQuantities[product.id] || 0}
+                    cartQuantities={cartQuantities}
+                    onAddToCart={handleAddToCart}
+                    onUpdateQuantity={handleUpdateQuantity}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </main>

@@ -102,7 +102,7 @@ export const OffersForYou: React.FC<OffersForYouProps> = ({
                   FREE Delivery above ₹{minFreeDelivery}
                 </h4>
                 <p className="text-[11px] text-stone-600 font-medium mt-0.5">
-                  ⚡ 10-15 minute doorstep drop across Waidhan
+                  ⚡ Bharosemand doorstep delivery across Waidhan
                 </p>
               </div>
             </div>

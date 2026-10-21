@@ -232,7 +232,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
                   Delivery Slot:
                 </p>
                 <p className="text-[11px] text-stone-600 font-medium">
-                  {currentOrder.deliverySlot || 'Instant Delivery (30-45 mins)'}
+                  {currentOrder.deliverySlot || 'Bharosemand Doorstep Delivery'}
                 </p>
               </div>
             </div>

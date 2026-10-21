@@ -654,7 +654,7 @@ export async function createOrderInFirestore(
     minute: '2-digit',
   });
 
-  const assignedSlot = orderData.deliverySlot || 'Instant Delivery (30-45 mins)';
+  const assignedSlot = orderData.deliverySlot || 'Bharosemand Doorstep Delivery';
 
   const order: Order = {
     id: orderId,

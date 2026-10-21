@@ -7,11 +7,8 @@ interface CreatorCreditsProps {
 }
 
 /**
- * Official Brand Footer & Creator Credits
- * Required on: Customer Storefront, Admin Panel, and Splash/Login screens.
- *
- * • Line 1: "Designed by Sam Solutions"
- * • Line 2: "Mohit Chaurasia"
+ * Official Brand Footer Credits
+ * Clean and professional: "Designed by Sam Solutions"
  */
 export const CreatorCredits: React.FC<CreatorCreditsProps> = ({
   className = '',
@@ -20,24 +17,17 @@ export const CreatorCredits: React.FC<CreatorCreditsProps> = ({
 }) => {
   return (
     <div
-      className={`text-center flex flex-col items-center justify-center space-y-1 select-none ${
+      className={`text-center flex flex-col items-center justify-center select-none ${
         withBottomPadding ? 'pb-20 sm:pb-8' : ''
       } ${className}`}
       aria-label="Creator and Branding Credits"
     >
       <p
-        className={`text-xs font-medium tracking-wide ${
+        className={`text-xs font-semibold tracking-wide ${
           isDark ? 'text-stone-400' : 'text-stone-500'
         }`}
       >
         Designed by Sam Solutions
-      </p>
-      <p
-        className={`text-xs sm:text-sm font-bold tracking-tight ${
-          isDark ? 'text-stone-200' : 'text-stone-800'
-        }`}
-      >
-        Mohit Chaurasia
       </p>
     </div>
   );

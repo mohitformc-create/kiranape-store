@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
 dotenv.config();
 
 // Prevent uncaught errors from crashing Cloud Run instance
@@ -285,81 +284,6 @@ app.post('/api/upload-image', (req, res) => {
   } catch (err: any) {
     console.error('[CDN Upload] Error saving image upload:', err);
     return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ==========================================
-// TIER 4: GEMINI AI SMART FMCG BARCODE LOOKUP
-// ==========================================
-app.post('/api/barcode/ai-lookup', async (req, res) => {
-  try {
-    const { barcode } = req.body || {};
-    const cleanBarcode = String(barcode || '').trim().replace(/[^0-9a-zA-Z]/g, '');
-    if (!cleanBarcode) {
-      return res.status(400).json({ success: false, error: 'Barcode is required' });
-    }
-
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        error: 'GEMINI_API_KEY not configured on server',
-      });
-    }
-
-    const ai = new GoogleGenAI();
-    const prompt = `You are a high-speed Indian FMCG & Kirana grocery retail database expert.
-The user scanned an Indian/Global retail barcode: "${cleanBarcode}".
-
-Your task: Identify the exact retail packed product with this barcode from the Indian FMCG market.
-Categories to consider:
-1. Household Essentials: Harpic, Lizol, Phenyl, Surf Excel, Ariel, Tide, Wheel, Ghari, Rin, Vim bar/liquid, Pril, Colin, Godrej Aer, All Out, Good Knight, Odonil, floor/toilet cleaner, mosquito coils.
-2. Personal Care: Dettol soap/liquid, Lifebuoy, Lux, Dove, Pears, Santoor, Cinthol, Colgate toothpaste/brush, Pepsodent, Close Up, Sensodyne, Clinic Plus, Sunsilk, Head & Shoulders, Pantene, Whisper sanitary pads, Stayfree, Sofy, Fair & Lovely / Glow & Lovely, Pond's, Vaseline, Nivea, Parachute coconut oil, Bajaj Almond drops, Gillette.
-3. Packaged Foods & Sauces: Maggi noodles, Yippee, Pasta, Macaroni, Kissan ketchup/jam, Ching's soy/chilli sauce, vinegar, mayonnaise, canned sweets (Rasgulla tin, Gulab Jamun tin), pickles, papad.
-4. Snacks & Biscuits: Parle-G, Britannia Good Day, Marie Gold, Oreo, Bourbon, Kurkure, Lays, Haldiram bhujia, Bikaji, Bikano, Cadbury Dairy Milk.
-5. Tea, Coffee & Drinks: Tata Tea, Red Label, Taj Mahal, Nescafe, Bru, Rooh Afza, Maaza, Frooti, Thums Up, Sprite, Coke.
-6. Atta, Rice, Dal, Oil, Spices: Aashirvaad, Fortune oil/atta, Tata Salt, MDH, Everest, Catch, Daawat.
-
-Return ONLY a valid JSON object strictly matching this format:
-{
-  "name": "Full Product Title with Brand (e.g. 'Harpic Power Plus Disinfectant Toilet Cleaner 500ml', 'Dettol Original Germ Protection Bathing Soap 75g', 'Lizol Citrus Disinfectant Floor Cleaner 500ml', 'Surf Excel Easy Wash Detergent Powder 1kg', 'Whisper Choice Ultra Wings Sanitary Pads (Pack of 6)', 'Ching\\'s Secret Dark Soy Sauce 200g', 'Colgate Strong Teeth Dental Cream Toothpaste 100g', 'Vim Dishwash Bar with Lemon 150g')",
-  "brand": "Brand Name (e.g. 'Harpic', 'Dettol', 'Lizol', 'Surf Excel', 'Whisper', 'Colgate', 'Vim', 'Maggi')",
-  "unit": "Pack Size / Net Weight (e.g. '500 ml', '1 L', '75 g', '1 kg', 'Pack of 6', '200 g')",
-  "category": "Exactly one of: 'Household Essentials', 'Personal Care', 'Packaged Foods', 'Snacks & Biscuits', 'Tea, Coffee & Drinks', 'Atta & Flours', 'Rice & Dal', 'Oil & Ghee', 'Spices & Salt', 'Dairy & Bakery', 'Health & Nutrition'",
-  "originalPrice": 120,
-  "finalPrice": 110,
-  "discountPercent": 8,
-  "description": "Short 1-line product description"
-}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const text = response.text || '';
-    const parsed = JSON.parse(text);
-
-    return res.json({
-      success: true,
-      data: {
-        barcode: cleanBarcode,
-        name: parsed.name || `FMCG Product (${cleanBarcode})`,
-        brand: parsed.brand || '',
-        unit: parsed.unit || '1 piece',
-        category: parsed.category || 'Household Essentials',
-        originalPrice: Number(parsed.originalPrice) || 0,
-        finalPrice: Number(parsed.finalPrice) || 0,
-        discountPercent: Number(parsed.discountPercent) || 0,
-        description: parsed.description || '',
-        source: 'gemini-ai',
-      },
-    });
-  } catch (err: any) {
-    console.warn('[Barcode AI Lookup] Error processing barcode:', err);
-    return res.status(500).json({ success: false, error: err.message || 'AI Lookup failed' });
   }
 });
 

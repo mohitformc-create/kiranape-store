@@ -41,7 +41,7 @@ export function mapSupabaseRowToOrder(row: any): Order {
   const phone = row.phone || row.customerPhone || '';
   const address = row.address || row.deliveryAddress || 'Store Pickup';
   const status = (row.status || 'received') as OrderStatus;
-  const deliverySlot = row.delivery_slot || row.deliverySlot || 'Instant Delivery (30-45 mins)';
+  const deliverySlot = row.delivery_slot || row.deliverySlot || 'Bharosemand Doorstep Delivery';
   const deliveryLocation = row.delivery_location || row.deliveryLocation || 'Waidhan, Singrauli';
 
   return {

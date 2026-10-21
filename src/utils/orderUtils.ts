@@ -31,7 +31,7 @@ export function generateWhatsAppBillMessage(order: Order, storeSettings?: StoreS
 • *Customer Name:* ${order.customerName}
 • *Phone:* ${order.phone}
 • *Delivery Address:* ${order.address}
-• *Delivery Slot:* ${order.deliverySlot || 'Instant Delivery (30-45 mins)'}
+• *Delivery Slot:* ${order.deliverySlot || 'Bharosemand Doorstep Delivery'}
 
 📦 *ORDERED ITEMS (${order.itemsCount || order.items.length}):*
 ${itemsList}

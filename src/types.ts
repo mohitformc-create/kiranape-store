@@ -80,7 +80,7 @@ export type OrderStatus =
 export type DeliverySlot =
   | 'Morning (10:00 AM - 2:00 PM)'
   | 'Evening (7:00 PM - 9:00 PM)'
-  | 'Instant Delivery (30-45 mins)'
+  | 'Bharosemand Doorstep Delivery'
   | 'Today Evening (5:00 PM - 8:00 PM)'
   | 'Tomorrow Morning (7:30 AM - 10:30 AM)'
   | 'Tomorrow Evening (5:00 PM - 8:00 PM)'
