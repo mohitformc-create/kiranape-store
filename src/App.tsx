@@ -16,9 +16,9 @@ import {
   Store,
   ChevronRight,
   Search,
-  Filter,
   MessageCircle,
   Key,
+  PenLine,
 } from 'lucide-react';
 import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
 import {
@@ -88,6 +88,7 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { SplashScreen } from './components/SplashScreen';
 import { ParchiUploadModal } from './components/ParchiUploadModal';
+import { DigitalParchiModal } from './components/DigitalParchiModal';
 import { VoiceGroceryModal } from './components/VoiceGroceryModal';
 import { QuickOrderActionBar } from './components/QuickOrderActionBar';
 import { CreatorCredits } from './components/CreatorCredits';
@@ -146,6 +147,7 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isParchiModalOpen, setIsParchiModalOpen] = useState(false);
+  const [isDigitalParchiOpen, setIsDigitalParchiOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
@@ -312,6 +314,11 @@ export default function App() {
         window.history.pushState({ app: 'kiranape', page: 'home' }, '');
         return;
       }
+      if (isDigitalParchiOpen) {
+        setIsDigitalParchiOpen(false);
+        window.history.pushState({ app: 'kiranape', page: 'home' }, '');
+        return;
+      }
       if (placedOrder) {
         setPlacedOrder(null);
         window.history.pushState({ app: 'kiranape', page: 'home' }, '');
@@ -335,6 +342,7 @@ export default function App() {
     isPrivacyOpen,
     isAuthModalOpen,
     isParchiModalOpen,
+    isDigitalParchiOpen,
     placedOrder,
     currentView,
     handleClosePrivacy,
@@ -844,15 +852,11 @@ export default function App() {
         categories={customCategories}
         onOpenParchiModal={() => setIsParchiModalOpen(true)}
         onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
+        onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
       />
 
       {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto w-full px-2.5 sm:px-4 pt-3 sm:pt-4 flex-1">
-        {/* CONSOLIDATED MASTER ACTION BAR: 📸 Parchi Ki Photo Bhejo & 🎙️ Bol Kar Saman Likhein */}
-        <QuickOrderActionBar
-          onOpenParchiModal={() => setIsParchiModalOpen(true)}
-          onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
-        />
+      <main className="max-w-6xl mx-auto w-full px-2 sm:px-4 pt-1 sm:pt-2 flex-1">
 
         {/* CONDITIONAL RENDERING: 
             1. Search Results (if user entered search text)
@@ -949,7 +953,28 @@ export default function App() {
           />
         ) : (
           /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
-          <div className="pb-8 space-y-6">
+          <div className="pb-8 space-y-4 sm:space-y-5">
+            {/* Sleek Blinkit Quick Note Strip */}
+            <div className="flex items-center gap-2 px-3 pt-1 pb-0.5">
+              <button
+                type="button"
+                id="home-digital-parchi-pill"
+                onClick={() => setIsDigitalParchiOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100/70 border border-amber-200/80 text-stone-800 text-xs font-semibold shadow-2xs active:scale-98 transition-all cursor-pointer"
+              >
+                <PenLine className="w-3.5 h-3.5 text-amber-700" />
+                <span>📝 पर्ची टाइप करें</span>
+              </button>
+              <button
+                type="button"
+                id="home-parchi-photo-pill"
+                onClick={() => setIsParchiModalOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200/80 text-stone-800 text-xs font-semibold shadow-2xs active:scale-98 transition-all cursor-pointer"
+              >
+                <span>📸 पर्ची की फोटो</span>
+              </button>
+            </div>
+
             {/* Category Hub (Cards with icons) */}
             <div id="category-grid-section">
               <CategoryTileGrid
@@ -1141,6 +1166,13 @@ export default function App() {
       <ParchiUploadModal
         isOpen={isParchiModalOpen}
         onClose={() => setIsParchiModalOpen(false)}
+        storeSettings={storeSettings}
+      />
+
+      {/* 4.55. Interactive Digital Parchi (Type Grocery List) Notepad Modal */}
+      <DigitalParchiModal
+        isOpen={isDigitalParchiOpen}
+        onClose={() => setIsDigitalParchiOpen(false)}
         storeSettings={storeSettings}
       />
 

@@ -32,6 +32,7 @@ interface CustomerHeaderProps {
   onSelectDepartment?: (dept: 'grocery' | 'stationery') => void;
   onOpenParchiModal?: () => void;
   onOpenVoiceModal?: () => void;
+  onOpenDigitalParchiModal?: () => void;
 }
 
 export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
@@ -49,6 +50,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onSelectDepartment,
   onOpenParchiModal,
   onOpenVoiceModal,
+  onOpenDigitalParchiModal,
 }) => {
   const dynamicCategories = categories && categories.length > 0 ? categories : getCustomCategories();
 
@@ -146,6 +148,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
             onSecretAdminTrigger={onSecretAdminTrigger}
             onOpenParchiModal={onOpenParchiModal}
             onOpenVoiceModal={onOpenVoiceModal}
+            onOpenDigitalParchiModal={onOpenDigitalParchiModal}
             className="mt-2.5"
           />
 

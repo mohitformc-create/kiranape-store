@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Mic, Camera } from 'lucide-react';
+import { Search, X, Mic, Camera, PenLine } from 'lucide-react';
 
 interface SearchBarProps {
   searchQuery: string;
@@ -8,15 +8,15 @@ interface SearchBarProps {
   onSecretAdminTrigger?: () => void;
   onOpenParchiModal?: () => void;
   onOpenVoiceModal?: () => void;
+  onOpenDigitalParchiModal?: () => void;
   className?: string;
 }
 
 const ROTATING_SEARCH_PLACEHOLDERS = [
-  'खोजें: चीनी, चावल, दाल, आटा, तेल...',
-  'Search for sugar, fortune oil, atta, spices...',
-  'Search for cheeni, chawal, sarso tel, ghee...',
-  'खोजें: बिस्कुट, चाय पत्ती, सर्फ़, साबुन...',
-  'Search for tata tea, surf excel, maggi, colgate...',
+  'Search for atta, dal, biscuits, surf...',
+  'Search for sugar, fortune oil, tea, ghee...',
+  'खोजें: आटा, दाल, तेल, बिस्कुट, मसाले...',
+  'Search for surf excel, maggi, colgate, soap...',
 ];
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -26,6 +26,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSecretAdminTrigger,
   onOpenParchiModal,
   onOpenVoiceModal,
+  onOpenDigitalParchiModal,
   className = '',
 }) => {
   const [isListening, setIsListening] = useState(false);
@@ -246,6 +247,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           >
             <Mic className={`w-4 h-4 ${isListening ? 'text-white animate-pulse' : 'text-stone-700'}`} />
           </button>
+
+          {/* Digital Parchi (Type List) Notepad Icon */}
+          {onOpenDigitalParchiModal && (
+            <button
+              type="button"
+              onClick={onOpenDigitalParchiModal}
+              className="p-1.5 rounded-full text-stone-600 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+              title="📝 अपनी किराना पर्ची टाइप करें (Type Grocery List)"
+            >
+              <PenLine className="w-4 h-4 text-amber-600" />
+            </button>
+          )}
 
           {/* Camera / Lens Icon for Parchi */}
           {onOpenParchiModal && (

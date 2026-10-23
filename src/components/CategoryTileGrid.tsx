@@ -1,6 +1,5 @@
 import React from 'react';
 import { CustomCategory, Product } from '../types';
-import { Sparkles, ChevronRight } from 'lucide-react';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 
 interface CategoryTileGridProps {
@@ -10,185 +9,101 @@ interface CategoryTileGridProps {
   onSelectCategory: (categoryName: string) => void;
 }
 
-// Visual theme mapping for authentic Instamart / Blinkit soft pastel styling
-const CATEGORY_THEMES: Record<
-  string,
-  { bg: string; border: string; text: string; iconBg: string; badgeBg: string }
-> = {
-  'Snacks & Biscuits': {
-    bg: 'bg-amber-50/90 hover:bg-amber-100/90',
-    border: 'border-amber-200/80',
-    text: 'text-amber-950',
-    iconBg: 'bg-amber-100 text-amber-800',
-    badgeBg: 'bg-amber-200/70 text-amber-900',
-  },
-  'Atta & Flours': {
-    bg: 'bg-orange-50/90 hover:bg-orange-100/90',
-    border: 'border-orange-200/80',
-    text: 'text-orange-950',
-    iconBg: 'bg-orange-100 text-orange-800',
-    badgeBg: 'bg-orange-200/70 text-orange-900',
-  },
-  'Rice & Dal': {
-    bg: 'bg-emerald-50/90 hover:bg-emerald-100/90',
-    border: 'border-emerald-200/80',
-    text: 'text-emerald-950',
-    iconBg: 'bg-emerald-100 text-emerald-800',
-    badgeBg: 'bg-emerald-200/70 text-emerald-900',
-  },
-  'Oil & Ghee': {
-    bg: 'bg-yellow-50/90 hover:bg-yellow-100/90',
-    border: 'border-yellow-200/80',
-    text: 'text-yellow-950',
-    iconBg: 'bg-yellow-100 text-yellow-800',
-    badgeBg: 'bg-yellow-200/70 text-yellow-900',
-  },
-  'Spices & Salt': {
-    bg: 'bg-rose-50/90 hover:bg-rose-100/90',
-    border: 'border-rose-200/80',
-    text: 'text-rose-950',
-    iconBg: 'bg-rose-100 text-rose-800',
-    badgeBg: 'bg-rose-200/70 text-rose-900',
-  },
-  'Dairy & Bakery': {
-    bg: 'bg-sky-50/90 hover:bg-sky-100/90',
-    border: 'border-sky-200/80',
-    text: 'text-sky-950',
-    iconBg: 'bg-sky-100 text-sky-800',
-    badgeBg: 'bg-sky-200/70 text-sky-900',
-  },
-  'Tea, Coffee & Drinks': {
-    bg: 'bg-stone-100/90 hover:bg-stone-200/90',
-    border: 'border-stone-300/80',
-    text: 'text-stone-900',
-    iconBg: 'bg-stone-200 text-stone-800',
-    badgeBg: 'bg-stone-300/70 text-stone-900',
-  },
-  'Health & Nutrition': {
-    bg: 'bg-teal-50/90 hover:bg-teal-100/90',
-    border: 'border-teal-200/80',
-    text: 'text-teal-950',
-    iconBg: 'bg-teal-100 text-teal-800',
-    badgeBg: 'bg-teal-200/70 text-teal-900',
-  },
-  'Personal Care': {
-    bg: 'bg-indigo-50/90 hover:bg-indigo-100/90',
-    border: 'border-indigo-200/80',
-    text: 'text-indigo-950',
-    iconBg: 'bg-indigo-100 text-indigo-800',
-    badgeBg: 'bg-indigo-200/70 text-indigo-900',
-  },
-  'Household Essentials': {
-    bg: 'bg-cyan-50/90 hover:bg-cyan-100/90',
-    border: 'border-cyan-200/80',
-    text: 'text-cyan-950',
-    iconBg: 'bg-cyan-100 text-cyan-800',
-    badgeBg: 'bg-cyan-200/70 text-cyan-900',
-  },
-  'Packaged Foods': {
-    bg: 'bg-fuchsia-50/90 hover:bg-fuchsia-100/90',
-    border: 'border-fuchsia-200/80',
-    text: 'text-fuchsia-950',
-    iconBg: 'bg-fuchsia-100 text-fuchsia-800',
-    badgeBg: 'bg-fuchsia-200/70 text-fuchsia-900',
-  },
-  'Pooja Samagri': {
-    bg: 'bg-amber-100/70 hover:bg-amber-100',
-    border: 'border-amber-300/80',
-    text: 'text-amber-950',
-    iconBg: 'bg-amber-200 text-amber-900',
-    badgeBg: 'bg-amber-300/80 text-amber-950',
-  },
-  'Baby Care': {
-    bg: 'bg-pink-50/90 hover:bg-pink-100/90',
-    border: 'border-pink-200/80',
-    text: 'text-pink-950',
-    iconBg: 'bg-pink-100 text-pink-800',
-    badgeBg: 'bg-pink-200/70 text-pink-900',
-  },
-  'Copies & Registers': {
-    bg: 'bg-blue-50/90 hover:bg-blue-100/90',
-    border: 'border-blue-200/80',
-    text: 'text-blue-950',
-    iconBg: 'bg-blue-100 text-blue-800',
-    badgeBg: 'bg-blue-200/70 text-blue-900',
-  },
-  'Pens, Pencils & Geometry': {
-    bg: 'bg-indigo-50/90 hover:bg-indigo-100/90',
-    border: 'border-indigo-200/80',
-    text: 'text-indigo-950',
-    iconBg: 'bg-indigo-100 text-indigo-800',
-    badgeBg: 'bg-indigo-200/70 text-indigo-900',
-  },
-  'Art, Craft & Fevicol': {
-    bg: 'bg-purple-50/90 hover:bg-purple-100/90',
-    border: 'border-purple-200/80',
-    text: 'text-purple-950',
-    iconBg: 'bg-purple-100 text-purple-800',
-    badgeBg: 'bg-purple-200/70 text-purple-900',
-  },
-  'Office & Daily Stationery': {
-    bg: 'bg-teal-50/90 hover:bg-teal-100/90',
-    border: 'border-teal-200/80',
-    text: 'text-teal-950',
-    iconBg: 'bg-teal-100 text-teal-800',
-    badgeBg: 'bg-teal-200/70 text-teal-900',
-  },
+// Deterministic Blinkit pastel colors
+const PASTEL_TINTS: Record<string, string> = {
+  'Atta & Flours': 'bg-[#fff3e0]', // warm peach
+  'Rice & Dal': 'bg-[#e8f5e9]', // soft mint
+  'Oil & Ghee': 'bg-[#fffde7]', // soft cream
+  'Spices & Salt': 'bg-[#ffebee]', // soft rose
+  'Dairy & Bakery': 'bg-[#e1f5fe]', // baby blue
+  'Pooja Samagri': 'bg-[#fff8e1]', // soft golden
+  'Snacks & Biscuits': 'bg-[#fff3e0]', // warm peach
+  'Tea, Coffee & Drinks': 'bg-[#efebe9]', // warm mocha
+  'Packaged Foods': 'bg-[#f3e5f5]', // light lavender
+  'Health & Nutrition': 'bg-[#e0f2f1]', // pale teal
+  'Household Essentials': 'bg-[#e0f7fa]', // soft cyan
+  'Personal Care': 'bg-[#ede7f6]', // soft lavender
+  'Baby Care': 'bg-[#fce4ec]', // soft pink
+  'Copies & Registers': 'bg-[#e3f2fd]', // baby blue
+  'Pens, Pencils & Geometry': 'bg-[#ede7f6]', // soft lavender
+  'Art, Craft & Fevicol': 'bg-[#f3e5f5]', // light purple
+  'Office & Daily Stationery': 'bg-[#e0f2f1]', // soft mint
 };
 
-const DEFAULT_THEME = {
-  bg: 'bg-stone-50/90 hover:bg-stone-100',
-  border: 'border-stone-200',
-  text: 'text-stone-900',
-  iconBg: 'bg-stone-100 text-stone-700',
-  badgeBg: 'bg-stone-200 text-stone-700',
+const DEFAULT_PASTEL_CYCLE = [
+  'bg-[#e8f5e9]', // soft mint
+  'bg-[#e1f5fe]', // baby blue
+  'bg-[#f3e5f5]', // light lavender
+  'bg-[#fff3e0]', // warm peach
+  'bg-[#fffde7]', // soft cream
+  'bg-[#fce4ec]', // soft pink
+  'bg-[#e0f2f1]', // soft teal
+  'bg-[#fef3c7]', // soft amber
+];
+
+// Curated high-res authentic packshots for instant Blinkit look
+const CURATED_PACKSHOTS: Record<string, string> = {
+  'Atta & Flours': 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg',
+  'Rice & Dal': 'https://images.openfoodfacts.org/images/products/890/171/200/1018/front_en.3.400.jpg',
+  'Oil & Ghee': 'https://images.openfoodfacts.org/images/products/890/600/728/0014/front_en.3.400.jpg',
+  'Spices & Salt': 'https://images.openfoodfacts.org/images/products/890/105/885/2160/front_en.3.400.jpg',
+  'Dairy & Bakery': 'https://images.openfoodfacts.org/images/products/890/126/201/0058/front_en.4.400.jpg',
+  'Pooja Samagri': 'https://images.unsplash.com/photo-1609605988071-0d1bc71900f4?w=400&auto=format&fit=crop&q=80',
+  'Snacks & Biscuits': 'https://images.openfoodfacts.org/images/products/890/106/301/2160/front_en.11.400.jpg',
+  'Tea, Coffee & Drinks': 'https://images.openfoodfacts.org/images/products/890/103/038/3859/front_en.4.400.jpg',
+  'Packaged Foods': 'https://images.openfoodfacts.org/images/products/890/105/884/7203/front_en.4.400.jpg',
+  'Health & Nutrition': 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg',
+  'Household Essentials': 'https://images.openfoodfacts.org/images/products/890/103/038/3866/front_en.4.400.jpg',
+  'Personal Care': 'https://images.openfoodfacts.org/images/products/871/716/364/1216/front_en.3.400.jpg',
+  'Baby Care': 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&auto=format&fit=crop&q=80',
+  'Copies & Registers': 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&auto=format&fit=crop&q=80',
+  'Pens, Pencils & Geometry': 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&auto=format&fit=crop&q=80',
+  'Art, Craft & Fevicol': 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=400&auto=format&fit=crop&q=80',
+  'Office & Daily Stationery': 'https://images.unsplash.com/photo-1589330694653-ded6df03f754?w=400&auto=format&fit=crop&q=80',
 };
 
-// Curated 2x2 collage packshot previews for authentic Blinkit storefront aesthetics
-const CURATED_COLLAGE_FALLBACKS: Record<string, { name: string; img: string }[]> = {
-  'Atta & Flours': [
-    { name: 'Aashirvaad Atta', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg' },
-    { name: 'Fortune Chakki', img: 'https://images.openfoodfacts.org/images/products/890/600/728/0021/front_en.3.400.jpg' },
-    { name: 'Rajdhani Sooji', img: 'https://images.openfoodfacts.org/images/products/890/601/328/0107/front_en.3.400.jpg' },
-    { name: 'Rajdhani Besan', img: 'https://images.openfoodfacts.org/images/products/890/601/328/0091/front_en.3.400.jpg' },
-  ],
-  'Oil & Ghee': [
-    { name: 'Fortune Mustard Oil', img: 'https://images.openfoodfacts.org/images/products/890/600/728/0014/front_en.3.400.jpg' },
-    { name: 'Fortune Soya Oil', img: 'https://images.openfoodfacts.org/images/products/890/600/728/0120/front_en.3.400.jpg' },
-    { name: 'Amul Pure Ghee', img: 'https://images.openfoodfacts.org/images/products/890/126/201/0058/front_en.4.400.jpg' },
-    { name: 'Saffola Gold', img: 'https://images.openfoodfacts.org/images/products/890/108/800/4058/front_en.3.400.jpg' },
-  ],
-  'Snacks & Biscuits': [
-    { name: 'Good Day', img: 'https://images.openfoodfacts.org/images/products/890/106/301/2160/front_en.11.400.jpg' },
-    { name: 'Marie Gold', img: 'https://images.openfoodfacts.org/images/products/890/106/301/2207/front_en.4.400.jpg' },
-    { name: 'Parle-G', img: 'https://images.openfoodfacts.org/images/products/890/171/910/1032/front_en.3.400.jpg' },
-    { name: 'Bourbon', img: 'https://images.openfoodfacts.org/images/products/890/106/301/2221/front_en.4.400.jpg' },
-  ],
-  'Rice & Dal': [
-    { name: 'India Gate Basmati', img: 'https://images.openfoodfacts.org/images/products/890/171/200/1018/front_en.3.400.jpg' },
-    { name: 'Tata Sampann Toor Dal', img: 'https://images.openfoodfacts.org/images/products/890/105/885/2146/front_en.3.400.jpg' },
-    { name: 'Tata Sampann Moong Dal', img: 'https://images.openfoodfacts.org/images/products/890/105/885/2153/front_en.3.400.jpg' },
-    { name: 'Tata Sampann Chana Dal', img: 'https://images.openfoodfacts.org/images/products/890/105/885/2160/front_en.3.400.jpg' },
-  ],
-  'Tea, Coffee & Drinks': [
-    { name: 'Red Label Tea', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3859/front_en.4.400.jpg' },
-    { name: 'Tata Tea Gold', img: 'https://images.openfoodfacts.org/images/products/890/105/885/2115/front_en.3.400.jpg' },
-    { name: 'Nescafe Classic', img: 'https://images.openfoodfacts.org/images/products/761/303/494/3431/front_en.3.400.jpg' },
-    { name: 'Coca-Cola', img: 'https://images.openfoodfacts.org/images/products/544/900/000/0996/front_en.4.400.jpg' },
-  ],
-  'Household Essentials': [
-    { name: 'Surf Excel', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3866/front_en.4.400.jpg' },
-    { name: 'Vim Bar', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3873/front_en.4.400.jpg' },
-    { name: 'Rin Bar', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3880/front_en.4.400.jpg' },
-    { name: 'Harpic', img: 'https://images.openfoodfacts.org/images/products/890/139/600/0014/front_en.3.400.jpg' },
-  ],
-  'Personal Care': [
-    { name: 'Dove Soap', img: 'https://images.openfoodfacts.org/images/products/871/716/364/1216/front_en.3.400.jpg' },
-    { name: 'Lux Rose', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3897/front_en.4.400.jpg' },
-    { name: 'Colgate Strong Teeth', img: 'https://images.openfoodfacts.org/images/products/890/131/400/0016/front_en.3.400.jpg' },
-    { name: 'Close Up', img: 'https://images.openfoodfacts.org/images/products/890/103/038/3903/front_en.4.400.jpg' },
-  ],
-};
+interface BlinkitSectionConfig {
+  id: string;
+  title: string;
+  hindiTitle?: string;
+  matchKeys: string[];
+}
+
+const GROCERY_SECTIONS: BlinkitSectionConfig[] = [
+  {
+    id: 'grocery-kitchen',
+    title: 'Grocery & Kitchen',
+    hindiTitle: 'किराना व रसोई',
+    matchKeys: ['atta', 'flour', 'rice', 'dal', 'oil', 'ghee', 'spice', 'salt', 'masala', 'dairy', 'bakery', 'pooja'],
+  },
+  {
+    id: 'snacks-drinks',
+    title: 'Snacks & Drinks',
+    hindiTitle: 'नाश्ता व पेय',
+    matchKeys: ['snack', 'biscuit', 'tea', 'coffee', 'drink', 'beverage', 'packaged', 'sweets', 'instant', 'health', 'nutrition'],
+  },
+  {
+    id: 'household-essentials',
+    title: 'Household Essentials',
+    hindiTitle: 'सफाई व घर का सामान',
+    matchKeys: ['household', 'clean', 'detergent', 'phenyl', 'harpic', 'vim', 'dishwash', 'laundry', 'surf'],
+  },
+  {
+    id: 'personal-care',
+    title: 'Personal Care',
+    hindiTitle: 'पर्सनल व बेबी केयर',
+    matchKeys: ['personal', 'soap', 'shampoo', 'cream', 'baby', 'oral', 'care', 'tooth', 'paste'],
+  },
+];
+
+const STATIONERY_SECTIONS: BlinkitSectionConfig[] = [
+  {
+    id: 'stationery-office',
+    title: 'Stationery & Office',
+    hindiTitle: 'कॉपियां, पेन व ऑफिस सप्लाइज',
+    matchKeys: ['cop', 'register', 'pen', 'pencil', 'geometry', 'craft', 'fevicol', 'art', 'office', 'stationery'],
+  },
+];
 
 export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
   categories,
@@ -196,19 +111,19 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
   department = 'grocery',
   onSelectCategory,
 }) => {
-  // Precompute products list per category
-  const categoryProductsMap = React.useMemo(() => {
-    const map: Record<string, Product[]> = {};
-    products.forEach((p) => {
-      const c = p.category || 'Household Essentials';
-      if (!map[c]) map[c] = [];
-      map[c].push(p);
-    });
+  // First product packshot map by category
+  const firstProductImageMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of products) {
+      if (p.category && p.imageUrl && !map[p.category]) {
+        map[p.category] = p.imageUrl;
+      }
+    }
     return map;
   }, [products]);
 
-  // Filter out the meta "All" category from grid cards and filter by department
-  const displayCategories = React.useMemo(() => {
+  // Filter out meta "All" category and partition by department
+  const eligibleCategories = React.useMemo(() => {
     return categories
       .filter((cat) => cat.name !== 'All')
       .filter((cat) => {
@@ -222,130 +137,124 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
       });
   }, [categories, department]);
 
+  // Group categories into Blinkit sections
+  const sectionsData = React.useMemo(() => {
+    const sectionConfigs = department === 'stationery' ? STATIONERY_SECTIONS : GROCERY_SECTIONS;
+    const categorizedMap = new Map<string, CustomCategory[]>();
+    const usedCatIds = new Set<string>();
+
+    sectionConfigs.forEach((s) => categorizedMap.set(s.id, []));
+
+    // Sort categories into sections
+    eligibleCategories.forEach((cat) => {
+      const lowerName = cat.name.toLowerCase();
+      let matchedSectionId: string | null = null;
+
+      for (const section of sectionConfigs) {
+        if (section.matchKeys.some((k) => lowerName.includes(k))) {
+          matchedSectionId = section.id;
+          break;
+        }
+      }
+
+      if (matchedSectionId) {
+        categorizedMap.get(matchedSectionId)?.push(cat);
+        usedCatIds.add(cat.id || cat.name);
+      }
+    });
+
+    // Any unassigned categories go into an "Other Essentials" section
+    const remaining = eligibleCategories.filter((c) => !usedCatIds.has(c.id || c.name));
+
+    const finalSections: { id: string; title: string; hindiTitle?: string; categories: CustomCategory[] }[] = [];
+
+    sectionConfigs.forEach((s) => {
+      const list = categorizedMap.get(s.id) || [];
+      if (list.length > 0) {
+        finalSections.push({
+          id: s.id,
+          title: s.title,
+          hindiTitle: s.hindiTitle,
+          categories: list,
+        });
+      }
+    });
+
+    if (remaining.length > 0) {
+      finalSections.push({
+        id: 'other-essentials',
+        title: 'Daily Essentials',
+        hindiTitle: 'दैनिक जरूरतें',
+        categories: remaining,
+      });
+    }
+
+    return finalSections;
+  }, [eligibleCategories, department]);
+
   return (
-    <section className="mb-5 sm:mb-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center text-base font-black shadow-2xs">
-            {department === 'stationery' ? '📚' : '⚡'}
-          </div>
-          <div>
-            <h2 className="font-heading font-black text-stone-900 text-base sm:text-lg tracking-tight">
-              {department === 'stationery'
-                ? 'स्टेशनरी व स्कूल सप्लाइज (Stationery & Supplies)'
-                : 'Bestsellers & Curated Categories'}
+    <section className="mb-6 w-full">
+      {sectionsData.map((section) => (
+        <div key={section.id} className="mb-5 last:mb-2">
+          {/* Section Header - Blinkit Style */}
+          <div className="flex items-center justify-between px-3 mt-4 mb-2.5">
+            <h2 className="text-base font-bold text-gray-900 tracking-tight">
+              {section.title}
             </h2>
-            <p className="text-[11px] sm:text-xs text-stone-500 font-medium">
-              {department === 'stationery'
-                ? 'कॉपियां, रजिस्टर, पेन, फेविकोल और ऑफिस क्राफ्ट का सामान'
-                : 'Tap any category to view full instant delivery inventory'}
-            </p>
+            {section.hindiTitle && (
+              <span className="text-[11px] font-medium text-gray-400">
+                {section.hindiTitle}
+              </span>
+            )}
+          </div>
+
+          {/* 4-Column Blinkit Category Grid */}
+          <div className="grid grid-cols-4 gap-2.5 px-3">
+            {section.categories.map((cat, idx) => {
+              // Background pastel tint
+              const bgColor =
+                PASTEL_TINTS[cat.name] ||
+                DEFAULT_PASTEL_CYCLE[idx % DEFAULT_PASTEL_CYCLE.length];
+
+              // Clean centered packshot
+              const packshotUrl =
+                firstProductImageMap[cat.name] ||
+                CURATED_PACKSHOTS[cat.name] ||
+                getCategoryFallbackSvg(cat.name);
+
+              return (
+                <button
+                  key={cat.id || cat.name}
+                  type="button"
+                  onClick={() => onSelectCategory(cat.name)}
+                  className={`${bgColor} rounded-2xl p-2 flex flex-col items-center justify-between text-center aspect-[4/5] shadow-xs active:scale-95 transition-all cursor-pointer hover:shadow-sm border border-stone-200/50 group select-none`}
+                  title={`View ${cat.name}`}
+                >
+                  {/* Category Image - Clean centered packshot */}
+                  <div className="w-full flex-1 flex items-center justify-center p-1 min-h-0">
+                    <img
+                      src={packshotUrl}
+                      alt={cat.name}
+                      loading="lazy"
+                      className="h-12 w-12 sm:h-14 sm:w-14 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200 mix-blend-multiply"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(cat.name);
+                      }}
+                    />
+                  </div>
+
+                  {/* Category Title */}
+                  <div className="w-full px-0.5 mt-1">
+                    <span className="text-[11px] font-semibold text-gray-800 leading-tight line-clamp-2 block">
+                      {cat.name}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
-
-        <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-          {displayCategories.length} Categories
-        </span>
-      </div>
-
-      {/* 4-column rounded pastel category cards with 2x2 packshot collages */}
-      <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
-        {displayCategories.map((cat) => {
-          const theme = CATEGORY_THEMES[cat.name] || DEFAULT_THEME;
-          const catProducts = categoryProductsMap[cat.name] || [];
-          const count = catProducts.length;
-
-          // Take up to 4 preview items for the 2x2 collage (or use authentic curated brand packshots if empty)
-          const fallbackPacks = CURATED_COLLAGE_FALLBACKS[cat.name] || [];
-          const collageImages =
-            catProducts.length > 0
-              ? catProducts.slice(0, 4).map((p) => ({
-                  name: p.name,
-                  img: p.imageUrl || 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg',
-                }))
-              : fallbackPacks.slice(0, 4);
-
-          const hasMore = count > 4 || (count === 0 && fallbackPacks.length >= 4);
-          const moreCount = count > 4 ? count - 3 : 12;
-
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => onSelectCategory(cat.name)}
-              className={`group relative flex flex-col justify-between p-2.5 sm:p-3 rounded-2xl border ${theme.border} ${theme.bg} text-left transition-all duration-200 cursor-pointer hover:shadow-md active:scale-[0.98] overflow-hidden`}
-            >
-              {/* Top: 2x2 Collage of Genuine Packshot Images */}
-              <div className="relative w-full aspect-square bg-white rounded-xl p-1.5 border border-stone-200/70 shadow-2xs mb-2 overflow-hidden">
-                {collageImages.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-1 w-full h-full">
-                    {collageImages.map((item, idx) => {
-                      const isFourthWithMore = idx === 3 && hasMore;
-                      return (
-                        <div
-                          key={`${item.name}-${idx}`}
-                          className="relative w-full h-full bg-stone-50 rounded-md overflow-hidden flex items-center justify-center p-0.5"
-                        >
-                          <img
-                            src={item.img}
-                            alt={item.name}
-                            loading="lazy"
-                            className="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(cat.name, item.name);
-                            }}
-                          />
-                          {isFourthWithMore && (
-                            <div className="absolute inset-0 bg-stone-950/75 backdrop-blur-2xs flex items-center justify-center text-white text-[10px] font-black rounded-md z-10">
-                              +{moreCount} more
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {/* Fill remaining slots if fewer than 4 items */}
-                    {Array.from({ length: Math.max(0, 4 - collageImages.length) }).map((_, i) => (
-                      <div
-                        key={`empty-${i}`}
-                        className="w-full h-full bg-stone-50/60 rounded-md flex items-center justify-center text-stone-300 text-xs"
-                      >
-                        {cat.icon || '📦'}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-stone-50 rounded-lg text-2xl">
-                    <span>{cat.icon || '📦'}</span>
-                  </div>
-                )}
-
-                {/* Micro Item Count Tag */}
-                <div className="absolute top-2 right-2 bg-stone-950/85 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-2xs backdrop-blur-xs">
-                  {count > 0 ? `${count} items` : '⚡ 10m'}
-                </div>
-              </div>
-
-              {/* Bottom Info: Category Title & Hindi Translation */}
-              <div className="min-w-0">
-                <div className="flex items-center justify-between gap-1">
-                  <h3
-                    className={`font-heading font-black text-xs sm:text-sm leading-tight truncate ${theme.text}`}
-                  >
-                    {cat.name}
-                  </h3>
-                  <ChevronRight className="w-3.5 h-3.5 text-stone-400 group-hover:text-stone-900 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                </div>
-                {cat.hindiName && (
-                  <p className="text-[10px] sm:text-[11px] font-medium text-stone-500 truncate mt-0.5">
-                    {cat.hindiName}
-                  </p>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      ))}
     </section>
   );
 };
