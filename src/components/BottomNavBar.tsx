@@ -43,100 +43,53 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-      {/* Floating Amazon Fresh Style Delivery Bar: Sticky pill with Free Delivery progress & Cart Summary */}
+      {/* Ultra-Sleek Blinkit Floating Cart Capsule */}
       {cartItemCount > 0 && (
-        <div className="max-w-md sm:max-w-lg mx-auto px-3 pb-2 pointer-events-auto animate-in slide-in-from-bottom-2 duration-200">
-          <div className="bg-[#0c831f] text-white rounded-2xl shadow-2xl border border-emerald-400/40 overflow-hidden ring-2 ring-emerald-500/20">
-            {/* Amazon Fresh Free Delivery Alert Strip */}
-            <div className="bg-[#085a15] px-3.5 py-1 flex items-center justify-between text-[11px] font-bold">
-              <span className="flex items-center gap-1.5 text-emerald-100">
-                <Zap className="w-3 h-3 text-amber-300 fill-amber-300" />
-                {remainingForFree > 0 ? (
-                  <span>
-                    Shop for <strong className="text-white">₹{remainingForFree} more</strong> for <strong className="text-amber-300">Free Delivery</strong>
-                  </span>
-                ) : (
-                  <span className="text-emerald-200 font-extrabold flex items-center gap-1">
-                    <span>🎉</span> Free Delivery Unlocked!
-                  </span>
+        <div className="max-w-md mx-auto px-3 pb-2 pointer-events-auto animate-in slide-in-from-bottom-2 duration-200">
+          <button
+            type="button"
+            id="floating-cart-pill-btn"
+            onClick={onOpenCart}
+            className="w-full h-12 sm:h-13 px-3.5 py-2 rounded-2xl bg-[#0c831f] hover:bg-[#0a731b] active:scale-[0.99] transition-all shadow-xl shadow-emerald-950/20 border border-emerald-400/30 flex items-center justify-between cursor-pointer"
+          >
+            {/* Left: 2 overlapping round thumbnails with white outline */}
+            <div className="flex items-center pl-0.5">
+              <div className="flex items-center">
+                {previewThumbnails.slice(0, 2).map((item, idx) => (
+                  <img
+                    key={item.id || idx}
+                    src={item.imageUrl || getCategoryFallbackSvg(item.category || '', item.name)}
+                    alt={item.name}
+                    className="ring-2 ring-white rounded-full h-8 w-8 object-contain bg-white -ml-2 first:ml-0 shadow-sm flex-shrink-0"
+                    onError={(e) => {
+                      const fallback = getCategoryFallbackSvg(item.category || '', item.name);
+                      if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                        (e.currentTarget as HTMLImageElement).src = fallback;
+                      }
+                    }}
+                  />
+                ))}
+                {previewThumbnails.length === 0 && (
+                  <div className="ring-2 ring-white rounded-full h-8 w-8 bg-white text-[#0c831f] flex items-center justify-center font-bold shadow-sm">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
                 )}
-              </span>
+              </div>
+            </div>
 
-              <span className="text-[10px] text-emerald-300 font-mono">
-                {progressPercent}%
+            {/* Center: White bold text "View cart • X items | ₹XX" */}
+            <div className="text-center px-2 flex-1 min-w-0">
+              <span className="text-xs sm:text-[13px] font-heading font-black text-white truncate block">
+                View cart • {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} | ₹{cartTotalAmount}
               </span>
             </div>
 
-            {/* Micro Progress Bar */}
-            <div className="w-full bg-emerald-950/60 h-1">
-              <div
-                className="bg-amber-300 h-1 transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
+            {/* Right: Yellow pill button "Proceed >" */}
+            <div className="bg-[#ffc200] hover:bg-[#e6af00] text-stone-950 text-xs font-heading font-black px-3 py-1.5 rounded-full flex items-center gap-1 shadow-xs flex-shrink-0 active:scale-95 transition-transform">
+              <span>Proceed</span>
+              <ArrowRight className="w-3.5 h-3.5 stroke-[2.8]" />
             </div>
-
-            {/* Interactive Cart Button */}
-            <button
-              type="button"
-              id="floating-cart-pill-btn"
-              onClick={onOpenCart}
-              className="w-full p-2 sm:p-2.5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all hover:bg-[#0a701a]"
-            >
-              {/* Left: Overlapping micro-thumbnails + Item count & Live Total */}
-              <div className="flex items-center gap-2 sm:gap-2.5 pl-1 min-w-0">
-                {/* Overlapping Thumbnails */}
-                <div className="flex items-center -space-x-2.5 flex-shrink-0">
-                  {previewThumbnails.length > 0 ? (
-                    previewThumbnails.map((item, idx) => (
-                      <div
-                        key={item.id || idx}
-                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white p-0.5 border-2 border-[#0c831f] shadow-md overflow-hidden flex items-center justify-center relative"
-                        style={{ zIndex: 3 - idx }}
-                      >
-                        <img
-                          src={item.imageUrl || getCategoryFallbackSvg(item.category || '', item.name)}
-                          alt={item.name}
-                          className="w-full h-full object-contain mix-blend-multiply"
-                          onError={(e) => {
-                            const fallback = getCategoryFallbackSvg(item.category || '', item.name);
-                            if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                              (e.currentTarget as HTMLImageElement).src = fallback;
-                            }
-                          }}
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="w-8 h-8 rounded-xl bg-white text-[#0c831f] flex items-center justify-center font-bold shadow-2xs">
-                      <ShoppingBag className="w-4 h-4" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Count & Live Total */}
-                <div className="text-left leading-tight min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-heading font-black text-sm sm:text-base text-white truncate">
-                      {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'}
-                    </span>
-                    <span className="text-emerald-200 font-normal">|</span>
-                    <span className="font-heading font-black text-sm sm:text-base text-white">
-                      ₹{cartTotalAmount}
-                    </span>
-                  </div>
-                  <div className="text-[10px] sm:text-[11px] text-emerald-100 font-medium truncate mt-0.5">
-                    Tap to review items & address
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Prominent "View Cart →" button */}
-              <div className="flex items-center gap-1.5 bg-[#ffc200] hover:bg-[#e6af00] text-stone-950 text-xs sm:text-sm font-heading font-black px-3.5 sm:px-4 py-2 rounded-xl shadow-md flex-shrink-0 transition-transform active:scale-95">
-                <span>View Cart</span>
-                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-              </div>
-            </button>
-          </div>
+          </button>
         </div>
       )}
 

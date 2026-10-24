@@ -954,24 +954,25 @@ export default function App() {
         ) : (
           /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
           <div className="pb-8 space-y-4 sm:space-y-5">
-            {/* Sleek Blinkit Quick Note Strip */}
-            <div className="flex items-center gap-2 px-3 pt-1 pb-0.5">
+            {/* Subtle Blinkit Quick Note Chips */}
+            <div className="flex items-center justify-center gap-2.5 px-3 pt-1 pb-0.5">
               <button
                 type="button"
                 id="home-digital-parchi-pill"
                 onClick={() => setIsDigitalParchiOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100/70 border border-amber-200/80 text-stone-800 text-xs font-semibold shadow-2xs active:scale-98 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-white/90 hover:bg-amber-50/80 border border-stone-200/70 text-stone-700 hover:text-amber-900 text-[11px] font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
-                <PenLine className="w-3.5 h-3.5 text-amber-700" />
+                <PenLine className="w-3 h-3 text-amber-600 stroke-[2.2]" />
                 <span>📝 पर्ची टाइप करें</span>
               </button>
               <button
                 type="button"
                 id="home-parchi-photo-pill"
                 onClick={() => setIsParchiModalOpen(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200/80 text-stone-800 text-xs font-semibold shadow-2xs active:scale-98 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-white/90 hover:bg-emerald-50/80 border border-stone-200/70 text-stone-700 hover:text-emerald-900 text-[11px] font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
-                <span>📸 पर्ची की फोटो</span>
+                <span className="text-xs">📸</span>
+                <span>पर्ची की फोटो</span>
               </button>
             </div>
 

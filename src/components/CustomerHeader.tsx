@@ -107,8 +107,8 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden shadow-md">
-      {/* Bright Yellow / Amber App Header (Minimal, Blinkit-Style) */}
-      <div className="bg-[#ffc200] text-stone-900 border-b border-amber-400 px-3 sm:px-4 pt-2.5 pb-2">
+      {/* Warm Butter-Yellow App Header (Blinkit Premium Aesthetic) */}
+      <div className="bg-[#fff9e6] text-stone-900 border-b border-amber-200/70 backdrop-blur-md px-3 sm:px-4 pt-2 pb-2">
         <div className="max-w-6xl mx-auto">
           {/* Top Row: Official Kiranape Logo + Store Name on Left, Aligned Deliver To Selector on Right */}
           <div className="flex items-center justify-between gap-2">
@@ -125,7 +125,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
                 setDeliveryLocationsList(getDeliveryLocations());
                 setShowLocationModal(true);
               }}
-              className="flex items-center gap-1.5 bg-white/95 hover:bg-white active:scale-95 text-stone-900 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-extrabold shadow-2xs border border-stone-200 cursor-pointer transition-all max-w-[155px] xs:max-w-[200px] sm:max-w-sm flex-shrink-0"
+              className="flex items-center gap-1.5 bg-white/95 hover:bg-white active:scale-95 text-stone-900 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-extrabold shadow-2xs border border-amber-200/80 cursor-pointer transition-all max-w-[155px] xs:max-w-[200px] sm:max-w-sm flex-shrink-0"
               title="Deliver to - Change Location"
             >
               <MapPin className="w-3.5 h-3.5 text-emerald-700 fill-emerald-600 flex-shrink-0" />
@@ -149,11 +149,11 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
             onOpenParchiModal={onOpenParchiModal}
             onOpenVoiceModal={onOpenVoiceModal}
             onOpenDigitalParchiModal={onOpenDigitalParchiModal}
-            className="mt-2.5"
+            className="mt-2"
           />
 
-          {/* Top Horizontal Category Tabs (Amazon Fresh Style): Smoothly scrollable with clear icons & soft mint highlight */}
-          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar touch-pan-x scroll-smooth">
+          {/* Top Horizontal Category Tabs: Smoothly scrollable with clear icons & soft highlight */}
+          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none no-scrollbar touch-pan-x scroll-smooth">
             {filteredCategories.map((cat) => {
               const isSelected = selectedCategory === cat.name;
               return (
@@ -161,17 +161,14 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
                   key={cat.id || cat.name}
                   type="button"
                   onClick={() => onSelectCategory(cat.name as ProductCategory)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 active:scale-95 ${
+                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 active:scale-95 ${
                     isSelected
-                      ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-600 font-black shadow-xs ring-1 ring-emerald-600/30'
-                      : 'bg-white hover:bg-emerald-50/50 text-stone-800 border border-stone-200 shadow-2xs font-semibold'
+                      ? 'bg-emerald-700 text-white font-black shadow-xs'
+                      : 'bg-white/95 hover:bg-white text-stone-800 border border-stone-200/80 shadow-2xs font-semibold'
                   }`}
                 >
                   <span className="text-sm leading-none">{cat.icon || '🏷️'}</span>
                   <span>{cat.name}</span>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse ml-0.5" />
-                  )}
                 </button>
               );
             })}

@@ -280,10 +280,20 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
   let brandName = 'KIRANAPE EXPRESS';
   let brandColor = '#059669'; // default emerald
   let brandBg = '#ECFDF5';
-  let packType: 'biscuit' | 'cake' | 'tea' | 'soap' | 'detergent' | 'oral' | 'talc' | 'ketchup' | 'atta' | 'oil' | 'dal' | 'spices' | 'dairy' | 'vegetables' | 'drinks' | 'stationery' | 'general' = 'general';
+  let packType: 'biscuit' | 'cake' | 'tea' | 'soap' | 'detergent' | 'oral' | 'talc' | 'ketchup' | 'atta' | 'oil' | 'dal' | 'spices' | 'dairy' | 'vegetables' | 'drinks' | 'stationery' | 'pooja' | 'baby' | 'general' = 'general';
 
   // Category & Product specific detection
-  if (c.includes('stationery') || c.includes('copies') || c.includes('register') || c.includes('pen') || c.includes('pencil') || c.includes('craft') || t.includes('classmate') || t.includes('register') || t.includes('notebook') || t.includes('fevicol') || t.includes('paper') || t.includes('stapler') || t.includes('geometry')) {
+  if (c.includes('pooja') || t.includes('pooja') || t.includes('agarbatti') || t.includes('diya') || t.includes('camphor') || t.includes('dhoop') || t.includes('hawan')) {
+    brandName = 'CYCLE PURE';
+    brandColor = '#B45309';
+    brandBg = '#FEF3C7';
+    packType = 'pooja';
+  } else if (c.includes('baby') || t.includes('baby') || t.includes('diaper') || t.includes('johnson') || t.includes('pampers') || t.includes('huggies') || t.includes('mamy poko')) {
+    brandName = t.includes('pampers') ? 'PAMPERS' : 'JOHNSON\'S';
+    brandColor = '#DB2777';
+    brandBg = '#FDF2F8';
+    packType = 'baby';
+  } else if (c.includes('stationery') || c.includes('copies') || c.includes('register') || c.includes('pen') || c.includes('pencil') || c.includes('craft') || t.includes('classmate') || t.includes('register') || t.includes('notebook') || t.includes('fevicol') || t.includes('paper') || t.includes('stapler') || t.includes('geometry')) {
     brandName = t.includes('classmate') ? 'CLASSMATE' : t.includes('fevicol') ? 'FEVICOL MR' : t.includes('reynolds') ? 'REYNOLDS' : t.includes('apsara') ? 'APSARA' : t.includes('camlin') ? 'CAMLIN' : 'STATIONERY';
     brandColor = '#1D4ED8';
     brandBg = '#EFF6FF';
@@ -722,6 +732,56 @@ export function getCategoryFallbackSvg(category: string, title?: string, unit?: 
           <!-- Pen / School Icon Badge -->
           <circle cx="160" cy="140" r="18" fill="#FBBF24" stroke="#FFFFFF" stroke-width="2" />
           <text x="160" y="146" text-anchor="middle" font-size="16">✏️</text>
+        </g>
+      `;
+      break;
+
+    case 'pooja':
+      packGraphic = `
+        <!-- 3D Authentic Pooja Samagri Brass Diya & Agarbatti Pack -->
+        <g transform="translate(95, 45)">
+          <circle cx="105" cy="85" r="48" fill="#FEF3C7" opacity="0.6"/>
+          <ellipse cx="105" cy="115" rx="46" ry="14" fill="#B45309" />
+          <ellipse cx="105" cy="112" rx="42" ry="12" fill="#D97706" />
+          <path d="M65,110 Q105,135 145,110 Q130,90 105,92 Q80,90 65,110 Z" fill="#F59E0B" />
+          <ellipse cx="105" cy="98" rx="26" ry="8" fill="#FDE68A" />
+          <path d="M105,62 Q115,78 115,88 Q115,96 105,96 Q95,96 95,88 Q95,78 105,62 Z" fill="#EA580C" />
+          <path d="M105,68 Q111,80 111,88 Q111,94 105,94 Q99,94 99,88 Q99,80 105,68 Z" fill="#FACC15" />
+          <line x1="55" y1="125" x2="35" y2="40" stroke="#78350F" stroke-width="2.5" stroke-linecap="round" />
+          <line x1="58" y1="125" x2="44" y2="35" stroke="#92400E" stroke-width="2.5" stroke-linecap="round" />
+          <path d="M35,38 Q30,28 35,20 Q40,12 36,5" fill="none" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" opacity="0.75" />
+          <text x="105" y="145" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="12" fill="#92400E" letter-spacing="0.5">
+            POOJA SAMAGRI
+          </text>
+          <text x="105" y="158" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="9" fill="#B45309">
+            SHUDDHA &amp; PAVITRA
+          </text>
+        </g>
+      `;
+      break;
+
+    case 'baby':
+      packGraphic = `
+        <!-- 3D Authentic Baby Care Packshot -->
+        <g transform="translate(100, 48)">
+          <circle cx="100" cy="85" r="46" fill="#FDF2F8" />
+          <rect x="75" y="30" width="50" height="95" rx="18" fill="#FCE7F3" stroke="#F472B6" stroke-width="1.5" />
+          <rect x="85" y="18" width="30" height="14" rx="4" fill="#F472B6" />
+          <circle cx="100" cy="65" r="16" fill="#FFFFFF" />
+          <circle cx="92" cy="52" r="5" fill="#FBCFE8" />
+          <circle cx="108" cy="52" r="5" fill="#FBCFE8" />
+          <circle cx="96" cy="62" r="2" fill="#831843" />
+          <circle cx="104" cy="62" r="2" fill="#831843" />
+          <ellipse cx="100" cy="67" rx="3" ry="2" fill="#BE185D" />
+          <text x="100" y="98" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="11" fill="#BE185D">
+            BABY CARE
+          </text>
+          <text x="100" y="112" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="8" fill="#9D174D">
+            GENTLE &amp; MILD
+          </text>
+          <text x="100" y="145" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="10" fill="#DB2777">
+            DERMA TESTED
+          </text>
         </g>
       `;
       break;
