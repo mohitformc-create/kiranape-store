@@ -244,12 +244,40 @@ app.get('/manifest.json', (_req, res) => {
   return res.status(404).json({ error: 'manifest.json not found' });
 });
 
+// Dedicated Digital Asset Links endpoint for Android TWA verification (Removes URL browser bar)
+app.get(['/.well-known/assetlinks.json', '/assetlinks.json'], (_req, res) => {
+  const assetlinksPath = path.join(PUBLIC_DIR, '.well-known', 'assetlinks.json');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  if (fs.existsSync(assetlinksPath)) {
+    return res.status(200).sendFile(assetlinksPath);
+  }
+  return res.status(200).json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: 'com.kiranape.app',
+        sha256_cert_fingerprints: [
+          '59:78:61:F3:98:57:24:23:C1:8D:4A:65:42:55:18:1F:43:D2:22:ED:8A:C8:62:0D:CB:2C',
+        ],
+      },
+    },
+  ]);
+});
+
 // Statically serve all assets from the 'public' directory
 app.use(
   express.static(PUBLIC_DIR, {
+    dotfiles: 'allow',
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('manifest.json')) {
         res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+      }
+      if (filePath.endsWith('assetlinks.json')) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
       }
     },
   })
@@ -756,9 +784,9 @@ async function startServer() {
   ];
   const publicPath = publicCandidates.find((p) => fs.existsSync(p)) || publicCandidates[0];
 
-  // Always serve public static assets (logos, icons, manifest, etc.)
+  // Always serve public static assets (logos, icons, manifest, assetlinks, etc.)
   if (fs.existsSync(publicPath)) {
-    app.use(express.static(publicPath));
+    app.use(express.static(publicPath, { dotfiles: 'allow' }));
   }
 
   // Detect Cloud Run, Google Cloud deployment, or production build
@@ -775,7 +803,7 @@ async function startServer() {
   if (isProduction) {
     if (hasDist) {
       console.log(`[Kiranape Server] Serving production static build from ${distPath}`);
-      app.use(express.static(distPath));
+      app.use(express.static(distPath, { dotfiles: 'allow' }));
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api')) {
           return res.status(404).json({ error: 'Endpoint not found' });

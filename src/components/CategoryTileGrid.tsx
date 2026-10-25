@@ -195,7 +195,10 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
       PASTEL_TINTS[cat.name] ||
       DEFAULT_PASTEL_CYCLE[idx % DEFAULT_PASTEL_CYCLE.length];
 
+    // Prioritize custom uploaded photo set by Admin, then live product packshot, then curated fallback
     const packshotUrl =
+      cat.imageUrl ||
+      cat.image_url ||
       firstProductImageMap[cat.name] ||
       CURATED_PACKSHOTS[cat.name] ||
       getCategoryFallbackSvg(cat.name);
@@ -214,7 +217,7 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
             src={packshotUrl}
             alt={cat.name}
             loading="lazy"
-            className="h-16 w-16 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200 mix-blend-multiply"
+            className="h-14 w-14 sm:h-16 sm:w-16 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(cat.name);
             }}

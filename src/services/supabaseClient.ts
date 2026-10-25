@@ -165,6 +165,86 @@ export async function uploadProductImageToSupabase(
 }
 
 /**
+ * Uploads a category packshot image to Supabase Storage:
+ * 1. Attempts 'category-images' bucket
+ * 2. Falls back to 'product-images' bucket
+ * 3. Gracefully returns generated public URL
+ */
+export async function uploadCategoryImageToSupabase(
+  file: File | Blob,
+  fileNameInput?: string
+): Promise<{ publicUrl: string; fileName: string; error?: any }> {
+  const originalName = fileNameInput || (file instanceof File ? file.name : 'category.png');
+  const cleanName = originalName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileName = `cat_${Date.now()}_${cleanName || 'packshot.png'}`;
+
+  // Try category-images bucket first
+  try {
+    const { error: catErr } = await supabase.storage
+      .from('category-images')
+      .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+    if (!catErr) {
+      const { data } = supabase.storage.from('category-images').getPublicUrl(fileName);
+      if (data?.publicUrl) {
+        return { publicUrl: data.publicUrl, fileName };
+      }
+    }
+  } catch (e) {
+    // Fall back to product-images
+  }
+
+  // Fall back to verified product-images bucket
+  try {
+    const { error: prodErr } = await supabase.storage
+      .from(PRODUCT_IMAGES_BUCKET)
+      .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+    if (!prodErr) {
+      const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(fileName);
+      if (data?.publicUrl) {
+        return { publicUrl: data.publicUrl, fileName };
+      }
+    }
+
+    const fallbackUrl = formatSupabasePublicImageUrl(fileName);
+    return { publicUrl: fallbackUrl, fileName, error: prodErr };
+  } catch (err: any) {
+    console.warn('[Supabase Storage] Category upload exception:', err);
+    return { publicUrl: formatSupabasePublicImageUrl(fileName), fileName, error: err };
+  }
+}
+
+/**
+ * Safely updates category metadata in Supabase table 'categories' if available
+ */
+export async function updateCategoryInSupabase(
+  id: string,
+  updates: Record<string, any>
+): Promise<boolean> {
+  try {
+    const payload: Record<string, any> = { id };
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.hindiName !== undefined || updates.hindi_name !== undefined) {
+      payload.hindi_name = updates.hindiName || updates.hindi_name;
+    }
+    if (updates.icon !== undefined) payload.icon = updates.icon;
+    if (updates.imageUrl !== undefined || updates.image_url !== undefined) {
+      payload.image_url = updates.imageUrl || updates.image_url;
+    }
+    const { error } = await supabase.from('categories').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.warn('[Supabase] updateCategoryInSupabase notice:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Supabase] Category update exception:', err);
+    return false;
+  }
+}
+
+/**
  * Synchronizes products from Supabase table 'products'
  * Directly maps live rows to the app's Product model
  */

@@ -147,6 +147,8 @@ export interface CustomCategory {
   name: string; // English Name (e.g. "Pooja Samagri", "Baby Care", "Cold Drinks")
   hindiName?: string; // Hindi Name (e.g. "पूजा सामग्री")
   icon?: string; // Emoji or Icon identifier (e.g. "🪔", "🍼", "🥤")
+  imageUrl?: string; // Custom 3D packshot or photo URL for the category
+  image_url?: string; // Alias for Supabase schema
   department?: StoreDepartment;
   isSystem?: boolean;
   order?: number;
