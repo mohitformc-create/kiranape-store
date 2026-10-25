@@ -1,8 +1,12 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "com.kiranape.app",
-    "sha256_cert_fingerprints": ["59:78:61:F3:98:57:24:23:C1:8D:4A:65:42:55:18:1F:43:D2:22:ED:8A:C8:62:0D:CB:2C"]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.kiranape.app",
+      "sha256_cert_fingerprints": [
+        "59:78:61:F3:98:57:24:23:C1:8D:4A:65:42:55:18:1F:43:D2:22:ED:8A:C8:62:0D:CB:2C"
+      ]
+    }
   }
-}]
+]
