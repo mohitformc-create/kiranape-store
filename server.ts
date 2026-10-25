@@ -24,6 +24,32 @@ app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Direct Digital Asset Links endpoint for Android TWA verification
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const filePathInDist = path.join(APP_ROOT, 'dist', '.well-known', 'assetlinks.json');
+  const filePathInPublic = path.join(APP_ROOT, 'public', '.well-known', 'assetlinks.json');
+  if (fs.existsSync(filePathInDist)) {
+    return res.sendFile(filePathInDist);
+  }
+  if (fs.existsSync(filePathInPublic)) {
+    return res.sendFile(filePathInPublic);
+  }
+  return res.json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: 'com.kiranape.app',
+        sha256_cert_fingerprints: [
+          '59:78:61:F3:98:57:24:23:C1:8D:4A:65:42:55:18:1F:43:D2:22:ED:8A:C8:62:0D:CB:2C',
+        ],
+      },
+    },
+  ]);
+});
+
 // ==========================================
 // CENTRAL SERVER ORDERS DATABASE (Blinkit/Zepto Style)
 // ==========================================
