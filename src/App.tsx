@@ -73,6 +73,12 @@ import {
   saveBannersToFirestore,
 } from './services/firebase';
 import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
+import {
+  STAYFREE_REWARD_PRODUCT_ID,
+  STAYFREE_REWARD_PRICE,
+  STAYFREE_UNLOCK_THRESHOLD,
+} from './data/specialDealsCatalog';
+import { HomeBannerCarousel } from './components/HomeBannerCarousel';
 import { CustomerHeader } from './components/CustomerHeader';
 import { ProductCard } from './components/ProductCard';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
@@ -451,7 +457,7 @@ export default function App() {
     saveCart(cartQuantities);
   }, [cartQuantities]);
 
-  // Derived Cart Items with current products data & variants
+  // Derived Cart Items with current products data & variants + Smart Stayfree Reward Discount
   const cartItems: CartItem[] = useMemo(() => {
     const items: CartItem[] = [];
     const productMap = new Map<string, Product>();
@@ -484,6 +490,32 @@ export default function App() {
         }
       }
     }
+
+    // Check if subtotal qualifies for Stayfree reward discount (>= ₹1999)
+    const baseSubtotal = items.reduce((sum, item) => {
+      const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
+      return sum + price * item.quantity;
+    }, 0);
+
+    const isRewardUnlocked = baseSubtotal >= STAYFREE_UNLOCK_THRESHOLD;
+
+    if (isRewardUnlocked) {
+      return items.map((item) => {
+        if (item.product.id === STAYFREE_REWARD_PRODUCT_ID && !item.selectedVariant) {
+          const orig = item.product.originalPrice || 270;
+          return {
+            ...item,
+            product: {
+              ...item.product,
+              finalPrice: STAYFREE_REWARD_PRICE,
+              discountPercent: Math.round(((orig - STAYFREE_REWARD_PRICE) / orig) * 100),
+            },
+          };
+        }
+        return item;
+      });
+    }
+
     return items;
   }, [products, cartQuantities]);
 
@@ -508,6 +540,32 @@ export default function App() {
       ...prev,
       [itemKey]: (prev[itemKey] || 0) + 1,
     }));
+  }, []);
+
+  // Quick 1-tap add Stayfree deal reward directly to cart
+  const handleAddStayfreeReward = useCallback(() => {
+    setCartQuantities((prev) => ({
+      ...prev,
+      [STAYFREE_REWARD_PRODUCT_ID]: (prev[STAYFREE_REWARD_PRODUCT_ID] || 0) + 1,
+    }));
+  }, []);
+
+  // Banner Action: Claim Stayfree Deal
+  const handleClaimStayfreeDeal = useCallback(() => {
+    const stayfreeProd = products.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
+    if (stayfreeProd) {
+      handleAddToCart(stayfreeProd);
+      setIsCartOpen(true);
+    } else {
+      setSelectedCategory('Personal Care');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [products, handleAddToCart]);
+
+  // Banner Action: Filter Parle 50% Off Biscuits
+  const handleFilterParleBiscuits = useCallback(() => {
+    setSearchQuery('Parle');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const handleUpdateQuantity = useCallback((itemKey: string, newQuantity: number) => {
@@ -954,6 +1012,20 @@ export default function App() {
         ) : (
           /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
           <div className="pb-8 space-y-4 sm:space-y-5">
+            {/* Blinkit-Style Auto-Sliding Carousel Engine */}
+            <HomeBannerCarousel
+              banners={banners}
+              onOpenDigitalParchi={() => setIsDigitalParchiOpen(true)}
+              onOpenParchiUpload={() => setIsParchiModalOpen(true)}
+              onSelectCategory={(catName) => {
+                setSelectedCategory(catName as ProductCategory);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onClaimStayfreeDeal={handleClaimStayfreeDeal}
+              onFilterParleBiscuits={handleFilterParleBiscuits}
+              storePhone={storeSettings.phone || '9424316081'}
+            />
+
             {/* Subtle Blinkit Quick Note Chips */}
             <div className="flex items-center justify-center gap-2.5 px-3 pt-1 pb-0.5">
               <button
@@ -1161,6 +1233,7 @@ export default function App() {
         storeSettings={storeSettings}
         orders={orders}
         onRepeatOrder={handleRepeatOrder}
+        onAddStayfreeReward={handleAddStayfreeReward}
       />
 
       {/* 4.5. Handwritten Grocery List / Parchi Photo Upload Modal */}
@@ -1191,6 +1264,7 @@ export default function App() {
         cartItems={cartItems}
         onSubmitOrder={handleCheckoutSubmit}
         storeSettings={storeSettings}
+        onAddStayfreeReward={handleAddStayfreeReward}
         initialCustomer={
           currentUser
             ? {

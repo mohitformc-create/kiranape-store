@@ -88,13 +88,24 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Product Image & Badges */}
         <div className="relative w-full bg-stone-50/60 overflow-hidden flex items-center justify-center pt-2">
           {/* Top-left red discount badge & Top-right FSSAI veg badge */}
-          <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 z-10 pointer-events-none">
-            {hasDiscount && product.isAvailable ? (
-              <div className="bg-[#e53935] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-2xs tracking-tight">
-                {discountPercent}% OFF
-              </div>
-            ) : (
-              <span />
+          <div className="absolute top-2 inset-x-2 flex items-center justify-between z-10 pointer-events-none">
+            {/* Top-left discount badge: 50% Parle Steal Deal or Stayfree Reward or regular OFF */}
+            {product.isAvailable && (
+              product.id === 'prod-stayfree-secure-xl-40' ? (
+                <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs tracking-tight flex items-center gap-1">
+                  <span>🌟 ₹180 REWARD</span>
+                </div>
+              ) : (product.name.toLowerCase().includes('parle') && discountPercent >= 50) ? (
+                <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-2xs tracking-tight flex items-center gap-0.5">
+                  <span>🍪 50% OFF</span>
+                </div>
+              ) : hasDiscount ? (
+                <div className="bg-[#e53935] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-2xs tracking-tight">
+                  {discountPercent}% OFF
+                </div>
+              ) : (
+                <span />
+              )
             )}
 
             {/* Veg Dot Indicator (for grocery/food items) */}
@@ -223,6 +234,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               {hasDiscount && savings > 0 && (
                 <span className="text-[10px] text-emerald-700 font-bold leading-none mt-0.5">
                   Save ₹{savings}
+                </span>
+              )}
+              {product.id === 'prod-stayfree-secure-xl-40' && (
+                <span className="text-[10px] font-bold text-pink-700 bg-pink-50 px-1 py-0.5 rounded mt-0.5 block leading-tight">
+                  ₹180 on ₹1999+ cart
                 </span>
               )}
             </div>

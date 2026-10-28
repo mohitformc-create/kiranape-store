@@ -3,9 +3,14 @@ import { INITIAL_PRODUCTS, STORE_DEFAULTS, DEFAULT_BANNERS } from '../data/initi
 import { WHOLESALE_105_PRODUCTS } from '../data/wholesaleCatalog105';
 import { FORTUNE_OIL_PRODUCTS } from '../data/fortuneCatalog';
 import { STATIONERY_PRODUCTS } from '../data/stationeryCatalog';
+import { SPECIAL_DEAL_PRODUCTS } from '../data/specialDealsCatalog';
 import { idbGet, idbSet, idbDelete } from './idbStorage';
 
-export const ALL_VERIFIED_PRODUCTS: Product[] = [...WHOLESALE_105_PRODUCTS, ...FORTUNE_OIL_PRODUCTS];
+export const ALL_VERIFIED_PRODUCTS: Product[] = [
+  ...WHOLESALE_105_PRODUCTS,
+  ...FORTUNE_OIL_PRODUCTS,
+  ...SPECIAL_DEAL_PRODUCTS,
+];
 
 export const PERMANENT_CATALOG_KEY = 'kiranape_permanent_catalog';
 export const SETTINGS_STORAGE_KEY = 'kiranape_store_settings';
@@ -375,6 +380,20 @@ export function getProducts(): Product[] {
     });
     if (hasNewStationery) {
       loadedProducts = Array.from(existingStationeryMap.values());
+      safeSaveProductsToLocalStorage(loadedProducts);
+    }
+
+    // Ensure all special deal products (Stayfree XL reward & Parle 50% deals) are present in the catalog
+    const existingDealsMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
+    let hasNewDeals = false;
+    SPECIAL_DEAL_PRODUCTS.forEach((dealItem) => {
+      if (!existingDealsMap.has(dealItem.id)) {
+        existingDealsMap.set(dealItem.id, dealItem);
+        hasNewDeals = true;
+      }
+    });
+    if (hasNewDeals) {
+      loadedProducts = Array.from(existingDealsMap.values());
       safeSaveProductsToLocalStorage(loadedProducts);
     }
 
@@ -755,6 +774,11 @@ export function getSavedBanners(): PromoBanner[] {
     const parsed: PromoBanner[] = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_BANNERS;
     const cleaned = parsed.filter((b) => !isObsoleteDeliveryBanner(b));
+    const hasStayfreeDeal = cleaned.some((b) => b.id === 'banner-stayfree-xl');
+    if (!hasStayfreeDeal) {
+      saveStoredBanners(DEFAULT_BANNERS);
+      return DEFAULT_BANNERS;
+    }
     if (cleaned.length !== parsed.length) {
       saveStoredBanners(cleaned);
     }

@@ -15,6 +15,7 @@ interface CartDrawerProps {
   storeSettings?: StoreSettings;
   orders?: Order[];
   onRepeatOrder?: (order: Order) => void;
+  onAddStayfreeReward?: () => void;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -27,6 +28,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   storeSettings = STORE_DEFAULTS,
   orders,
   onRepeatOrder,
+  onAddStayfreeReward,
 }) => {
   const [repeatSuccessNotice, setRepeatSuccessNotice] = useState<string | null>(null);
 
@@ -64,6 +66,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const finalPayable = subtotalSellingPrice + deliveryCharge;
 
   const totalCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Stayfree XL Special Reward Unlock Logic (@ ₹180 on ₹1999+ orders)
+  const STAYFREE_REWARD_ID = 'prod-stayfree-secure-xl-40';
+  const STAYFREE_THRESHOLD = 1999;
+  const isStayfreeInCart = cartItems.some((item) => item.product.id === STAYFREE_REWARD_ID);
+  const remainingForStayfree = Math.max(0, STAYFREE_THRESHOLD - subtotalSellingPrice);
+  const isStayfreeUnlocked = subtotalSellingPrice >= STAYFREE_THRESHOLD;
+  const stayfreeProgress = Math.min(100, Math.round((subtotalSellingPrice / STAYFREE_THRESHOLD) * 100));
 
   return (
     <div
@@ -203,6 +213,71 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </p>
               )}
             </div>
+
+            {/* Stayfree XL Special Reward Unlock Logic (@ ₹180 on ₹1999+ orders) */}
+            {isStayfreeUnlocked ? (
+              <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-rose-700 text-white rounded-2xl p-3.5 shadow-sm space-y-1.5 border border-pink-400/30 animate-in fade-in">
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md text-white flex items-center justify-center text-base flex-shrink-0">
+                      🎉
+                    </div>
+                    <div>
+                      <span className="bg-yellow-300 text-stone-950 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        REWARD UNLOCKED
+                      </span>
+                      <h4 className="font-heading font-black text-xs sm:text-sm text-white leading-tight mt-0.5">
+                        Stayfree Secure XL (40 Pads) @ ₹180!
+                      </h4>
+                      <p className="text-[10px] text-pink-100 font-medium">
+                        MRP ₹270 • Save ₹90 on this exclusive cart deal
+                      </p>
+                    </div>
+                  </div>
+
+                  {!isStayfreeInCart ? (
+                    <button
+                      type="button"
+                      onClick={onAddStayfreeReward}
+                      className="flex-shrink-0 px-3 py-1.5 bg-white text-rose-700 hover:bg-pink-50 active:scale-95 rounded-xl text-xs font-heading font-black shadow-xs cursor-pointer transition-all"
+                    >
+                      + Add @ ₹180
+                    </button>
+                  ) : (
+                    <span className="flex-shrink-0 text-[10px] font-black bg-white/25 border border-white/40 px-2.5 py-1 rounded-lg text-white">
+                      ✓ Added @ ₹180
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-pink-50/90 via-rose-50/80 to-pink-50/90 border border-pink-200/90 rounded-2xl p-3.5 space-y-2 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-rose-950">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-full bg-pink-200 text-pink-700 flex items-center justify-center flex-shrink-0 text-xs">
+                      🎁
+                    </div>
+                    <span className="font-medium text-xs leading-tight">
+                      Add <strong className="font-bold text-pink-900">₹{remainingForStayfree}</strong> more to unlock <strong className="text-pink-900">Stayfree XL 40s at ₹180!</strong>
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-pink-800 whitespace-nowrap ml-2">
+                    ₹{subtotalSellingPrice} / ₹{STAYFREE_THRESHOLD}
+                  </span>
+                </div>
+
+                <div className="w-full bg-pink-200/60 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-pink-500 to-rose-600 h-full rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${stayfreeProgress}%` }}
+                  />
+                </div>
+
+                <p className="text-[10px] text-pink-800 text-right font-medium">
+                  {stayfreeProgress}% to ₹180 Stayfree Deal (MRP ₹270, Save ₹90)
+                </p>
+              </div>
+            )}
 
             {/* Discount savings celebratory pill */}
             {totalSavings > 0 && (

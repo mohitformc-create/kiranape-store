@@ -200,6 +200,10 @@ export interface PromoBanner {
   isActive: boolean;
   order?: number;
   createdAt?: number;
+  gradient?: string;
+  buttonText?: string;
+  actionType?: 'stayfree_deal' | 'parle_deal' | 'free_delivery' | 'parchi' | 'stationery' | 'category' | 'whatsapp';
+  actionPayload?: string;
 }
 
 export type StoreInfo = StoreSettings;

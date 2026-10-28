@@ -21,6 +21,7 @@ interface CheckoutModalProps {
     deliverySlot: DeliverySlot;
   }) => Promise<void> | void;
   storeSettings?: StoreSettings;
+  onAddStayfreeReward?: () => void;
 }
 
 const DELIVERY_SLOT_OPTIONS: { id: DeliverySlot; label: string; timeRange: string; desc: string }[] = [
@@ -50,6 +51,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   initialCustomer,
   onSubmitOrder,
   storeSettings = STORE_DEFAULTS,
+  onAddStayfreeReward,
 }) => {
   const [fullName, setFullName] = useState(initialCustomer?.fullName || '');
   const [phoneNumber, setPhoneNumber] = useState(initialCustomer?.phoneNumber || '');
@@ -73,6 +75,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const isFreeDelivery = subtotal >= minFree;
   const deliveryCharge = isFreeDelivery ? 0 : standardFee;
   const finalPayable = subtotal + deliveryCharge;
+
+  // Stayfree Reward Calculations
+  const STAYFREE_REWARD_ID = 'prod-stayfree-secure-xl-40';
+  const STAYFREE_THRESHOLD = 1999;
+  const isStayfreeInCart = cartItems.some((item) => item.product.id === STAYFREE_REWARD_ID);
+  const remainingForStayfree = Math.max(0, STAYFREE_THRESHOLD - subtotal);
+  const isStayfreeUnlocked = subtotal >= STAYFREE_THRESHOLD;
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -329,6 +338,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               })}
             </div>
           </div>
+
+          {/* Stayfree XL Cart Deal Banner in Checkout */}
+          {isStayfreeUnlocked ? (
+            <div className="p-3 bg-gradient-to-r from-pink-600 via-rose-600 to-rose-700 text-white rounded-xl shadow-xs flex items-center justify-between gap-2.5 animate-in fade-in">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg">🎉</span>
+                <div>
+                  <span className="bg-yellow-300 text-stone-950 text-[9px] font-black px-1 py-0.5 rounded uppercase tracking-wider">
+                    REWARD UNLOCKED
+                  </span>
+                  <h5 className="font-heading font-black text-xs text-white leading-tight mt-0.5">
+                    Stayfree Secure XL (40 Pads) @ ₹180!
+                  </h5>
+                  <p className="text-[10px] text-pink-100">
+                    MRP ₹270 • Save ₹90 on this exclusive cart deal
+                  </p>
+                </div>
+              </div>
+              {!isStayfreeInCart && onAddStayfreeReward && (
+                <button
+                  type="button"
+                  onClick={onAddStayfreeReward}
+                  className="px-2.5 py-1.5 bg-white text-rose-700 hover:bg-pink-50 active:scale-95 rounded-lg text-xs font-heading font-black shadow-xs cursor-pointer flex-shrink-0"
+                >
+                  + Add @ ₹180
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="p-2.5 bg-pink-50 border border-pink-200/90 rounded-xl text-xs text-pink-900 flex items-center justify-between gap-2">
+              <span className="text-xs">🎁</span>
+              <span className="flex-1 font-medium text-[11px]">
+                Add <strong>₹{remainingForStayfree}</strong> more to unlock <strong>Stayfree XL (40 Pads) @ ₹180!</strong> (MRP ₹270)
+              </span>
+            </div>
+          )}
 
           {/* Payment Method & Cost Breakdown */}
           <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/90 space-y-2.5">
