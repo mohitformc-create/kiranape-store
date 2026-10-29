@@ -375,6 +375,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           )}
 
+          {/* Reverse Total Alert if Stayfree in cart but not unlocked */}
+          {!isStayfreeUnlocked && isStayfreeInCart && (
+            <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+              <span className="text-base flex-shrink-0">⚠️</span>
+              <span className="text-[11px] leading-snug">
+                Order subtotal is below ₹{STAYFREE_THRESHOLD}. Stayfree XL has reverted to regular price ₹200. Add <strong>₹{remainingForStayfree}</strong> more to get it at <strong>₹180</strong>!
+              </span>
+            </div>
+          )}
+
           {/* Payment Method & Cost Breakdown */}
           <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/90 space-y-2.5">
             <div className="flex items-center justify-between text-xs">

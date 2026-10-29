@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Sparkles,
   Tag,
@@ -23,7 +23,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { StoreSettings, PromoBanner, CustomCategory } from '../types';
+import { StoreSettings, PromoBanner, CustomCategory, Product, BannerTargetType } from '../types';
 import { compressImageFile } from '../utils/imageUtils';
 
 interface AdminOffersAndSettingsProps {
@@ -32,7 +32,28 @@ interface AdminOffersAndSettingsProps {
   onSaveSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   onSaveBanners: (banners: PromoBanner[]) => Promise<void>;
   categories?: CustomCategory[];
+  products?: Product[];
 }
+
+export const GRADIENT_PRESETS = [
+  { label: 'Pink Rose', value: 'from-pink-600 via-rose-600 to-rose-700', bg: 'bg-gradient-to-r from-pink-600 to-rose-700' },
+  { label: 'Amber Orange', value: 'from-amber-500 via-orange-500 to-orange-600', bg: 'bg-gradient-to-r from-amber-500 to-orange-600' },
+  { label: 'Emerald Teal', value: 'from-emerald-600 via-teal-600 to-teal-700', bg: 'bg-gradient-to-r from-emerald-600 to-teal-700' },
+  { label: 'Royal Blue', value: 'from-blue-600 via-indigo-600 to-indigo-700', bg: 'bg-gradient-to-r from-blue-600 to-indigo-700' },
+  { label: 'Purple Violet', value: 'from-purple-600 via-violet-600 to-fuchsia-700', bg: 'bg-gradient-to-r from-purple-600 to-violet-700' },
+  { label: 'Dark Slate', value: 'from-stone-800 via-stone-900 to-black', bg: 'bg-gradient-to-r from-stone-800 to-black' },
+];
+
+export const BADGE_SUGGESTIONS = [
+  'EXCLUSIVE DEAL',
+  'CRAZY BISCUIT OFFER',
+  '🌟 EXCLUSIVE CART REWARD',
+  '⚡ FAST & FREE DELIVERY',
+  'SUPER SAVER',
+  'DAILY ESSENTIAL',
+  'FLAT 50% OFF',
+  'BESTSELLER',
+];
 
 const INSTAMART_PRESETS = [
   {
@@ -41,6 +62,7 @@ const INSTAMART_PRESETS = [
     badge: 'UP TO 25% OFF',
     imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80',
     linkCategory: 'Snacks & Biscuits',
+    gradient: 'from-emerald-600 via-teal-600 to-teal-700',
   },
   {
     title: 'Tea Time Combos & Biscuits',
@@ -48,6 +70,7 @@ const INSTAMART_PRESETS = [
     badge: 'DAILY ESSENTIAL',
     imageUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=1200&q=80',
     linkCategory: 'Tea, Coffee & Drinks',
+    gradient: 'from-amber-500 via-orange-500 to-orange-600',
   },
   {
     title: 'Pure Desi Ghee & Chakki Atta',
@@ -55,6 +78,7 @@ const INSTAMART_PRESETS = [
     badge: 'WHOLESALE BAZAAR',
     imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1200&q=80',
     linkCategory: 'Atta & Flours',
+    gradient: 'from-blue-600 via-indigo-600 to-indigo-700',
   },
   {
     title: 'Home Cleaning & Laundry Care',
@@ -62,6 +86,7 @@ const INSTAMART_PRESETS = [
     badge: 'SUPER VALUE',
     imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=1200&q=80',
     linkCategory: 'Household Essentials',
+    gradient: 'from-purple-600 via-violet-600 to-fuchsia-700',
   },
 ];
 
@@ -71,6 +96,7 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
   onSaveSettings,
   onSaveBanners,
   categories = [],
+  products = [],
 }) => {
   // Global Store Settings Form State
   const [deliveryTagline, setDeliveryTagline] = useState(
@@ -98,12 +124,27 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerSubtitle, setBannerSubtitle] = useState('');
-  const [bannerBadge, setBannerBadge] = useState('SUPER SAVER');
+  const [bannerBadge, setBannerBadge] = useState('EXCLUSIVE DEAL');
   const [bannerImageUrl, setBannerImageUrl] = useState('');
   const [bannerCategory, setBannerCategory] = useState('All');
   const [bannerIsActive, setBannerIsActive] = useState(true);
+  const [bannerGradient, setBannerGradient] = useState<string>('from-pink-600 via-rose-600 to-rose-700');
+  const [bannerButtonText, setBannerButtonText] = useState<string>('Claim Deal ➔');
+  const [bannerTargetType, setBannerTargetType] = useState<BannerTargetType>('category');
+  const [bannerProductId, setBannerProductId] = useState<string>('');
+  const [bannerShowDirectAdd, setBannerShowDirectAdd] = useState<boolean>(false);
+  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
+
+  // Searchable products for banner deep-linking
+  const searchedProducts = useMemo(() => {
+    if (!productSearchQuery.trim()) return products.slice(0, 100);
+    const q = productSearchQuery.toLowerCase().trim();
+    return products
+      .filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
+      .slice(0, 80);
+  }, [products, productSearchQuery]);
 
   // Sync when prop changes
   React.useEffect(() => {
@@ -185,10 +226,16 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
     setEditingBannerId(null);
     setBannerTitle('');
     setBannerSubtitle('');
-    setBannerBadge('SUPER SAVER');
+    setBannerBadge('EXCLUSIVE DEAL');
     setBannerImageUrl(INSTAMART_PRESETS[0].imageUrl);
     setBannerCategory('All');
     setBannerIsActive(true);
+    setBannerGradient('from-pink-600 via-rose-600 to-rose-700');
+    setBannerButtonText('Claim Deal ➔');
+    setBannerTargetType('category');
+    setBannerProductId('');
+    setBannerShowDirectAdd(false);
+    setProductSearchQuery('');
     setIsModalOpen(true);
   };
 
@@ -201,6 +248,21 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
     setBannerImageUrl(banner.imageUrl);
     setBannerCategory(banner.linkCategory || 'All');
     setBannerIsActive(banner.isActive);
+    setBannerGradient(banner.gradient || 'from-pink-600 via-rose-600 to-rose-700');
+    setBannerButtonText(banner.buttonText || 'Claim Deal ➔');
+    
+    // Infer or use targetType
+    let inferredTarget: BannerTargetType = banner.targetType || 'category';
+    if (!banner.targetType) {
+      if (banner.productId) inferredTarget = 'product';
+      else if (banner.actionType === 'parchi') inferredTarget = 'parchi';
+      else if (banner.actionType === 'whatsapp') inferredTarget = 'whatsapp';
+      else inferredTarget = 'category';
+    }
+    setBannerTargetType(inferredTarget);
+    setBannerProductId(banner.productId || '');
+    setBannerShowDirectAdd(banner.showDirectAdd ?? false);
+    setProductSearchQuery('');
     setIsModalOpen(true);
   };
 
@@ -225,32 +287,46 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
     e.preventDefault();
     if (!bannerTitle.trim() || !bannerImageUrl.trim()) return;
 
+    const bannerPayload: Partial<PromoBanner> = {
+      title: bannerTitle.trim(),
+      subtitle: bannerSubtitle.trim() || undefined,
+      badge: bannerBadge.trim() || undefined,
+      imageUrl: bannerImageUrl.trim(),
+      linkCategory: bannerTargetType === 'category' ? bannerCategory : undefined,
+      isActive: bannerIsActive,
+      gradient: bannerGradient,
+      buttonText: bannerButtonText.trim() || 'Claim Deal ➔',
+      targetType: bannerTargetType,
+      productId: bannerTargetType === 'product' ? bannerProductId : undefined,
+      showDirectAdd: bannerTargetType === 'product' ? bannerShowDirectAdd : false,
+      actionType:
+        bannerTargetType === 'product'
+          ? (bannerProductId === 'prod-stayfree-secure-xl-40' ? 'stayfree_deal' : 'product')
+          : bannerTargetType === 'parchi'
+          ? 'parchi'
+          : bannerTargetType === 'whatsapp'
+          ? 'whatsapp'
+          : 'category',
+    };
+
     let updated: PromoBanner[];
     if (editingBannerId) {
       updated = bannerList.map((b) =>
         b.id === editingBannerId
-          ? {
+          ? ({
               ...b,
-              title: bannerTitle.trim(),
-              subtitle: bannerSubtitle.trim() || undefined,
-              badge: bannerBadge.trim() || undefined,
-              imageUrl: bannerImageUrl.trim(),
-              linkCategory: bannerCategory,
-              isActive: bannerIsActive,
-            }
+              ...bannerPayload,
+            } as PromoBanner)
           : b
       );
     } else {
       const newBanner: PromoBanner = {
         id: `banner-${Date.now()}`,
-        title: bannerTitle.trim(),
-        subtitle: bannerSubtitle.trim() || undefined,
-        badge: bannerBadge.trim() || undefined,
-        imageUrl: bannerImageUrl.trim(),
-        linkCategory: bannerCategory,
         isActive: bannerIsActive,
         createdAt: Date.now(),
-      };
+        order: bannerList.length + 1,
+        ...bannerPayload,
+      } as PromoBanner;
       updated = [newBanner, ...bannerList];
     }
 
@@ -543,13 +619,33 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
                     )}
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-heading font-bold text-stone-900 text-sm truncate">
                         {banner.title}
                       </h4>
-                      {banner.linkCategory && banner.linkCategory !== 'All' && (
+                      {/* Destination Type Badge */}
+                      {banner.targetType === 'product' || banner.productId ? (
+                        <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+                          🎯 Product Deal
+                        </span>
+                      ) : banner.targetType === 'parchi' || banner.actionType === 'parchi' ? (
+                        <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                          📝 Parchi Modal
+                        </span>
+                      ) : banner.targetType === 'whatsapp' || banner.actionType === 'whatsapp' ? (
+                        <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                          💬 WhatsApp Support
+                        </span>
+                      ) : banner.linkCategory && banner.linkCategory !== 'All' ? (
                         <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                          {banner.linkCategory}
+                          📂 {banner.linkCategory}
+                        </span>
+                      ) : null}
+
+                      {/* Direct "+ ADD" indicator */}
+                      {banner.showDirectAdd && (
+                        <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                          🛒 Direct "+ ADD"
                         </span>
                       )}
                     </div>
@@ -657,7 +753,7 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveModalBanner} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSaveModalBanner} className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
               {/* Title */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-stone-700">Banner Headline *</label>
@@ -665,41 +761,10 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
                   type="text"
                   value={bannerTitle}
                   onChange={(e) => setBannerTitle(e.target.value)}
-                  placeholder="e.g. Super Saver FMCG Combos"
+                  placeholder="e.g. Stayfree Secure XL (40 Pads) @ ₹180 Only!"
                   className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-sm font-semibold text-stone-900 focus:bg-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600"
                   required
                 />
-              </div>
-
-              {/* Subtitle / Discount Tag */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Discount Tag / Badge</label>
-                  <input
-                    type="text"
-                    value={bannerBadge}
-                    onChange={(e) => setBannerBadge(e.target.value)}
-                    placeholder="e.g. UP TO 25% OFF"
-                    className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-900 font-bold focus:bg-white"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Target Category</label>
-                  <select
-                    value={bannerCategory}
-                    onChange={(e) => setBannerCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-900 font-medium focus:bg-white"
-                  >
-                    <option value="All">All Categories (Storewide)</option>
-                    {categories
-                      .filter((c) => c.name !== 'All')
-                      .map((cat) => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name} {cat.hindiName ? `(${cat.hindiName})` : ''}
-                        </option>
-                      ))}
-                  </select>
-                </div>
               </div>
 
               {/* Subtitle */}
@@ -709,15 +774,229 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
                   type="text"
                   value={bannerSubtitle}
                   onChange={(e) => setBannerSubtitle(e.target.value)}
-                  placeholder="e.g. Britannia, Good Day, Dove & Surf Excel at wholesale prices"
+                  placeholder="e.g. MRP ₹270 pack just at ₹180 on orders above ₹1999!"
                   className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-900 focus:bg-white"
+                />
+              </div>
+
+              {/* Badge / Tag with Quick Select Suggestions */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-700">Discount Tag / Badge</label>
+                <input
+                  type="text"
+                  value={bannerBadge}
+                  onChange={(e) => setBannerBadge(e.target.value)}
+                  placeholder="e.g. EXCLUSIVE DEAL"
+                  className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-900 font-bold focus:bg-white"
+                />
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] text-stone-400 font-medium">Quick Suggestions:</span>
+                  {BADGE_SUGGESTIONS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setBannerBadge(tag)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                        bannerBadge === tag
+                          ? 'bg-amber-400 text-stone-950 border-amber-500 shadow-2xs'
+                          : 'bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Background Gradient Presets */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-700">Background Gradient Theme</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {GRADIENT_PRESETS.map((preset) => {
+                    const isSelected = bannerGradient === preset.value;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setBannerGradient(preset.value)}
+                        className={`p-2 rounded-xl border flex items-center gap-2 text-left cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-emerald-600 ring-2 ring-emerald-500/30 bg-emerald-50/30'
+                            : 'border-stone-200 hover:border-stone-300 bg-white'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-lg ${preset.bg} flex-shrink-0 shadow-2xs`} />
+                        <span className="text-xs font-bold text-stone-800 line-clamp-1">{preset.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Link Destination Type */}
+              <div className="space-y-2 pt-1 border-t border-stone-100">
+                <label className="text-xs font-bold text-stone-800">
+                  Link Destination Type (Click Action) *
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'product', label: 'Specific Product', icon: '🎯' },
+                    { id: 'category', label: 'Category', icon: '📂' },
+                    { id: 'parchi', label: 'Parchi Modal', icon: '📝' },
+                    { id: 'whatsapp', label: 'WhatsApp Help', icon: '💬' },
+                  ].map((dst) => (
+                    <button
+                      key={dst.id}
+                      type="button"
+                      onClick={() => {
+                        const target = dst.id as BannerTargetType;
+                        setBannerTargetType(target);
+                        if (target === 'product') {
+                          setBannerShowDirectAdd(true);
+                          setBannerButtonText('+ ADD');
+                        } else if (target === 'parchi') {
+                          setBannerButtonText('Upload / Type Parchi ➔');
+                        } else if (target === 'whatsapp') {
+                          setBannerButtonText('Chat on WhatsApp ➔');
+                        } else {
+                          setBannerShowDirectAdd(false);
+                          setBannerButtonText('Claim Deal ➔');
+                        }
+                      }}
+                      className={`p-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer ${
+                        bannerTargetType === dst.id
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20'
+                          : 'border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100'
+                      }`}
+                    >
+                      <span className="text-base">{dst.icon}</span>
+                      <span>{dst.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sub-Panel: When Destination is 'product' */}
+                {bannerTargetType === 'product' && (
+                  <div className="space-y-2.5 bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-200/80 mt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                        <span>🎯 Select Store Product *</span>
+                      </label>
+                      <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-full border border-indigo-200">
+                        {products.length} products loaded
+                      </span>
+                    </div>
+
+                    {/* Search box to quickly find product */}
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      placeholder="Search product by name to pick..."
+                      className="w-full px-3 py-1.5 bg-white rounded-lg border border-indigo-200 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+
+                    {/* Product Select Dropdown */}
+                    <select
+                      value={bannerProductId}
+                      onChange={(e) => {
+                        const pId = e.target.value;
+                        setBannerProductId(pId);
+                        const chosen = products.find((p) => p.id === pId);
+                        if (chosen) {
+                          if (!bannerTitle || bannerTitle === 'Headline Preview') {
+                            setBannerTitle(chosen.name);
+                          }
+                          if (!bannerImageUrl || bannerImageUrl.includes('unsplash')) {
+                            setBannerImageUrl(chosen.imageUrl);
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-indigo-300 text-xs text-stone-900 font-semibold focus:outline-none"
+                      required={bannerTargetType === 'product'}
+                    >
+                      <option value="">-- Click to choose product --</option>
+                      {searchedProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.unit}) - ₹{p.finalPrice} [MRP ₹{p.originalPrice}]
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Toggle: Direct Add-to-Cart Button on Banner */}
+                    <div className="pt-2 border-t border-indigo-200/70">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={bannerShowDirectAdd}
+                          onChange={(e) => setBannerShowDirectAdd(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded border-stone-300 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-indigo-950">
+                          [✓] Show Direct &quot;+ ADD&quot; to Cart Button on Banner
+                        </span>
+                      </label>
+                      <p className="text-[11px] text-indigo-800 ml-6 mt-0.5 leading-snug">
+                        Customers can directly add this product to cart and adjust quantity (+ / -) right from the homepage banner without opening anything else!
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-Panel: When Destination is 'category' */}
+                {bannerTargetType === 'category' && (
+                  <div className="space-y-1 bg-stone-50 p-3 rounded-xl border border-stone-200">
+                    <label className="text-xs font-bold text-stone-700">Target Category to Open</label>
+                    <select
+                      value={bannerCategory}
+                      onChange={(e) => setBannerCategory(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-stone-200 text-xs text-stone-900 font-medium focus:bg-white"
+                    >
+                      <option value="All">All Categories (Storewide)</option>
+                      {categories
+                        .filter((c) => c.name !== 'All')
+                        .map((cat) => (
+                          <option key={cat.id} value={cat.name}>
+                            {cat.name} {cat.hindiName ? `(${cat.hindiName})` : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Sub-Panel: When Destination is 'parchi' */}
+                {bannerTargetType === 'parchi' && (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
+                    <span className="text-base">📝</span>
+                    <span>Tapping this banner triggers the handwritten / digital grocery list notepad sheet directly.</span>
+                  </div>
+                )}
+
+                {/* Sub-Panel: When Destination is 'whatsapp' */}
+                {bannerTargetType === 'whatsapp' && (
+                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+                    <span className="text-base">💬</span>
+                    <span>Tapping this banner opens WhatsApp chat with Kiranape store assistance on 9424316081.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Button Text */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Banner Action Button Text</label>
+                <input
+                  type="text"
+                  value={bannerButtonText}
+                  onChange={(e) => setBannerButtonText(e.target.value)}
+                  placeholder="e.g. Claim Deal ➔ or + ADD"
+                  className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-sm text-stone-900 font-bold focus:bg-white"
                 />
               </div>
 
               {/* Image URL & Phone Upload */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-stone-700">Banner Background Image *</label>
+                  <label className="text-xs font-bold text-stone-700">Banner Packshot / Graphic Image *</label>
                   <label className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer">
                     <Camera className="w-3.5 h-3.5" />
                     <span>Upload from Phone</span>
@@ -734,7 +1013,7 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
                   type="url"
                   value={bannerImageUrl}
                   onChange={(e) => setBannerImageUrl(e.target.value)}
-                  placeholder="https://... image URL"
+                  placeholder="https://... image URL or packshot"
                   className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-mono text-stone-800 focus:bg-white"
                   required
                 />
@@ -745,34 +1024,58 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
                   </p>
                 )}
 
-                {/* Preview */}
-                {bannerImageUrl && (
-                  <div className="mt-2 h-28 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 relative">
-                    <img
-                      src={bannerImageUrl}
-                      alt="Banner Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-stone-950/20 to-transparent p-3 flex flex-col justify-end text-white">
+                {/* Live Card Preview */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                    Live Storefront Card Preview
+                  </label>
+                  <div
+                    className={`rounded-2xl bg-gradient-to-br ${bannerGradient} p-4 text-white shadow-md relative overflow-hidden flex items-center justify-between gap-3`}
+                  >
+                    <div className="flex-1 min-w-0 pr-2 z-10">
                       {bannerBadge && (
-                        <span className="bg-amber-400 text-stone-950 text-[10px] font-black px-1.5 py-0.5 rounded w-fit uppercase">
+                        <span className="inline-block bg-white/20 backdrop-blur-md text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider mb-1">
                           {bannerBadge}
                         </span>
                       )}
-                      <p className="font-heading font-extrabold text-sm text-white drop-shadow-xs">
+                      <h4 className="font-heading font-black text-sm text-white line-clamp-1 drop-shadow-xs">
                         {bannerTitle || 'Headline Preview'}
-                      </p>
+                      </h4>
+                      {bannerSubtitle && (
+                        <p className="text-[11px] text-white/90 line-clamp-1 mt-0.5">
+                          {bannerSubtitle}
+                        </p>
+                      )}
+                      <div className="pt-2">
+                        {bannerShowDirectAdd ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white text-stone-950 text-xs font-heading font-black shadow-xs">
+                            <span>🛒 + ADD</span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-white text-stone-900 text-xs font-heading font-extrabold shadow-xs">
+                            <span>{bannerButtonText || 'Claim Deal ➔'}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl bg-white/10 p-1 flex items-center justify-center border border-white/20 flex-shrink-0">
+                      <img
+                        src={bannerImageUrl || INSTAMART_PRESETS[0].imageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-contain drop-shadow-md rounded-lg"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
+                        }}
+                      />
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Active Toggle */}
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1 border-t border-stone-100">
                 <input
                   type="checkbox"
                   id="modal-banner-active"

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ShoppingBag,
   ArrowRight,
@@ -19,6 +19,7 @@ import {
   MessageCircle,
   Key,
   PenLine,
+  X,
 } from 'lucide-react';
 import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
 import {
@@ -75,8 +76,10 @@ import {
 import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
 import {
   STAYFREE_REWARD_PRODUCT_ID,
+  STAYFREE_REGULAR_PRICE,
   STAYFREE_REWARD_PRICE,
   STAYFREE_UNLOCK_THRESHOLD,
+  SPECIAL_DEAL_PRODUCTS,
 } from './data/specialDealsCatalog';
 import { HomeBannerCarousel } from './components/HomeBannerCarousel';
 import { CustomerHeader } from './components/CustomerHeader';
@@ -461,6 +464,8 @@ export default function App() {
   const cartItems: CartItem[] = useMemo(() => {
     const items: CartItem[] = [];
     const productMap = new Map<string, Product>();
+    // Pre-populate with special deal products to guarantee Stayfree & Parle products always resolve
+    SPECIAL_DEAL_PRODUCTS.forEach((dp) => productMap.set(dp.id, dp));
     products.forEach((p) => productMap.set(p.id, p));
 
     for (const [key, qty] of Object.entries(cartQuantities)) {
@@ -479,7 +484,10 @@ export default function App() {
             });
           }
         } else {
-          const product = productMap.get(key);
+          let product = productMap.get(key);
+          if (!product && key === STAYFREE_REWARD_PRODUCT_ID) {
+            product = SPECIAL_DEAL_PRODUCTS.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
+          }
           if (product) {
             items.push({
               product,
@@ -491,32 +499,49 @@ export default function App() {
       }
     }
 
-    // Check if subtotal qualifies for Stayfree reward discount (>= ₹1999)
-    const baseSubtotal = items.reduce((sum, item) => {
-      const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
-      return sum + price * item.quantity;
+    // Check if subtotal qualifies for Stayfree reward discount (>= ₹1999) using regular prices
+    const regularSubtotal = items.reduce((sum, item) => {
+      const regularPrice =
+        item.product.id === STAYFREE_REWARD_PRODUCT_ID && !item.selectedVariant
+          ? STAYFREE_REGULAR_PRICE
+          : item.selectedVariant
+          ? item.selectedVariant.price
+          : item.product.finalPrice;
+      return sum + regularPrice * item.quantity;
     }, 0);
 
-    const isRewardUnlocked = baseSubtotal >= STAYFREE_UNLOCK_THRESHOLD;
+    const isRewardUnlocked = regularSubtotal >= STAYFREE_UNLOCK_THRESHOLD;
 
-    if (isRewardUnlocked) {
-      return items.map((item) => {
-        if (item.product.id === STAYFREE_REWARD_PRODUCT_ID && !item.selectedVariant) {
-          const orig = item.product.originalPrice || 270;
+    return items.map((item) => {
+      if (item.product.id === STAYFREE_REWARD_PRODUCT_ID && !item.selectedVariant) {
+        if (isRewardUnlocked) {
           return {
             ...item,
+            isRewardItem: true,
             product: {
               ...item.product,
               finalPrice: STAYFREE_REWARD_PRICE,
-              discountPercent: Math.round(((orig - STAYFREE_REWARD_PRICE) / orig) * 100),
+              originalPrice: STAYFREE_REGULAR_PRICE,
+              discountPercent: 10,
+              isRewardItem: true,
+            },
+          };
+        } else {
+          return {
+            ...item,
+            isRewardItem: false,
+            product: {
+              ...item.product,
+              finalPrice: STAYFREE_REGULAR_PRICE,
+              originalPrice: 270,
+              discountPercent: 26,
+              isRewardItem: false,
             },
           };
         }
-        return item;
-      });
-    }
-
-    return items;
+      }
+      return item;
+    });
   }, [products, cartQuantities]);
 
   const totalCartCount = useMemo(
@@ -533,6 +558,46 @@ export default function App() {
     [cartItems]
   );
 
+  // Check whether cart qualifies for Stayfree reward discount
+  const isStayfreeRewardUnlocked = useMemo(() => {
+    const regularSubtotal = cartItems.reduce((sum, item) => {
+      const reg =
+        item.product.id === STAYFREE_REWARD_PRODUCT_ID && !item.selectedVariant
+          ? STAYFREE_REGULAR_PRICE
+          : item.selectedVariant
+          ? item.selectedVariant.price
+          : item.product.finalPrice;
+      return sum + reg * item.quantity;
+    }, 0);
+    return regularSubtotal >= STAYFREE_UNLOCK_THRESHOLD;
+  }, [cartItems]);
+
+  // Reverse Cart Total Protection: Notify when subtotal drops below ₹1999 or unlocks back
+  const prevRewardUnlockedRef = useRef<boolean>(false);
+  const prevStayfreeInCartRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const isStayfreeInCart = Boolean(
+      cartQuantities[STAYFREE_REWARD_PRODUCT_ID] &&
+      cartQuantities[STAYFREE_REWARD_PRODUCT_ID] > 0
+    );
+
+    if (isStayfreeInCart && prevStayfreeInCartRef.current) {
+      if (prevRewardUnlockedRef.current && !isStayfreeRewardUnlocked) {
+        setToastBanner(
+          `Cart total dropped below ₹${STAYFREE_UNLOCK_THRESHOLD}. Stayfree XL reverted to regular price ₹${STAYFREE_REGULAR_PRICE}.`
+        );
+      } else if (!prevRewardUnlockedRef.current && isStayfreeRewardUnlocked) {
+        setToastBanner(
+          `Stayfree XL unlocked at reward price ₹${STAYFREE_REWARD_PRICE}! 🎉`
+        );
+      }
+    }
+
+    prevRewardUnlockedRef.current = isStayfreeRewardUnlocked;
+    prevStayfreeInCartRef.current = isStayfreeInCart;
+  }, [isStayfreeRewardUnlocked, cartQuantities]);
+
   // Cart Handlers
   const handleAddToCart = useCallback((product: Product, variant?: ProductVariant) => {
     const itemKey = variant ? `${product.id}::${variant.id}` : product.id;
@@ -542,25 +607,33 @@ export default function App() {
     }));
   }, []);
 
-  // Quick 1-tap add Stayfree deal reward directly to cart
+  // Quick 1-tap add Stayfree deal reward directly to cart with instant feedback
   const handleAddStayfreeReward = useCallback(() => {
     setCartQuantities((prev) => ({
       ...prev,
       [STAYFREE_REWARD_PRODUCT_ID]: (prev[STAYFREE_REWARD_PRODUCT_ID] || 0) + 1,
     }));
+    setToastBanner('Stayfree XL added at reward price ₹180! 🎉');
   }, []);
 
   // Banner Action: Claim Stayfree Deal
   const handleClaimStayfreeDeal = useCallback(() => {
-    const stayfreeProd = products.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
+    const stayfreeProd =
+      products.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID) ||
+      SPECIAL_DEAL_PRODUCTS.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
     if (stayfreeProd) {
       handleAddToCart(stayfreeProd);
+      setToastBanner(
+        isStayfreeRewardUnlocked
+          ? 'Stayfree XL added at reward price ₹180! 🎉'
+          : 'Stayfree XL added to cart! Add orders above ₹1999 to get it at ₹180.'
+      );
       setIsCartOpen(true);
     } else {
       setSelectedCategory('Personal Care');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [products, handleAddToCart]);
+  }, [products, handleAddToCart, isStayfreeRewardUnlocked]);
 
   // Banner Action: Filter Parle 50% Off Biscuits
   const handleFilterParleBiscuits = useCallback(() => {
@@ -881,6 +954,22 @@ export default function App() {
   // Otherwise, render Customer View (Default App)
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col selection:bg-emerald-600 selection:text-white pb-28 sm:pb-32 w-full max-w-full overflow-x-hidden">
+      {/* Floating Instant Toast Notification */}
+      {toastBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-md w-[92%] sm:w-auto px-4 py-2.5 rounded-2xl bg-stone-900/95 text-white backdrop-blur-md shadow-2xl border border-stone-700/60 flex items-center justify-between gap-3 text-xs font-semibold animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>{toastBanner}</span>
+          </div>
+          <button
+            onClick={() => setToastBanner(null)}
+            className="p-1 rounded-full hover:bg-white/20 text-stone-300 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Customer Header with brand, search, category pills */}
       <CustomerHeader
         searchQuery={searchQuery}
@@ -1012,18 +1101,28 @@ export default function App() {
         ) : (
           /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
           <div className="pb-8 space-y-4 sm:space-y-5">
-            {/* Blinkit-Style Auto-Sliding Carousel Engine */}
+            {/* Blinkit-Style Auto-Sliding Carousel Engine with Direct + ADD & Deep Linking */}
             <HomeBannerCarousel
               banners={banners}
+              products={products}
+              cartQuantities={cartQuantities}
+              onAddToCart={handleAddToCart}
+              onUpdateQuantity={handleUpdateQuantity}
               onOpenDigitalParchi={() => setIsDigitalParchiOpen(true)}
               onOpenParchiUpload={() => setIsParchiModalOpen(true)}
               onSelectCategory={(catName) => {
                 setSelectedCategory(catName as ProductCategory);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
+              onSelectProduct={(prod) => {
+                if (prod.category) {
+                  setSelectedCategory(prod.category as ProductCategory);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
               onClaimStayfreeDeal={handleClaimStayfreeDeal}
               onFilterParleBiscuits={handleFilterParleBiscuits}
-              storePhone={storeSettings.phone || '9424316081'}
+              whatsappNumber={storeSettings.phone || '9424316081'}
             />
 
             {/* Subtle Blinkit Quick Note Chips */}

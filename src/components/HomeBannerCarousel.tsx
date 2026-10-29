@@ -1,27 +1,47 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, ShoppingBag, Truck, FileText, MessageCircle, Heart } from 'lucide-react';
-import { PromoBanner } from '../types';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  ArrowRight,
+  ShoppingBag,
+  Plus,
+  Minus,
+  Check,
+} from 'lucide-react';
+import { PromoBanner, Product } from '../types';
 import { DEFAULT_BANNERS } from '../data/initialProducts';
+import { SPECIAL_DEAL_PRODUCTS, STAYFREE_REWARD_PRODUCT_ID } from '../data/specialDealsCatalog';
 
 interface HomeBannerCarouselProps {
   banners?: PromoBanner[];
+  products?: Product[];
+  cartQuantities?: Record<string, number>;
+  onAddToCart?: (product: Product) => void;
+  onUpdateQuantity?: (itemKey: string, qty: number) => void;
   onClaimStayfreeDeal?: () => void;
   onFilterParleBiscuits?: () => void;
   onOpenParchi?: () => void;
   onOpenDigitalParchi?: () => void;
   onShopGrocery?: () => void;
-  onSelectDepartment?: (dept: 'grocery' | 'stationery') => void;
+  onSelectCategory?: (categoryName: string) => void;
+  onSelectProduct?: (product: Product) => void;
   whatsappNumber?: string;
 }
 
 export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
   banners,
+  products = [],
+  cartQuantities = {},
+  onAddToCart,
+  onUpdateQuantity,
   onClaimStayfreeDeal,
   onFilterParleBiscuits,
   onOpenParchi,
   onOpenDigitalParchi,
   onShopGrocery,
-  onSelectDepartment,
+  onSelectCategory,
+  onSelectProduct,
   whatsappNumber = '9424316081',
 }) => {
   const activeBanners = banners && banners.length > 0 ? banners : DEFAULT_BANNERS;
@@ -41,7 +61,7 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
     setCurrentIndex((prev) => (prev - 1 + totalSlides) % totalSlides);
   }, [totalSlides]);
 
-  // 3.5 Seconds Auto-Sliding Loop Engine (Pauses on Hover / Touch)
+  // 3.5 Seconds Auto-Sliding Loop Engine (Pauses on Hover / Touch / Stepper Interaction)
   useEffect(() => {
     if (isPaused || totalSlides <= 1) return;
 
@@ -83,28 +103,76 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
     setTimeout(() => setIsPaused(false), 800);
   };
 
+  // Helper to resolve linked product
+  const getLinkedProduct = (banner: PromoBanner): Product | undefined => {
+    if (banner.productId) {
+      const found = products.find((p) => p.id === banner.productId);
+      if (found) return found;
+      // Fallback in special deals catalog
+      return SPECIAL_DEAL_PRODUCTS.find((p) => p.id === banner.productId);
+    }
+    if (banner.id === 'banner-stayfree-xl' || banner.actionType === 'stayfree_deal') {
+      const found = products.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
+      if (found) return found;
+      return SPECIAL_DEAL_PRODUCTS.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
+    }
+    return undefined;
+  };
+
   // Slide Action Trigger Handler
-  const handleBannerAction = (banner: PromoBanner) => {
+  const handleBannerAction = (banner: PromoBanner, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    // 1. Specific product deal
+    if (banner.targetType === 'product' || banner.productId) {
+      const prod = getLinkedProduct(banner);
+      if (prod) {
+        if (onSelectProduct) {
+          onSelectProduct(prod);
+        } else if (onSelectCategory && prod.category) {
+          onSelectCategory(prod.category);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        return;
+      }
+    }
+
+    // 2. Named deals
     if (banner.actionType === 'stayfree_deal' || banner.id === 'banner-stayfree-xl') {
-      if (onClaimStayfreeDeal) onClaimStayfreeDeal();
+      if (onClaimStayfreeDeal) {
+        onClaimStayfreeDeal();
+      } else if (onSelectCategory) {
+        onSelectCategory('Personal Care');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } else if (banner.actionType === 'parle_deal' || banner.id === 'banner-parle-50off') {
       if (onFilterParleBiscuits) onFilterParleBiscuits();
     } else if (banner.actionType === 'free_delivery' || banner.id === 'banner-free-delivery') {
-      if (onShopGrocery) onShopGrocery();
-    } else if (banner.actionType === 'parchi' || banner.id === 'banner-parchi-upload') {
+      if (onShopGrocery) {
+        onShopGrocery();
+      } else if (onSelectCategory) {
+        onSelectCategory('All');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else if (banner.targetType === 'parchi' || banner.actionType === 'parchi' || banner.id === 'banner-parchi-upload') {
       if (onOpenDigitalParchi) {
         onOpenDigitalParchi();
       } else if (onOpenParchi) {
         onOpenParchi();
       }
-    } else if (banner.actionType === 'whatsapp' || banner.id === 'banner-stationery-whatsapp') {
+    } else if (banner.targetType === 'whatsapp' || banner.actionType === 'whatsapp' || banner.id === 'banner-stationery-whatsapp') {
       const cleanPhone = whatsappNumber.replace(/\D/g, '').slice(-10);
       const text = encodeURIComponent(
-        'Namaste Kiranape! Mujhe stationery aur grocery order karni hai. Kripya details confirm karein.'
+        'Namaste Kiranape! Mujhe grocery aur household items order karne hain. Kripya details confirm karein.'
       );
       window.open(`https://wa.me/91${cleanPhone}?text=${text}`, '_blank');
-    } else if (banner.linkCategory) {
-      if (onShopGrocery) onShopGrocery();
+    } else if (banner.targetType === 'category' || banner.linkCategory) {
+      if (onSelectCategory) {
+        onSelectCategory(banner.linkCategory || 'All');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (onShopGrocery) {
+        onShopGrocery();
+      }
     }
   };
 
@@ -136,10 +204,17 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
               ? 'from-emerald-600 via-teal-600 to-teal-700'
               : 'from-indigo-600 via-purple-600 to-violet-700');
 
+          const linkedProduct = getLinkedProduct(banner);
+          const showDirectAdd = Boolean(
+            (banner.showDirectAdd || banner.id === 'banner-stayfree-xl') && linkedProduct
+          );
+          const qtyInCart = linkedProduct ? cartQuantities[linkedProduct.id] || 0 : 0;
+
           return (
             <div
               key={banner.id || index}
-              className={`w-full flex-shrink-0 bg-gradient-to-br ${gradientClass} text-white relative overflow-hidden`}
+              onClick={() => handleBannerAction(banner)}
+              className={`w-full flex-shrink-0 bg-gradient-to-br ${gradientClass} text-white relative overflow-hidden cursor-pointer`}
               style={{ minHeight: '148px' }}
             >
               {/* Subtle ambient background glow circles */}
@@ -171,16 +246,70 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
                     )}
                   </div>
 
-                  {/* CTA Action Button */}
-                  <div className="pt-2 sm:pt-3">
-                    <button
-                      type="button"
-                      onClick={() => handleBannerAction(banner)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white text-stone-900 hover:bg-stone-100 active:scale-95 text-xs font-heading font-extrabold shadow-md transition-all cursor-pointer group"
-                    >
-                      <span>{banner.buttonText || 'Claim Deal ➔'}</span>
-                      <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                    </button>
+                  {/* CTA Action Area: Direct Add-to-Cart Counter OR CTA Button */}
+                  <div className="pt-2 sm:pt-3 flex items-center gap-2">
+                    {showDirectAdd && linkedProduct ? (
+                      qtyInCart === 0 ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsPaused(true);
+                            if (onAddToCart) onAddToCart(linkedProduct);
+                            setTimeout(() => setIsPaused(false), 2000);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-stone-950 hover:bg-stone-100 active:scale-95 text-xs font-heading font-black shadow-md transition-all cursor-pointer group"
+                          aria-label={`Add ${linkedProduct.name} to cart`}
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[3] text-emerald-700" />
+                          <span>+ ADD</span>
+                        </button>
+                      ) : (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center bg-white text-stone-950 rounded-xl p-0.5 shadow-md border border-stone-200"
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsPaused(true);
+                              if (onUpdateQuantity) onUpdateQuantity(linkedProduct.id, qtyInCart - 1);
+                              setTimeout(() => setIsPaused(false), 2000);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center hover:bg-stone-100 text-stone-800 rounded-lg active:scale-90 transition-transform cursor-pointer"
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+                          <span className="w-7 text-center font-heading font-black text-xs text-stone-950">
+                            {qtyInCart}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsPaused(true);
+                              if (onUpdateQuantity) onUpdateQuantity(linkedProduct.id, qtyInCart + 1);
+                              setTimeout(() => setIsPaused(false), 2000);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center hover:bg-stone-100 text-stone-800 rounded-lg active:scale-90 transition-transform cursor-pointer"
+                            aria-label="Increase quantity"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => handleBannerAction(banner, e)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white text-stone-900 hover:bg-stone-100 active:scale-95 text-xs font-heading font-extrabold shadow-md transition-all cursor-pointer group"
+                      >
+                        <span>{banner.buttonText || 'Claim Deal ➔'}</span>
+                        <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -194,7 +323,6 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
                         className="w-full h-full object-contain drop-shadow-md rounded-xl"
                         loading="lazy"
                         onError={(e) => {
-                          // Fallback icon box
                           (e.currentTarget as HTMLImageElement).style.display = 'none';
                         }}
                       />

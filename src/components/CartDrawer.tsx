@@ -279,6 +279,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
             )}
 
+            {/* Reverse Cart Total Warning: If Stayfree is in cart but subtotal < 1999 */}
+            {!isStayfreeUnlocked && isStayfreeInCart && (
+              <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3 flex items-center gap-2.5 text-xs text-amber-900 shadow-2xs animate-in fade-in">
+                <span className="text-base flex-shrink-0">⚠️</span>
+                <span className="leading-snug">
+                  Cart subtotal is below ₹{STAYFREE_THRESHOLD}. Stayfree XL has reverted to regular price ₹200. Add <strong>₹{remainingForStayfree}</strong> more to get it at <strong>₹180</strong>!
+                </span>
+              </div>
+            )}
+
             {/* Discount savings celebratory pill */}
             {totalSavings > 0 && (
               <div className="bg-gradient-to-r from-amber-500/15 to-emerald-500/15 border border-emerald-300/60 rounded-xl p-2.5 flex items-center gap-2 text-xs text-emerald-900">
@@ -321,9 +331,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       <h5 className="text-xs font-semibold text-stone-900 line-clamp-1">
                         {product.name}
                       </h5>
-                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mt-0.5">
-                        {unit}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded inline-block">
+                          {unit}
+                        </span>
+                        {item.isRewardItem || (product.id === 'prod-stayfree-secure-xl-40' && isStayfreeUnlocked) ? (
+                          <span className="text-[9px] font-black bg-gradient-to-r from-pink-600 to-rose-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                            🌟 ₹180 REWARD ITEM
+                          </span>
+                        ) : product.id === 'prod-stayfree-secure-xl-40' ? (
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
+                            Regular ₹200 (Unlock @ ₹180 on ₹1999+)
+                          </span>
+                        ) : null}
+                      </div>
 
                       <div className="mt-1 flex items-baseline gap-1.5">
                         <span className="font-heading font-bold text-xs text-stone-900">

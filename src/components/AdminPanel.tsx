@@ -3091,6 +3091,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onSaveSettings={onSaveSettings}
             onSaveBanners={onSaveBanners}
             categories={customCategories}
+            products={products}
           />
         )}
 

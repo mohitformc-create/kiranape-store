@@ -30,6 +30,7 @@ export interface Product {
   barcode?: string;
   variants?: ProductVariant[];
   updatedAt: number;
+  isRewardItem?: boolean;
 }
 
 export interface ScannedBillItem {
@@ -53,6 +54,7 @@ export interface CartItem {
   quantity: number;
   selectedVariant?: ProductVariant;
   itemKey: string;
+  isRewardItem?: boolean;
 }
 
 export interface OrderItemSummary {
@@ -190,6 +192,8 @@ export interface StoreSettings {
   updatedAt?: number;
 }
 
+export type BannerTargetType = 'product' | 'category' | 'parchi' | 'whatsapp';
+
 export interface PromoBanner {
   id: string;
   title: string;
@@ -202,9 +206,13 @@ export interface PromoBanner {
   createdAt?: number;
   gradient?: string;
   buttonText?: string;
-  actionType?: 'stayfree_deal' | 'parle_deal' | 'free_delivery' | 'parchi' | 'stationery' | 'category' | 'whatsapp';
+  actionType?: 'stayfree_deal' | 'parle_deal' | 'free_delivery' | 'parchi' | 'stationery' | 'category' | 'whatsapp' | 'product';
   actionPayload?: string;
+  targetType?: BannerTargetType;
+  productId?: string;
+  showDirectAdd?: boolean;
 }
 
 export type StoreInfo = StoreSettings;
+
 
