@@ -18,6 +18,8 @@ export const STORE_DEFAULTS: StoreSettings = {
   minOrderForFreeDelivery: 199,
   deliveryCharge: 25,
   adminPin: '@2508',
+  telegramBotToken: '9114137658:AAGUWLhcv_ihDIRhZz_F4BrMjI_i3CpdT8M',
+  telegramChatId: '6229341464',
 };
 
 export const DEFAULT_BANNERS: PromoBanner[] = [

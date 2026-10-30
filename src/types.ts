@@ -189,6 +189,8 @@ export interface StoreSettings {
   minOrderForFreeDelivery: number;
   deliveryCharge: number;
   adminPin: string;
+  telegramBotToken?: string;
+  telegramChatId?: string;
   updatedAt?: number;
 }
 

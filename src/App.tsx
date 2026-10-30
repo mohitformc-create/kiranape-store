@@ -63,6 +63,7 @@ import {
   syncProductsFromSupabase,
 } from './services/supabaseClient';
 import { dispatchOrderInBackground } from './services/orderQueueService';
+import { sendTelegramOrderNotification } from './services/telegramNotificationService';
 import {
   isFirebaseConfigured,
   subscribeToAuth,
@@ -782,6 +783,11 @@ export default function App() {
         deliveryFee,
         finalPayableAmount,
         isParchi: false,
+      });
+
+      // 5. Silent Telegram Instant Admin Alert
+      sendTelegramOrderNotification(localOrder, storeSettings).catch((err) => {
+        console.warn('[Telegram Order Alert Silent Catch]:', err);
       });
     },
     [cartItems, totalCartCount, storeSettings]

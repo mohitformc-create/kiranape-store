@@ -19,10 +19,18 @@ import {
   Upload,
   Camera,
   RefreshCw,
+  Send,
+  Bell,
+  AlertCircle,
 } from 'lucide-react';
 import { StoreSettings, PromoBanner } from '../types';
 import { CATEGORIES } from '../data/initialProducts';
 import { compressImageFile } from '../utils/imageUtils';
+import {
+  DEFAULT_TELEGRAM_BOT_TOKEN,
+  DEFAULT_TELEGRAM_CHAT_ID,
+  sendTelegramTestNotification,
+} from '../services/telegramNotificationService';
 import {
   getDeliveryLocations,
   addDeliveryLocation,
@@ -83,6 +91,20 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
   const [deliveryCharge, setDeliveryCharge] = useState<number>(
     storeSettings.deliveryCharge ?? 25
   );
+
+  // Telegram Admin Bot Notification State
+  const [telegramBotToken, setTelegramBotToken] = useState(
+    storeSettings.telegramBotToken || DEFAULT_TELEGRAM_BOT_TOKEN
+  );
+  const [telegramChatId, setTelegramChatId] = useState(
+    storeSettings.telegramChatId || DEFAULT_TELEGRAM_CHAT_ID
+  );
+  const [showBotToken, setShowBotToken] = useState(false);
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSuccessMsg, setSettingsSuccessMsg] = useState<string | null>(null);
@@ -152,11 +174,33 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
     setDeliveryTime(storeSettings.deliveryTime || 'Bharosemand Delivery');
     setMinOrderForFreeDelivery(storeSettings.minOrderForFreeDelivery ?? 199);
     setDeliveryCharge(storeSettings.deliveryCharge ?? 25);
+    setTelegramBotToken(storeSettings.telegramBotToken || DEFAULT_TELEGRAM_BOT_TOKEN);
+    setTelegramChatId(storeSettings.telegramChatId || DEFAULT_TELEGRAM_CHAT_ID);
   }, [storeSettings]);
 
   React.useEffect(() => {
     setBannerList(banners || []);
   }, [banners]);
+
+  // Handle Telegram Bot Test Alert
+  const handleTestTelegramAlert = async () => {
+    setIsTestingTelegram(true);
+    setTelegramTestResult(null);
+    try {
+      const res = await sendTelegramTestNotification(telegramBotToken, telegramChatId);
+      setTelegramTestResult(res);
+      setTimeout(() => {
+        setTelegramTestResult(null);
+      }, 7000);
+    } catch (err: any) {
+      setTelegramTestResult({
+        success: false,
+        message: err?.message || 'Failed to send test alert.',
+      });
+    } finally {
+      setIsTestingTelegram(false);
+    }
+  };
 
   // Handle Save Settings
   const handleSettingsSubmit = async (e: React.FormEvent) => {
@@ -180,9 +224,11 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
         deliveryTime: deliveryTime.trim() || 'Bharosemand Delivery',
         minOrderForFreeDelivery: Number(minOrderForFreeDelivery) || 199,
         deliveryCharge: Number(deliveryCharge) || 0,
+        telegramBotToken: telegramBotToken.trim(),
+        telegramChatId: telegramChatId.trim(),
       });
 
-      setSettingsSuccessMsg('Store settings saved successfully and updated live across customer screens!');
+      setSettingsSuccessMsg('Store settings & Telegram alerts saved successfully and updated live!');
       setTimeout(() => setSettingsSuccessMsg(null), 5000);
     } catch (err: any) {
       setSettingsErrorMsg(err?.message || 'Failed to save settings. Please try again.');
@@ -532,6 +578,106 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
               <span className="text-[10px] text-stone-500 mt-1 block">
                 Displayed in the customer footer and order receipt.
               </span>
+            </div>
+
+            {/* Telegram Instant Admin Alerts Section */}
+            <div className="md:col-span-2 bg-gradient-to-br from-sky-50 via-blue-50/50 to-indigo-50/30 rounded-2xl p-5 border border-sky-200 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sky-100 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center font-bold shadow-xs">
+                    <Send className="w-5 h-5 -rotate-12 translate-x-0.5" />
+                  </div>
+                  <div>
+                    <h4 className="font-heading font-extrabold text-stone-900 text-sm flex items-center gap-2">
+                      <span>Telegram Bot Instant Admin Alerts</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live & Silent
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-stone-600">
+                      Zero customer interference — instant silent notification arrives on your Telegram whenever any customer orders (Cart, Handwritten Parchi, or Voice grocery).
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  id="admin-test-telegram-alert-btn"
+                  onClick={handleTestTelegramAlert}
+                  disabled={isTestingTelegram || !telegramBotToken.trim() || !telegramChatId.trim()}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-heading font-extrabold shadow-2xs transition-all cursor-pointer disabled:opacity-50 flex-shrink-0"
+                  title="Send immediate test ping to your Telegram Bot"
+                >
+                  <Bell className={`w-3.5 h-3.5 ${isTestingTelegram ? 'animate-spin' : ''}`} />
+                  <span>{isTestingTelegram ? 'Sending Test...' : 'Test Telegram Alert'}</span>
+                </button>
+              </div>
+
+              {telegramTestResult && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-semibold flex items-start gap-2 ${
+                    telegramTestResult.success
+                      ? 'bg-emerald-100/90 border border-emerald-300 text-emerald-900'
+                      : 'bg-rose-100/90 border border-rose-300 text-rose-900'
+                  }`}
+                >
+                  {telegramTestResult.success ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-700 flex-shrink-0 mt-0.5" />
+                  )}
+                  <span>{telegramTestResult.message}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Bot Token */}
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Telegram Bot Token *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showBotToken ? 'text' : 'password'}
+                      required
+                      value={telegramBotToken}
+                      onChange={(e) => setTelegramBotToken(e.target.value)}
+                      placeholder="e.g. 9114137658:AAGUWLhcv_ihDIRhZz_F4BrMjI_i3CpdT8M"
+                      className="w-full pl-3.5 pr-10 py-2.5 text-xs font-mono bg-white border border-sky-200 rounded-xl focus:border-sky-500 focus:ring-2 focus:ring-sky-400/20 text-stone-900 font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowBotToken(!showBotToken)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer p-1"
+                      title={showBotToken ? 'Hide Bot Token' : 'Show Bot Token'}
+                    >
+                      {showBotToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1 block">
+                    Pre-filled with official bot token. Custom bots also supported.
+                  </span>
+                </div>
+
+                {/* Chat ID */}
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    Target Admin Chat ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="e.g. 6229341464"
+                    className="w-full px-3.5 py-2.5 text-xs font-mono bg-white border border-sky-200 rounded-xl focus:border-sky-500 focus:ring-2 focus:ring-sky-400/20 text-stone-900 font-semibold"
+                  />
+                  <span className="text-[10px] text-stone-500 mt-1 block">
+                    Admin Telegram User ID or Group Chat ID receiving instant alerts.
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 

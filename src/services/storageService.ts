@@ -5,6 +5,7 @@ import { FORTUNE_OIL_PRODUCTS } from '../data/fortuneCatalog';
 import { STATIONERY_PRODUCTS } from '../data/stationeryCatalog';
 import { SPECIAL_DEAL_PRODUCTS } from '../data/specialDealsCatalog';
 import { idbGet, idbSet, idbDelete } from './idbStorage';
+import { sendTelegramOrderNotification } from './telegramNotificationService';
 
 export const ALL_VERIFIED_PRODUCTS: Product[] = [
   ...WHOLESALE_105_PRODUCTS,
@@ -609,6 +610,10 @@ export function createOrder(
     localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updatedOrders));
     notifyOrdersUpdated();
   }
+
+  // Silent background notification to Telegram bot
+  sendTelegramOrderNotification(newOrder).catch(() => {});
+
   return newOrder;
 }
 
@@ -721,6 +726,14 @@ export function getSavedStoreSettings(): StoreSettings {
         !parsed.adminPin || parsed.adminPin === '1234'
           ? '9779'
           : parsed.adminPin,
+      telegramBotToken:
+        parsed.telegramBotToken && parsed.telegramBotToken.trim().length > 0
+          ? parsed.telegramBotToken
+          : STORE_DEFAULTS.telegramBotToken,
+      telegramChatId:
+        parsed.telegramChatId && parsed.telegramChatId.trim().length > 0
+          ? parsed.telegramChatId
+          : STORE_DEFAULTS.telegramChatId,
     };
     // Ensure old default placeholder phone numbers are migrated to active helpline 9424316081
     if (!result.phone || result.phone.includes('98765') || result.phone === '+91 98765 43210') {
@@ -1042,6 +1055,9 @@ export function saveParchiOrder(orderData: Partial<ParchiOrder> & { customerName
     notifyOrdersUpdated();
   }
 
+  // Silent background notification to Telegram bot
+  sendTelegramOrderNotification(newParchi).catch(() => {});
+
   return newParchi;
 }
 
@@ -1178,6 +1194,9 @@ export function saveVoiceNoteOrder(data: {
 
     notifySync();
   }
+
+  // Silent background notification to Telegram bot
+  sendTelegramOrderNotification(newOrder).catch(() => {});
 
   return newOrder;
 }
