@@ -174,19 +174,14 @@ export default function App() {
       return false;
     }
   });
-  const [toastBanner, setToastBanner] = useState<string | null>(null);
 
-  // Toast listener for network connection status updates
-  useEffect(() => {
-    const handleToast = (e: any) => {
-      const msg = e.detail?.message || 'Connecting to store server... please wait 10 seconds.';
-      setToastBanner(msg);
-      setTimeout(() => {
-        setToastBanner((prev) => (prev === msg ? null : prev));
-      }, 7000);
-    };
-    window.addEventListener('kiranape_toast', handleToast);
-    return () => window.removeEventListener('kiranape_toast', handleToast);
+  // Dedicated lightweight toast for Stayfree reward interactions (auto-clears in 2.5s)
+  const [rewardToast, setRewardToast] = useState<string | null>(null);
+  const showRewardToast = useCallback((msg: string) => {
+    setRewardToast(msg);
+    setTimeout(() => {
+      setRewardToast((prev) => (prev === msg ? null : prev));
+    }, 2800);
   }, []);
 
   const handleOpenPrivacy = useCallback(() => {
@@ -585,11 +580,11 @@ export default function App() {
 
     if (isStayfreeInCart && prevStayfreeInCartRef.current) {
       if (prevRewardUnlockedRef.current && !isStayfreeRewardUnlocked) {
-        setToastBanner(
+        showRewardToast(
           `Cart total dropped below ₹${STAYFREE_UNLOCK_THRESHOLD}. Stayfree XL reverted to regular price ₹${STAYFREE_REGULAR_PRICE}.`
         );
       } else if (!prevRewardUnlockedRef.current && isStayfreeRewardUnlocked) {
-        setToastBanner(
+        showRewardToast(
           `Stayfree XL unlocked at reward price ₹${STAYFREE_REWARD_PRICE}! 🎉`
         );
       }
@@ -597,7 +592,7 @@ export default function App() {
 
     prevRewardUnlockedRef.current = isStayfreeRewardUnlocked;
     prevStayfreeInCartRef.current = isStayfreeInCart;
-  }, [isStayfreeRewardUnlocked, cartQuantities]);
+  }, [isStayfreeRewardUnlocked, cartQuantities, showRewardToast]);
 
   // Cart Handlers
   const handleAddToCart = useCallback((product: Product, variant?: ProductVariant) => {
@@ -614,8 +609,8 @@ export default function App() {
       ...prev,
       [STAYFREE_REWARD_PRODUCT_ID]: (prev[STAYFREE_REWARD_PRODUCT_ID] || 0) + 1,
     }));
-    setToastBanner('Stayfree XL added at reward price ₹180! 🎉');
-  }, []);
+    showRewardToast('Stayfree XL added at reward price ₹180! 🎉');
+  }, [showRewardToast]);
 
   // Banner Action: Claim Stayfree Deal
   const handleClaimStayfreeDeal = useCallback(() => {
@@ -624,7 +619,7 @@ export default function App() {
       SPECIAL_DEAL_PRODUCTS.find((p) => p.id === STAYFREE_REWARD_PRODUCT_ID);
     if (stayfreeProd) {
       handleAddToCart(stayfreeProd);
-      setToastBanner(
+      showRewardToast(
         isStayfreeRewardUnlocked
           ? 'Stayfree XL added at reward price ₹180! 🎉'
           : 'Stayfree XL added to cart! Add orders above ₹1999 to get it at ₹180.'
@@ -634,7 +629,7 @@ export default function App() {
       setSelectedCategory('Personal Care');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [products, handleAddToCart, isStayfreeRewardUnlocked]);
+  }, [products, handleAddToCart, isStayfreeRewardUnlocked, showRewardToast]);
 
   // Banner Action: Filter Parle 50% Off Biscuits
   const handleFilterParleBiscuits = useCallback(() => {
@@ -960,16 +955,16 @@ export default function App() {
   // Otherwise, render Customer View (Default App)
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col selection:bg-emerald-600 selection:text-white pb-28 sm:pb-32 w-full max-w-full overflow-x-hidden">
-      {/* Floating Instant Toast Notification */}
-      {toastBanner && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-md w-[92%] sm:w-auto px-4 py-2.5 rounded-2xl bg-stone-900/95 text-white backdrop-blur-md shadow-2xl border border-stone-700/60 flex items-center justify-between gap-3 text-xs font-semibold animate-in fade-in slide-in-from-top-4 duration-200">
+      {/* Lightweight Stayfree Reward Notification (Auto-clears in 2.8s) */}
+      {rewardToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-md w-[92%] sm:w-auto px-4 py-2.5 rounded-2xl bg-pink-700/95 text-white backdrop-blur-md shadow-2xl border border-pink-500/60 flex items-center justify-between gap-3 text-xs font-semibold animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <span>{toastBanner}</span>
+            <Sparkles className="w-4 h-4 text-amber-300 flex-shrink-0" />
+            <span>{rewardToast}</span>
           </div>
           <button
-            onClick={() => setToastBanner(null)}
-            className="p-1 rounded-full hover:bg-white/20 text-stone-300 hover:text-white transition-colors cursor-pointer"
+            onClick={() => setRewardToast(null)}
+            className="p-1 rounded-full hover:bg-white/20 text-pink-200 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>

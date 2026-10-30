@@ -1,18 +1,10 @@
 /**
- * Floating Toast & Connection Status Notification Utility
+ * Floating Toast Utility - Silent No-Op
+ * Server delay / connecting banners permanently disabled
  */
 
 export function showStoreServerToast(
-  message = 'Connecting to store server... please wait 10 seconds.'
+  _message?: string
 ): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.dispatchEvent(
-      new CustomEvent('kiranape_toast', {
-        detail: { message },
-      })
-    );
-  } catch (e) {
-    console.warn('Toast dispatch error:', e);
-  }
+  // Permanently disabled: zero customer interference, no connecting banners
 }

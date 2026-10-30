@@ -10,7 +10,6 @@
 import { CreateOrderPayload } from './orderApiService';
 import { idbGet, idbSet } from './idbStorage';
 import { API_BASE_URL, getApiUrl } from '../config/api';
-import { showStoreServerToast } from '../utils/toast';
 
 const QUEUE_STORAGE_KEY = 'kiranape_pending_orders_queue_v1';
 const IDB_QUEUE_KEY = 'kiranape_idb_pending_order_queue';
@@ -174,12 +173,10 @@ export async function processPendingOrdersQueue(): Promise<void> {
           }
         } else {
           const errBody = await res.text().catch(() => '');
-          console.error(`[Order Queue] Server rejected Order #${item.id} (Status: ${res.status}): ${errBody}`);
-          showStoreServerToast('Connecting to store server... please wait 10 seconds.');
+          console.warn(`[Order Queue] Server rejected Order #${item.id} (Status: ${res.status}): ${errBody}`);
         }
       } catch (networkErr) {
-        console.error(`[Order Queue] Network error dispatching Order #${item.id}:`, networkErr);
-        showStoreServerToast('Connecting to store server... please wait 10 seconds.');
+        console.warn(`[Order Queue] Network error dispatching Order #${item.id}:`, networkErr);
         // Break loop if connection dropped
         break;
       }
