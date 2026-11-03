@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, User, Phone, MapPin, Banknote, ShieldCheck, CheckCircle2, ArrowRight, Clock, Sparkles } from 'lucide-react';
-import { CartItem, DeliverySlot, StoreSettings } from '../types';
+import { CartItem, DeliverySlot, StoreSettings, Product } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getCustomerSelectedLocation } from '../services/storageService';
 import { CreatorCredits } from './CreatorCredits';
+import { CartBumperProgressBar } from './CartBumperProgressBar';
+import { UpsellCarousel } from './UpsellCarousel';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -22,6 +24,8 @@ interface CheckoutModalProps {
   }) => Promise<void> | void;
   storeSettings?: StoreSettings;
   onAddStayfreeReward?: () => void;
+  onAddToCart?: (product: Product) => void;
+  onUpdateQuantity?: (itemKey: string, quantity: number) => void;
 }
 
 const DELIVERY_SLOT_OPTIONS: { id: DeliverySlot; label: string; timeRange: string; desc: string }[] = [
@@ -52,6 +56,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onSubmitOrder,
   storeSettings = STORE_DEFAULTS,
   onAddStayfreeReward,
+  onAddToCart,
+  onUpdateQuantity,
 }) => {
   const [fullName, setFullName] = useState(initialCustomer?.fullName || '');
   const [phoneNumber, setPhoneNumber] = useState(initialCustomer?.phoneNumber || '');
@@ -172,6 +178,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               Hand over cash or scan delivery agent UPI upon arrival.
             </div>
           </div>
+
+          {/* Dynamic Bumper Offer Progress Bar (Gamification: ₹999 & ₹1999) */}
+          <CartBumperProgressBar currentSubtotal={subtotal} />
 
           {/* Field 1: Full Name */}
           <div>
@@ -384,6 +393,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </span>
             </div>
           )}
+
+          {/* Blinkit-Style 'You Might Also Like' Upsell Carousel */}
+          <UpsellCarousel
+            cartItems={cartItems}
+            onAddToCart={(prod) => {
+              if (onAddToCart) {
+                onAddToCart(prod);
+              } else if (onUpdateQuantity) {
+                onUpdateQuantity(prod.id, 1);
+              }
+            }}
+            onUpdateQuantity={onUpdateQuantity}
+            className="pt-1"
+          />
 
           {/* Payment Method & Cost Breakdown */}
           <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/90 space-y-2.5">

@@ -108,6 +108,9 @@ import { deleteOrderFromCentralServer } from './services/orderApiService';
 import { API_BASE_URL } from './config/api';
 import { filterProductsUniversally } from './utils/universalSearch';
 import { insertSupabaseOrder } from './services/supabaseOrderService';
+import { UPSELL_PRODUCTS } from './data/upsellCatalog';
+import { LaunchOfferModal } from './components/LaunchOfferModal';
+import { ReferAndEarnModal } from './components/ReferAndEarnModal';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -159,6 +162,8 @@ export default function App() {
   const [isParchiModalOpen, setIsParchiModalOpen] = useState(false);
   const [isDigitalParchiOpen, setIsDigitalParchiOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [isReferModalOpen, setIsReferModalOpen] = useState(false);
+  const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
   // Admin PIN verification and Direct Link (#admin) state
@@ -324,6 +329,16 @@ export default function App() {
         window.history.pushState({ app: 'kiranape', page: 'home' }, '');
         return;
       }
+      if (isReferModalOpen) {
+        setIsReferModalOpen(false);
+        window.history.pushState({ app: 'kiranape', page: 'home' }, '');
+        return;
+      }
+      if (isLaunchModalOpen) {
+        setIsLaunchModalOpen(false);
+        window.history.pushState({ app: 'kiranape', page: 'home' }, '');
+        return;
+      }
       if (placedOrder) {
         setPlacedOrder(null);
         window.history.pushState({ app: 'kiranape', page: 'home' }, '');
@@ -348,6 +363,8 @@ export default function App() {
     isAuthModalOpen,
     isParchiModalOpen,
     isDigitalParchiOpen,
+    isReferModalOpen,
+    isLaunchModalOpen,
     placedOrder,
     currentView,
     handleClosePrivacy,
@@ -460,8 +477,9 @@ export default function App() {
   const cartItems: CartItem[] = useMemo(() => {
     const items: CartItem[] = [];
     const productMap = new Map<string, Product>();
-    // Pre-populate with special deal products to guarantee Stayfree & Parle products always resolve
+    // Pre-populate with special deal products and upsell catalog to guarantee instant resolution
     SPECIAL_DEAL_PRODUCTS.forEach((dp) => productMap.set(dp.id, dp));
+    UPSELL_PRODUCTS.forEach((up) => productMap.set(up.id, up));
     products.forEach((p) => productMap.set(p.id, p));
 
     for (const [key, qty] of Object.entries(cartQuantities)) {
@@ -1001,6 +1019,8 @@ export default function App() {
         onOpenParchiModal={() => setIsParchiModalOpen(true)}
         onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
         onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
+        onOpenReferAndEarn={() => setIsReferModalOpen(true)}
+        onOpenLaunchPoster={() => setIsLaunchModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -1261,7 +1281,23 @@ export default function App() {
         {/* Play Store Compliance / Legal Links & Copyright */}
         <div className="max-w-6xl mx-auto mt-6 pt-4 border-t border-stone-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-stone-400 text-center sm:text-left">
           <p>© {new Date().getFullYear()} Chaurasia Kirana (Kiranape) • Fresh Groceries Delivered in Waidhan & Singrauli</p>
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              id="footer-launch-offers-btn"
+              onClick={() => setIsLaunchModalOpen(true)}
+              className="text-amber-700 hover:text-amber-800 font-bold transition-colors cursor-pointer"
+            >
+              🔥 Launch Offers
+            </button>
+            <span>•</span>
+            <button
+              id="footer-refer-earn-btn"
+              onClick={() => setIsReferModalOpen(true)}
+              className="text-emerald-700 hover:text-emerald-800 font-bold transition-colors cursor-pointer"
+            >
+              🎁 Refer & Earn ₹50
+            </button>
+            <span>•</span>
             <button
               id="footer-privacy-policy-btn"
               onClick={handleOpenPrivacy}
@@ -1334,6 +1370,8 @@ export default function App() {
         orders={orders}
         onRepeatOrder={handleRepeatOrder}
         onAddStayfreeReward={handleAddStayfreeReward}
+        onAddToCart={handleAddToCart}
+        onOpenReferAndEarn={() => setIsReferModalOpen(true)}
       />
 
       {/* 4.5. Handwritten Grocery List / Parchi Photo Upload Modal */}
@@ -1365,6 +1403,8 @@ export default function App() {
         onSubmitOrder={handleCheckoutSubmit}
         storeSettings={storeSettings}
         onAddStayfreeReward={handleAddStayfreeReward}
+        onAddToCart={handleAddToCart}
+        onUpdateQuantity={handleUpdateQuantity}
         initialCustomer={
           currentUser
             ? {
@@ -1386,6 +1426,23 @@ export default function App() {
       <PrivacyPolicyModal
         isOpen={isPrivacyOpen}
         onClose={handleClosePrivacy}
+        storeSettings={storeSettings}
+      />
+
+      {/* 8. Exclusive Waidhan Launch Offer Poster Modal */}
+      <LaunchOfferModal
+        isOpen={isLaunchModalOpen}
+        onClose={() => setIsLaunchModalOpen(false)}
+        onExploreCatalog={() => {
+          setIsLaunchModalOpen(false);
+          window.scrollTo({ top: 350, behavior: 'smooth' });
+        }}
+      />
+
+      {/* 9. Waidhan Community Refer & Earn ₹50 Modal */}
+      <ReferAndEarnModal
+        isOpen={isReferModalOpen}
+        onClose={() => setIsReferModalOpen(false)}
         storeSettings={storeSettings}
       />
 

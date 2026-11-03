@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, ShieldCheck, Truck, Sparkles, RotateCcw, Check } from 'lucide-react';
-import { CartItem, StoreSettings, Order } from '../types';
+import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, ShieldCheck, Truck, Sparkles, RotateCcw, Check, Gift, Share2 } from 'lucide-react';
+import { CartItem, StoreSettings, Order, Product } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getCustomerOrders } from '../services/storageService';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { CartBumperProgressBar } from './CartBumperProgressBar';
+import { UpsellCarousel } from './UpsellCarousel';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -16,6 +18,8 @@ interface CartDrawerProps {
   orders?: Order[];
   onRepeatOrder?: (order: Order) => void;
   onAddStayfreeReward?: () => void;
+  onAddToCart?: (product: Product) => void;
+  onOpenReferAndEarn?: () => void;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -29,6 +33,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   orders,
   onRepeatOrder,
   onAddStayfreeReward,
+  onAddToCart,
+  onOpenReferAndEarn,
 }) => {
   const [repeatSuccessNotice, setRepeatSuccessNotice] = useState<string | null>(null);
 
@@ -175,44 +181,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {/* Smart Free Delivery Progress Bar */}
-            <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-3.5 space-y-2 shadow-2xs">
-              <div className="flex items-center justify-between text-xs text-emerald-950">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center flex-shrink-0">
-                    <Truck className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="font-medium text-xs leading-tight">
-                    {isFreeDelivery ? (
-                      <strong className="text-emerald-900 font-bold">
-                        🎉 FREE Doorstep Delivery Unlocked!
-                      </strong>
-                    ) : (
-                      <span>
-                        Add <strong className="font-bold text-emerald-900">₹{minFree - subtotalSellingPrice}</strong> more for <strong className="text-emerald-900">FREE Delivery</strong>
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <span className="text-[11px] font-bold text-emerald-800 whitespace-nowrap ml-2">
-                  ₹{subtotalSellingPrice} / ₹{minFree}
-                </span>
-              </div>
-
-              {/* Visual Progress Bar Meter */}
-              <div className="w-full bg-emerald-200/60 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-emerald-600 h-full rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${Math.min(100, Math.round((subtotalSellingPrice / minFree) * 100))}%` }}
-                />
-              </div>
-
-              {!isFreeDelivery && (
-                <p className="text-[10px] text-emerald-800 text-right font-medium">
-                  {Math.round((subtotalSellingPrice / minFree) * 100)}% to Free Delivery
-                </p>
-              )}
-            </div>
+            {/* Dynamic Bumper Offer Progress Bar (Gamification: ₹999 & ₹1999) */}
+            <CartBumperProgressBar currentSubtotal={subtotalSellingPrice} />
 
             {/* Stayfree XL Special Reward Unlock Logic (@ ₹180 on ₹1999+ orders) */}
             {isStayfreeUnlocked ? (
@@ -392,6 +362,45 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 );
               })}
             </div>
+
+            {/* Blinkit-Style 'You Might Also Like' Upsell Recommendations */}
+            <UpsellCarousel
+              cartItems={cartItems}
+              onAddToCart={(prod) => {
+                if (onAddToCart) {
+                  onAddToCart(prod);
+                } else {
+                  onUpdateQuantity(prod.id, 1);
+                }
+              }}
+              onUpdateQuantity={onUpdateQuantity}
+            />
+
+            {/* Refer & Earn Promotion Strip */}
+            {onOpenReferAndEarn && (
+              <button
+                type="button"
+                onClick={onOpenReferAndEarn}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-amber-500/15 border border-amber-300/80 flex items-center justify-between text-left hover:border-amber-400 transition-all cursor-pointer group shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-bold text-base shadow-xs flex-shrink-0">
+                    🎁
+                  </div>
+                  <div>
+                    <h5 className="font-heading font-black text-xs text-stone-900 group-hover:text-amber-900 transition-colors">
+                      Refer Neighbors & Earn ₹50 Cash Off
+                    </h5>
+                    <p className="text-[10px] text-stone-600 font-medium">
+                      Invite friends in Waidhan to shop fresh groceries
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-amber-800 bg-white/90 px-2 py-1 rounded-lg border border-amber-300 shadow-2xs whitespace-nowrap ml-1 flex-shrink-0">
+                  Invite ➔
+                </span>
+              </button>
+            )}
 
             {/* Bill Details */}
             <div className="bg-white rounded-2xl border border-stone-200/90 p-4 space-y-2.5 shadow-xs">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, ShoppingBag, Store, Camera, Mic, MapPin, Zap, ChevronDown, Check } from 'lucide-react';
+import { Search, X, ShoppingBag, Store, Camera, Mic, MapPin, Zap, ChevronDown, Check, Gift, Sparkles } from 'lucide-react';
 import { ProductCategory, AppUser, StoreSettings, CustomCategory } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
 import {
@@ -33,6 +33,8 @@ interface CustomerHeaderProps {
   onOpenParchiModal?: () => void;
   onOpenVoiceModal?: () => void;
   onOpenDigitalParchiModal?: () => void;
+  onOpenReferAndEarn?: () => void;
+  onOpenLaunchPoster?: () => void;
 }
 
 export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
@@ -51,6 +53,8 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onOpenParchiModal,
   onOpenVoiceModal,
   onOpenDigitalParchiModal,
+  onOpenReferAndEarn,
+  onOpenLaunchPoster,
 }) => {
   const dynamicCategories = categories && categories.length > 0 ? categories : getCustomCategories();
 
@@ -117,28 +121,58 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
               <BrandLogo className="h-9 w-auto object-contain" subtitle={cleanDeliveryTagline} />
             </div>
 
-            {/* Right: Delivery Area Selector Aligned Beside Brand */}
-            <button
-              type="button"
-              id="header-location-selector-btn"
-              onClick={() => {
-                setDeliveryLocationsList(getDeliveryLocations());
-                setShowLocationModal(true);
-              }}
-              className="flex items-center gap-1.5 bg-white/95 hover:bg-white active:scale-95 text-stone-900 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-extrabold shadow-2xs border border-amber-200/80 cursor-pointer transition-all max-w-[155px] xs:max-w-[200px] sm:max-w-sm flex-shrink-0"
-              title="Deliver to - Change Location"
-            >
-              <MapPin className="w-3.5 h-3.5 text-emerald-700 fill-emerald-600 flex-shrink-0" />
-              <div className="flex flex-col text-left min-w-0">
-                <span className="text-[8px] font-extrabold uppercase tracking-wider text-stone-400 leading-none">
-                  Deliver to
-                </span>
-                <span className="truncate text-stone-950 text-xs font-black leading-tight">
-                  {selectedLocation}
-                </span>
-              </div>
-              <ChevronDown className="w-3 h-3 text-stone-600 flex-shrink-0 ml-0.5" />
-            </button>
+            {/* Right: Actions and Delivery Area */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {onOpenLaunchPoster && (
+                <button
+                  type="button"
+                  id="header-launch-offers-btn"
+                  onClick={onOpenLaunchPoster}
+                  className="hidden xs:flex items-center gap-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300/80 px-2 sm:px-2.5 py-1.5 rounded-full text-xs font-black cursor-pointer transition-all active:scale-95 shadow-2xs"
+                  title="View Exclusive Waidhan Launch Offers"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                  <span className="hidden sm:inline">Offers</span>
+                  <span className="sm:hidden">Offer</span>
+                </button>
+              )}
+
+              {onOpenReferAndEarn && (
+                <button
+                  type="button"
+                  id="header-refer-earn-btn"
+                  onClick={onOpenReferAndEarn}
+                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black cursor-pointer transition-all shadow-xs"
+                  title="Refer & Earn ₹50 Discount"
+                >
+                  <Gift className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Refer <span className="text-amber-200">₹50</span></span>
+                </button>
+              )}
+
+              {/* Delivery Area Selector Aligned Beside Brand */}
+              <button
+                type="button"
+                id="header-location-selector-btn"
+                onClick={() => {
+                  setDeliveryLocationsList(getDeliveryLocations());
+                  setShowLocationModal(true);
+                }}
+                className="flex items-center gap-1.5 bg-white/95 hover:bg-white active:scale-95 text-stone-900 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-extrabold shadow-2xs border border-amber-200/80 cursor-pointer transition-all max-w-[140px] xs:max-w-[180px] sm:max-w-sm flex-shrink-0"
+                title="Deliver to - Change Location"
+              >
+                <MapPin className="w-3.5 h-3.5 text-emerald-700 fill-emerald-600 flex-shrink-0" />
+                <div className="flex flex-col text-left min-w-0">
+                  <span className="text-[8px] font-extrabold uppercase tracking-wider text-stone-400 leading-none">
+                    Deliver to
+                  </span>
+                  <span className="truncate text-stone-950 text-xs font-black leading-tight">
+                    {selectedLocation}
+                  </span>
+                </div>
+                <ChevronDown className="w-3 h-3 text-stone-600 flex-shrink-0 ml-0.5" />
+              </button>
+            </div>
           </div>
 
           {/* Minimal White Search Bar: Clean full-width pill with Mic and Camera icons */}
@@ -154,6 +188,30 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
 
           {/* Top Horizontal Category Tabs: Smoothly scrollable with clear icons & soft highlight */}
           <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none no-scrollbar touch-pan-x scroll-smooth">
+            {onOpenLaunchPoster && (
+              <button
+                type="button"
+                id="tab-launch-offers-pill"
+                onClick={onOpenLaunchPoster}
+                className="px-3 py-1 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs hover:brightness-105 active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+                <span>🔥 Launch Offers</span>
+              </button>
+            )}
+
+            {onOpenReferAndEarn && (
+              <button
+                type="button"
+                id="tab-refer-earn-pill"
+                onClick={onOpenReferAndEarn}
+                className="px-3 py-1 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs hover:bg-emerald-200 active:scale-95"
+              >
+                <Gift className="w-3.5 h-3.5 text-emerald-700" />
+                <span>🎁 Refer & Earn ₹50</span>
+              </button>
+            )}
+
             {filteredCategories.map((cat) => {
               const isSelected = selectedCategory === cat.name;
               return (
