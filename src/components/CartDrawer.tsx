@@ -6,6 +6,7 @@ import { getCustomerOrders } from '../services/storageService';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 import { CartBumperProgressBar } from './CartBumperProgressBar';
 import { UpsellCarousel } from './UpsellCarousel';
+import { calculateCartFinancials } from '../utils/rewardsEngine';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -52,26 +53,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     setTimeout(() => setRepeatSuccessNotice(null), 3000);
   };
 
-  // Calculate bill totals taking variants into account
-  const totalOriginalMRP = cartItems.reduce((sum, item) => {
-    const mrp = item.selectedVariant ? item.selectedVariant.mrp : item.product.originalPrice;
-    return sum + mrp * item.quantity;
-  }, 0);
-
-  const subtotalSellingPrice = cartItems.reduce((sum, item) => {
-    const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
-    return sum + price * item.quantity;
-  }, 0);
-
-  const totalSavings = Math.max(0, totalOriginalMRP - subtotalSellingPrice);
-
-  const minFree = storeSettings.minOrderForFreeDelivery ?? STORE_DEFAULTS.minOrderForFreeDelivery;
-  const standardFee = storeSettings.deliveryCharge ?? STORE_DEFAULTS.deliveryCharge;
-  const isFreeDelivery = subtotalSellingPrice >= minFree;
-  const deliveryCharge = isFreeDelivery ? 0 : standardFee;
-  const finalPayable = subtotalSellingPrice + deliveryCharge;
-
-  const totalCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  // Strict numeric calculations from centralized rewardsEngine
+  const financials = calculateCartFinancials(cartItems);
+  const {
+    itemsCount: totalCount,
+    subtotal: subtotalSellingPrice,
+    subtotalOriginalMRP: totalOriginalMRP,
+    totalSavings,
+    isFreeDelivery,
+    deliveryCharge,
+    totalPayable: finalPayable,
+    unlockedGifts,
+    amountNeededForNext,
+  } = financials;
 
   // Stayfree XL Special Reward Unlock Logic (@ ₹180 on ₹1999+ orders)
   const STAYFREE_REWARD_ID = 'prod-stayfree-secure-xl-40';
@@ -404,8 +398,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
             {/* Bill Details */}
             <div className="bg-white rounded-2xl border border-stone-200/90 p-4 space-y-2.5 shadow-xs">
-              <h5 className="font-heading font-bold text-xs text-stone-800 uppercase tracking-wider">
-                Bill Summary
+              <h5 className="font-heading font-bold text-xs text-stone-800 uppercase tracking-wider flex items-center justify-between">
+                <span>Bill Summary</span>
+                <span className="text-[10px] text-stone-400 font-sans font-normal">Cash on Delivery</span>
               </h5>
 
               <div className="flex justify-between text-xs text-stone-600">
@@ -420,22 +415,64 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-between text-xs text-stone-600">
-                <span>Delivery Charge</span>
-                <span>
-                  {isFreeDelivery ? (
-                    <span className="text-emerald-700 font-bold">FREE</span>
-                  ) : (
-                    `₹${deliveryCharge}`
-                  )}
-                </span>
+              <div className="flex justify-between text-xs text-stone-800 font-semibold pt-1 border-t border-stone-100">
+                <span>Items Subtotal</span>
+                <span className="font-bold">₹{subtotalSellingPrice}</span>
               </div>
 
+              {/* Unlocked Free Gifts itemized at ₹0 with prominent green 'FREE GIFT' badge */}
+              {unlockedGifts.length > 0 && (
+                <div className="space-y-1.5 py-2 px-3 bg-emerald-50/70 border border-emerald-200 rounded-xl">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-700" />
+                    <span>Unlocked Free Rewards ({unlockedGifts.length})</span>
+                  </div>
+                  {unlockedGifts.map((gift) => (
+                    <div key={gift.id} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                        <span>{gift.icon}</span>
+                        <span className="font-bold text-emerald-950 truncate">{gift.name}</span>
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.5 rounded shadow-2xs">
+                          FREE GIFT
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] text-stone-400 line-through">₹{gift.mrp}</span>
+                        <span className="font-black text-emerald-700">₹0</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Delivery Charge: Shows "FREE" ONLY when deliveryCharge === 0 (subtotal >= 499) */}
+              <div className="flex justify-between text-xs items-center">
+                <div className="flex flex-col">
+                  <span className="text-stone-700 font-medium">Delivery Charge</span>
+                  {!isFreeDelivery && (
+                    <span className="text-[10px] text-amber-700 font-medium">
+                      Add ₹{499 - subtotalSellingPrice} more to unlock FREE Delivery 🚚
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isFreeDelivery ? (
+                    <>
+                      <span className="text-[11px] text-stone-400 line-through">₹30</span>
+                      <span className="text-emerald-700 font-black">FREE</span>
+                    </>
+                  ) : (
+                    <span className="text-stone-900 font-bold">₹{deliveryCharge}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Strict Mathematical Guarantee: Items Subtotal + Delivery Charge === TOTAL PAYABLE (COD) */}
               <div className="pt-2 border-t border-stone-200 flex justify-between items-baseline font-heading">
                 <div>
                   <span className="font-extrabold text-stone-900 text-sm">To Pay</span>
                   <span className="block text-[10px] text-stone-500 font-sans font-normal">
-                    Cash on Delivery (No online fee)
+                    Items Subtotal + Delivery Charge
                   </span>
                 </div>
                 <span className="text-lg font-extrabold text-stone-950">
@@ -454,22 +491,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           </div>
         )}
 
-        {/* Footer Checkout Trigger */}
+        {/* Sticky Bottom Checkout Trigger - Blinkit-style tactile emerald green */}
         {cartItems.length > 0 && (
-          <div className="bg-white p-4 border-t border-stone-200 shadow-lg">
+          <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 border-t border-stone-200 shadow-2xl">
             <button
               id="checkout-btn"
               onClick={onProceedToCheckout}
-              className="w-full py-3 px-4 bg-[#c62828] hover:bg-[#b71c1c] active:scale-[0.99] text-white font-heading font-bold text-sm rounded-xl shadow-md flex items-center justify-between transition-all"
+              className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-heading font-bold text-sm rounded-2xl shadow-lg shadow-emerald-950/15 flex items-center justify-between transition-all cursor-pointer border border-emerald-500/40"
             >
               <div className="flex flex-col items-start leading-tight">
-                <span className="text-[10px] text-red-200 uppercase tracking-wider">
-                  {totalCount} Items • Pay on Delivery
+                <span className="text-[10px] text-emerald-100 uppercase tracking-wider font-semibold">
+                  {totalCount} {totalCount === 1 ? 'Item' : 'Items'} • {isFreeDelivery ? 'FREE Delivery' : '+₹30 Delivery'}
                 </span>
-                <span className="text-base font-extrabold">₹{finalPayable}</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-black font-mono">₹{finalPayable}</span>
+                  {totalSavings > 0 && (
+                    <span className="text-[11px] text-emerald-200 font-sans font-medium">
+                      (Saved ₹{totalSavings})
+                    </span>
+                  )}
+                </div>
               </div>
-              <span className="flex items-center gap-1.5 font-bold">
-                Proceed to Checkout <ArrowRight className="w-4 h-4" />
+              <span className="flex items-center gap-1.5 font-black text-xs sm:text-sm bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl backdrop-blur-xs transition-colors">
+                Proceed to Checkout <ArrowRight className="w-4 h-4 stroke-[2.5]" />
               </span>
             </button>
           </div>

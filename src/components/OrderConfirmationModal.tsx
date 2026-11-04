@@ -55,6 +55,21 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     else activeStepIndex = 0;
   }
 
+  const itemsList = Array.isArray(currentOrder.items) ? currentOrder.items : [];
+  const rawSubtotal = currentOrder.subtotal !== undefined
+    ? Number(currentOrder.subtotal)
+    : itemsList.reduce((sum, it) => sum + (Number(it.price) * Number(it.quantity)), 0);
+  const subtotal = Math.round(Number(rawSubtotal) * 100) / 100;
+  const isFreeDelivery = subtotal >= 499;
+  const deliveryCharge = isFreeDelivery
+    ? 0
+    : (currentOrder.deliveryFee !== undefined && Number(currentOrder.deliveryFee) > 0
+        ? Number(currentOrder.deliveryFee)
+        : (currentOrder.deliveryCharge !== undefined && Number(currentOrder.deliveryCharge) > 0
+            ? Number(currentOrder.deliveryCharge)
+            : 30));
+  const finalPayable = subtotal + deliveryCharge;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200"
@@ -254,8 +269,8 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
                 <span className="text-[11px] text-emerald-700">Payment on delivery</span>
               </div>
             </div>
-            <span className="font-heading font-extrabold text-2xl text-emerald-950">
-              ₹{currentOrder.finalPayableAmount}
+            <span className="font-heading font-extrabold text-2xl text-emerald-950 font-mono">
+              ₹{finalPayable}
             </span>
           </div>
 
@@ -289,17 +304,22 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
           {/* Ordered Items Breakdown */}
           <div className="space-y-2">
             <h5 className="font-bold text-stone-900 uppercase tracking-wider text-[11px] flex items-center justify-between">
-              <span>Items ({currentOrder.itemsCount})</span>
+              <span>Items ({itemsList.length || currentOrder.itemsCount})</span>
               <span className="text-[10px] text-stone-400 font-normal">
                 Ordered at {currentOrder.createdAt}
               </span>
             </h5>
             <div className="border border-stone-200 rounded-2xl divide-y divide-stone-100 overflow-hidden bg-white text-xs">
-              {currentOrder.items.map((item, idx) => (
+              {itemsList.map((item, idx) => (
                 <div key={idx} className="p-2.5 flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0 pr-2">
                     <span className="font-semibold text-stone-800 line-clamp-1">
                       {item.name}
+                      {item.isFreeGift && (
+                        <span className="ml-1.5 text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.2 rounded shadow-2xs">
+                          FREE GIFT
+                        </span>
+                      )}
                     </span>
                     <span className="text-[10px] text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded flex-shrink-0">
                       {item.unit}
@@ -307,10 +327,43 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-stone-500">x{item.quantity}</span>
-                    <span className="font-bold text-stone-900">₹{item.total}</span>
+                    <span className="font-bold text-stone-900">
+                      {item.isFreeGift || item.price === 0 ? (
+                        <span className="text-emerald-700">₹0</span>
+                      ) : (
+                        `₹${item.total}`
+                      )}
+                    </span>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Mathematical Bill Summary - Items Subtotal + Delivery Charge === TOTAL PAYABLE */}
+          <div className="bg-stone-50 rounded-2xl border border-stone-200/80 p-3.5 space-y-2 text-xs">
+            <h5 className="font-bold text-stone-900 uppercase tracking-wider text-[11px]">
+              Bill Summary
+            </h5>
+            <div className="space-y-1 text-stone-700">
+              <div className="flex justify-between">
+                <span>Items Subtotal:</span>
+                <span className="font-bold">₹{subtotal}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Delivery Charge:</span>
+                <span className="font-bold">
+                  {deliveryCharge === 0 ? (
+                    <span className="text-emerald-700">FREE</span>
+                  ) : (
+                    `₹${deliveryCharge}`
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between pt-1.5 border-t border-stone-200 font-extrabold text-stone-950">
+                <span>Total Payable (COD):</span>
+                <span className="font-mono text-sm">₹{finalPayable}</span>
+              </div>
             </div>
           </div>
 

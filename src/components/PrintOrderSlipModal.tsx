@@ -43,8 +43,28 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
   };
 
   const itemsList = Array.isArray(order.items) ? order.items : [];
-  const subtotal = itemsList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const deliveryFee = order.deliveryFee ?? (order.totalAmount > subtotal ? order.totalAmount - subtotal : 0);
+  // Strict Number() casting to prevent string concatenation bugs
+  const subtotal = Number(
+    order.subtotal !== undefined
+      ? Number(order.subtotal)
+      : itemsList.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0)
+  );
+
+  // Exact Mathematical Delivery Rules:
+  // - const STANDARD_DELIVERY_FEE = 30;
+  // - const isFreeDelivery = subtotal >= 499;
+  // - const deliveryCharge = isFreeDelivery ? 0 : STANDARD_DELIVERY_FEE;
+  // - const totalPayable = subtotal + deliveryCharge;
+  const isFreeDelivery = subtotal >= 499;
+  const deliveryCharge = isFreeDelivery
+    ? 0
+    : (order.deliveryFee !== undefined && Number(order.deliveryFee) > 0
+        ? Number(order.deliveryFee)
+        : (order.deliveryCharge !== undefined && Number(order.deliveryCharge) > 0
+            ? Number(order.deliveryCharge)
+            : 30));
+
+  const totalPayable = subtotal + deliveryCharge;
 
   return (
     <div
@@ -209,11 +229,24 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
                 itemsList.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start gap-1 text-[11px]">
                     <div className="flex-1 min-w-0 pr-1">
-                      <span className="font-semibold block truncate">{item.name}</span>
+                      <span className="font-semibold block truncate">
+                        {item.name}
+                        {item.isFreeGift && (
+                          <span className="ml-1 text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">
+                            FREE GIFT
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[10px] text-stone-600">({item.unit})</span>
                     </div>
                     <div className="text-right flex-shrink-0 font-medium">
-                      {item.quantity} x ₹{item.price} = <strong className="font-bold">₹{item.total}</strong>
+                      {item.price === 0 || item.isFreeGift ? (
+                        <span className="text-emerald-700 font-bold">FREE (₹0)</span>
+                      ) : (
+                        <span>
+                          {item.quantity} x ₹{item.price} = <strong className="font-bold">₹{item.total}</strong>
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))
@@ -226,19 +259,21 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
               )}
             </div>
 
-            {/* Bill Summary */}
+            {/* Bill Summary - Enforces: Items Subtotal + Delivery Charge === TOTAL PAYABLE (COD) */}
             <div className="space-y-1 text-xs border-b border-dashed border-stone-400 pb-2.5">
               <div className="flex justify-between">
                 <span>Items Subtotal:</span>
-                <span>₹{subtotal}</span>
+                <span className="font-bold">₹{subtotal}</span>
               </div>
               <div className="flex justify-between">
                 <span>Delivery Charge:</span>
-                <span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span>
+                <span className="font-bold">
+                  {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge}`}
+                </span>
               </div>
               <div className="flex justify-between font-extrabold text-sm pt-1 border-t border-stone-200">
                 <span>TOTAL PAYABLE (COD):</span>
-                <span>₹{order.finalPayableAmount || order.totalAmount}</span>
+                <span className="font-black text-sm">₹{totalPayable}</span>
               </div>
             </div>
 

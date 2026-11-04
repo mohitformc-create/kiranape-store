@@ -719,12 +719,16 @@ export function getSavedStoreSettings(): StoreSettings {
       serviceArea: parsed.serviceArea || STORE_DEFAULTS.serviceArea || 'Waidhan, Singrauli',
       deliveryTagline: parsed.deliveryTagline || STORE_DEFAULTS.deliveryTagline,
       minOrderForFreeDelivery:
-        parsed.minOrderForFreeDelivery !== undefined
+        parsed.minOrderForFreeDelivery !== undefined && Number(parsed.minOrderForFreeDelivery) >= 499
           ? Number(parsed.minOrderForFreeDelivery)
-          : 199,
+          : 499,
+      deliveryCharge:
+        parsed.deliveryCharge !== undefined && Number(parsed.deliveryCharge) > 0
+          ? Number(parsed.deliveryCharge)
+          : 30,
       adminPin:
         !parsed.adminPin || parsed.adminPin === '1234'
-          ? '9779'
+          ? '@2508'
           : parsed.adminPin,
       telegramBotToken:
         parsed.telegramBotToken && parsed.telegramBotToken.trim().length > 0

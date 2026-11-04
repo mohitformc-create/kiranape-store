@@ -2,6 +2,7 @@ import React from 'react';
 import { Home, LayoutGrid, Camera, RotateCcw, ArrowRight, Zap, ShoppingBag } from 'lucide-react';
 import { CartItem } from '../types';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { FREE_DELIVERY_THRESHOLD, calculateCartFinancials } from '../utils/rewardsEngine';
 
 interface BottomNavBarProps {
   currentCategory: string;
@@ -35,11 +36,11 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
 
   // Up to 3 preview thumbnails of items in cart
   const previewThumbnails = cartItems.slice(0, 3);
-
-  // Free delivery threshold (₹199 standard for Kirana stores)
-  const freeDeliveryThreshold = 199;
-  const remainingForFree = Math.max(0, freeDeliveryThreshold - cartTotalAmount);
-  const progressPercent = Math.min(100, Math.round((cartTotalAmount / freeDeliveryThreshold) * 100));
+  const financials = React.useMemo(() => calculateCartFinancials(cartItems), [cartItems]);
+  const isFreeDelivery = financials.isFreeDelivery;
+  const deliveryCharge = financials.deliveryCharge;
+  const totalPayable = financials.totalPayable;
+  const totalSavings = financials.totalSavings;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
@@ -50,7 +51,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
             type="button"
             id="floating-cart-pill-btn"
             onClick={onOpenCart}
-            className="w-full h-12 sm:h-13 px-3.5 py-2 rounded-2xl bg-[#0c831f] hover:bg-[#0a731b] active:scale-[0.99] transition-all shadow-xl shadow-emerald-950/20 border border-emerald-400/30 flex items-center justify-between cursor-pointer"
+            className="w-full h-13 sm:h-14 px-3.5 py-2 rounded-2xl bg-[#0c831f] hover:bg-[#0a731b] active:scale-[0.99] transition-all shadow-xl shadow-emerald-950/20 border border-emerald-400/30 flex items-center justify-between cursor-pointer"
           >
             {/* Left: 2 overlapping round thumbnails with white outline */}
             <div className="flex items-center pl-0.5">
@@ -77,10 +78,14 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
               </div>
             </div>
 
-            {/* Center: White bold text "View cart • X items | ₹XX" */}
+            {/* Center: White bold text with delivery status & total */}
             <div className="text-center px-2 flex-1 min-w-0">
               <span className="text-xs sm:text-[13px] font-heading font-black text-white truncate block">
-                View cart • {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} | ₹{cartTotalAmount}
+                View Cart • {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} | ₹{totalPayable}
+              </span>
+              <span className="text-[10px] text-emerald-100 font-medium truncate block">
+                {isFreeDelivery ? '🚚 FREE Delivery' : `+₹${deliveryCharge} Delivery`}
+                {totalSavings > 0 ? ` • Saved ₹${totalSavings}` : ''}
               </span>
             </div>
 

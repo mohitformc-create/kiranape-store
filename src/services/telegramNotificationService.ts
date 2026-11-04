@@ -115,6 +115,11 @@ export function buildOrderTelegramMessage(payload: TelegramOrderNotificationPayl
       ? `₹${totalAmount}`
       : '₹0 (Parchi / Price to be confirmed)';
 
+  const deliveryFeeStr =
+    payload.deliveryFee !== undefined
+      ? (Number(payload.deliveryFee) === 0 ? 'FREE' : `₹${payload.deliveryFee}`)
+      : null;
+
   const paymentMode = sanitizeForMarkdown(payload.paymentMethod || 'Cash on Delivery (COD)');
 
   return `🚨 *NEW ORDER RECEIVED - KIRANAPE!* 🚨
@@ -128,7 +133,7 @@ export function buildOrderTelegramMessage(payload: TelegramOrderNotificationPayl
 🛒 *Items:*
 ${itemsFormatted}
 ------------------------------------
-💰 *Total Bill:* ${totalBillStr}
+${deliveryFeeStr ? `🚚 *Delivery Fee:* ${deliveryFeeStr}\n` : ''}💰 *Total Bill:* ${totalBillStr}
 💳 *Payment Mode:* ${paymentMode}`;
 }
 

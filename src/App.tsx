@@ -21,7 +21,7 @@ import {
   PenLine,
   X,
 } from 'lucide-react';
-import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
+import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderItemSummary, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
 import {
   getProducts,
   saveProducts,
@@ -111,6 +111,7 @@ import { insertSupabaseOrder } from './services/supabaseOrderService';
 import { UPSELL_PRODUCTS } from './data/upsellCatalog';
 import { LaunchOfferModal } from './components/LaunchOfferModal';
 import { ReferAndEarnModal } from './components/ReferAndEarnModal';
+import { calculateCartFinancials } from './utils/rewardsEngine';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -558,18 +559,19 @@ export default function App() {
     });
   }, [products, cartQuantities]);
 
-  const totalCartCount = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+  const cartFinancials = useMemo(
+    () => calculateCartFinancials(cartItems),
     [cartItems]
   );
 
+  const totalCartCount = useMemo(
+    () => cartFinancials.itemsCount,
+    [cartFinancials]
+  );
+
   const cartTotalAmount = useMemo(
-    () =>
-      cartItems.reduce((sum, item) => {
-        const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
-        return sum + price * item.quantity;
-      }, 0),
-    [cartItems]
+    () => cartFinancials.totalPayable,
+    [cartFinancials]
   );
 
   // Check whether cart qualifies for Stayfree reward discount
@@ -699,33 +701,42 @@ export default function App() {
       fullAddress: string;
       deliverySlot: DeliverySlot;
     }) => {
-      const subtotalOriginal = cartItems.reduce((sum, item) => {
-        const mrp = item.selectedVariant ? item.selectedVariant.mrp : item.product.originalPrice;
-        return sum + mrp * item.quantity;
-      }, 0);
-      const subtotalFinal = cartItems.reduce((sum, item) => {
-        const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
-        return sum + price * item.quantity;
-      }, 0);
-      const totalSavings = Math.max(0, subtotalOriginal - subtotalFinal);
-      const freeDeliveryThreshold = storeSettings.minOrderForFreeDelivery ?? STORE_DEFAULTS.minOrderForFreeDelivery;
-      const standardDeliveryFee = storeSettings.deliveryCharge ?? STORE_DEFAULTS.deliveryCharge;
-      const isFreeDelivery = subtotalFinal >= freeDeliveryThreshold;
-      const deliveryFee = isFreeDelivery ? 0 : standardDeliveryFee;
-      const finalPayableAmount = subtotalFinal + deliveryFee;
+      // Strict mathematical calculations via centralized rewardsEngine
+      const financials = calculateCartFinancials(cartItems);
+      const subtotal = Number(financials.subtotal);
+      const subtotalOriginal = Number(financials.subtotalOriginalMRP);
+      const totalSavings = Number(financials.totalSavings);
+      const deliveryFee = Number(financials.deliveryCharge);
+      const finalPayableAmount = Number(financials.totalPayable);
 
-      const orderItems = cartItems.map((item) => {
-        const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
+      const orderItems: OrderItemSummary[] = cartItems.map((item) => {
+        const price = Number(item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice);
         const unit = item.selectedVariant ? item.selectedVariant.weight_unit : item.product.unit;
+        const qty = Number(item.quantity) || 1;
         return {
           productId: item.product.id,
           variantId: item.selectedVariant?.id,
           name: item.product.name,
           unit,
           price,
-          quantity: item.quantity,
-          total: price * item.quantity,
+          quantity: qty,
+          total: price * qty,
+          isFreeGift: false,
         };
+      });
+
+      // Itemize unlocked free gifts at ₹0 with isFreeGift: true
+      financials.unlockedGifts.forEach((gift) => {
+        orderItems.push({
+          productId: gift.id,
+          variantId: `gift-${gift.id}`,
+          name: `${gift.name} (${gift.badge})`,
+          unit: gift.pack,
+          price: 0,
+          quantity: 1,
+          total: 0,
+          isFreeGift: true,
+        });
       });
 
       // Generate the official unique Order ID
@@ -751,12 +762,16 @@ export default function App() {
         deliverySlot: customerDetails.deliverySlot,
         deliveryLocation: selectedLoc,
         items: orderItems,
-        itemsCount: totalCartCount,
-        subtotalOriginal,
-        totalSavings,
-        deliveryFee,
-        finalPayableAmount,
+        itemsCount: orderItems.length,
+        subtotal: subtotal,
+        subtotalOriginal: subtotalOriginal,
+        totalSavings: totalSavings,
+        deliveryFee: deliveryFee,
+        deliveryCharge: deliveryFee,
+        finalPayableAmount: finalPayableAmount,
+        totalPayable: finalPayableAmount,
         paymentMethod: 'Cash on Delivery (COD)',
+        unlockedRewards: financials.unlockedGifts.map((g) => g.name),
       });
 
       // 3. OPTIMISTIC CONFIRMATION: Instantly clear Cart, close checkout modal, and display the Order Placed Successfully screen (0ms)
@@ -790,7 +805,7 @@ export default function App() {
         deliverySlot: customerDetails.deliverySlot,
         deliveryLocation: selectedLoc,
         items: orderItems,
-        itemsCount: totalCartCount,
+        itemsCount: orderItems.length,
         subtotalOriginal,
         totalSavings,
         deliveryFee,
@@ -803,7 +818,7 @@ export default function App() {
         console.warn('[Telegram Order Alert Silent Catch]:', err);
       });
     },
-    [cartItems, totalCartCount, storeSettings]
+    [cartItems, storeSettings]
   );
 
   // Admin Operations with Central Server and Supabase synchronization

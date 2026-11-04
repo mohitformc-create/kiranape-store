@@ -65,6 +65,7 @@ export interface OrderItemSummary {
   price: number;
   quantity: number;
   total: number;
+  isFreeGift?: boolean;
 }
 
 export type OrderStatus =
@@ -95,14 +96,21 @@ export interface Order {
   customerPhone?: string;
   customerDeviceId?: string;
   address: string;
+  deliveryAddress?: string;
   deliverySlot?: string;
   deliveryLocation?: string;
   items: OrderItemSummary[];
   itemsCount: number;
+  subtotal?: number;
   subtotalOriginal: number;
   totalSavings: number;
   deliveryFee: number;
+  deliveryCharge?: number;
+  totalPayable?: number;
   finalPayableAmount: number;
+  totalAmount?: number;
+  total?: number;
+  unlockedRewards?: string[];
   paymentMethod: 'Cash on Delivery (COD)';
   status: OrderStatus;
   statusLabel?: string;

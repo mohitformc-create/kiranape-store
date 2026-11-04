@@ -8,16 +8,31 @@ export function generateWhatsAppBillMessage(order: Order, storeSettings?: StoreS
   const storeName = storeSettings?.name || 'Chaurasia Kirana & General Store';
   const supportPhone = '9424316081';
 
-  const itemsList = (order.items || [])
-    .map(
-      (item, idx) =>
-        `${idx + 1}. *${item.name}* (${item.unit})\n   Qty: ${item.quantity} × ₹${item.price} = *₹${item.total}*`
-    )
+  const items = order.items || [];
+  const itemsList = items
+    .map((item, idx) => {
+      if (item.isFreeGift || Number(item.price) === 0) {
+        return `${idx + 1}. *${item.name}* [FREE GIFT 🎁] (${item.unit})\n   Qty: ${item.quantity} = *FREE (₹0)*`;
+      }
+      return `${idx + 1}. *${item.name}* (${item.unit})\n   Qty: ${item.quantity} × ₹${item.price} = *₹${item.total}*`;
+    })
     .join('\n\n');
 
-  const deliveryFeeDisplay = Number(order.deliveryFee) === 0 ? 'FREE (Special Offer)' : `₹${order.deliveryFee}`;
+  const rawSubtotal = order.subtotal !== undefined
+    ? Number(order.subtotal)
+    : items.reduce((sum, it) => sum + (Number(it.price) * Number(it.quantity)), 0);
+  const subtotal = Math.round(Number(rawSubtotal) * 100) / 100;
+  const isFreeDelivery = subtotal >= 499;
+  const deliveryCharge = isFreeDelivery
+    ? 0
+    : (order.deliveryFee !== undefined && Number(order.deliveryFee) > 0
+        ? Number(order.deliveryFee)
+        : (order.deliveryCharge !== undefined && Number(order.deliveryCharge) > 0
+            ? Number(order.deliveryCharge)
+            : 30));
+  const finalPayable = subtotal + deliveryCharge;
+  const deliveryFeeDisplay = deliveryCharge === 0 ? 'FREE (Order above ₹499)' : `₹${deliveryCharge}`;
   const savingsDisplay = order.totalSavings > 0 ? `Total Discount / Savings: -₹${order.totalSavings}\n` : '';
-  const subtotalDisplay = order.subtotalOriginal || order.items.reduce((sum, it) => sum + (it.total || 0), 0);
 
   return (
 `🏪 *${storeName}*
@@ -33,14 +48,14 @@ export function generateWhatsAppBillMessage(order: Order, storeSettings?: StoreS
 • *Delivery Address:* ${order.address}
 • *Delivery Slot:* ${order.deliverySlot || 'Bharosemand Doorstep Delivery'}
 
-📦 *ORDERED ITEMS (${order.itemsCount || order.items.length}):*
+📦 *ORDERED ITEMS (${order.itemsCount || items.length}):*
 ${itemsList}
 
 ----------------------------------------
 💵 *BILL SUMMARY:*
-Subtotal: ₹${subtotalDisplay}
+Items Subtotal: ₹${subtotal}
 ${savingsDisplay}Delivery Fee: ${deliveryFeeDisplay}
-*Final Total Bill Amount: ₹${order.finalPayableAmount}*
+*TOTAL PAYABLE (COD): ₹${finalPayable}*
 *Payment Method:* 💵 Cash on Delivery (COD) / UPI on Delivery
 
 ----------------------------------------

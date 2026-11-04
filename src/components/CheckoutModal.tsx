@@ -6,6 +6,7 @@ import { getCustomerSelectedLocation } from '../services/storageService';
 import { CreatorCredits } from './CreatorCredits';
 import { CartBumperProgressBar } from './CartBumperProgressBar';
 import { UpsellCarousel } from './UpsellCarousel';
+import { calculateCartFinancials, STANDARD_DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '../utils/rewardsEngine';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -71,16 +72,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Bill calculations using dynamic store settings and item variants
-  const subtotal = cartItems.reduce((sum, item) => {
-    const price = item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice;
-    return sum + price * item.quantity;
-  }, 0);
-  const minFree = storeSettings.minOrderForFreeDelivery ?? STORE_DEFAULTS.minOrderForFreeDelivery;
-  const standardFee = storeSettings.deliveryCharge ?? STORE_DEFAULTS.deliveryCharge;
-  const isFreeDelivery = subtotal >= minFree;
-  const deliveryCharge = isFreeDelivery ? 0 : standardFee;
-  const finalPayable = subtotal + deliveryCharge;
+  // Strict numeric calculations from centralized rewardsEngine
+  const financials = calculateCartFinancials(cartItems);
+  const {
+    itemsCount,
+    subtotal,
+    subtotalOriginalMRP,
+    totalSavings,
+    isFreeDelivery,
+    deliveryCharge,
+    totalPayable: finalPayable,
+    unlockedGifts,
+    amountNeededForNext,
+  } = financials;
+  const minFree = FREE_DELIVERY_THRESHOLD;
+  const standardFee = STANDARD_DELIVERY_FEE;
 
   // Stayfree Reward Calculations
   const STAYFREE_REWARD_ID = 'prod-stayfree-secure-xl-40';
@@ -409,13 +415,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           />
 
           {/* Payment Method & Cost Breakdown */}
-          <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/90 space-y-2.5">
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/90 space-y-2.5 shadow-2xs">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-stone-700 uppercase tracking-wider">
                 Payment Method
               </span>
-              <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-700" />
+              <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
                 Cash on Delivery (COD)
               </span>
             </div>
@@ -423,26 +429,65 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="pt-2 border-t border-stone-200/80 space-y-1.5 text-xs text-stone-600">
               <div className="flex items-center justify-between">
                 <span>Items Subtotal:</span>
-                <span className="font-bold text-stone-800">₹{subtotal}</span>
+                <span className="font-bold text-stone-900">₹{subtotal}</span>
               </div>
+
+              {/* Unlocked Free Gifts itemized at ₹0 with prominent green 'FREE GIFT' badge */}
+              {unlockedGifts.length > 0 && (
+                <div className="space-y-1 py-1.5 px-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-700" />
+                    <span>Unlocked Free Rewards ({unlockedGifts.length})</span>
+                  </div>
+                  {unlockedGifts.map((gift) => (
+                    <div key={gift.id} className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                        <span>{gift.icon}</span>
+                        <span className="font-bold text-emerald-950 truncate">{gift.name}</span>
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.2 rounded shadow-2xs">
+                          FREE GIFT
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] text-stone-400 line-through">₹{gift.mrp}</span>
+                        <span className="font-black text-emerald-700">₹0</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Delivery Charge: Shows "FREE" ONLY when deliveryCharge === 0 (subtotal >= 499) */}
               <div className="flex items-center justify-between">
-                <span>Doorstep Delivery Fee:</span>
+                <div className="flex flex-col">
+                  <span>Doorstep Delivery Fee:</span>
+                  {!isFreeDelivery && (
+                    <span className="text-[10px] text-amber-700 font-medium">
+                      Add ₹{499 - subtotal} more for FREE Delivery 🚚
+                    </span>
+                  )}
+                </div>
                 {isFreeDelivery ? (
-                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                  <span className="text-emerald-700 font-black flex items-center gap-1">
+                    <span className="text-[11px] text-stone-400 line-through">₹30</span>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    FREE (Order above ₹{minFree})
+                    FREE
                   </span>
                 ) : (
-                  <span className="font-bold text-stone-800">
-                    ₹{deliveryCharge} <span className="text-[10px] text-stone-400 font-normal">(Free above ₹{minFree})</span>
+                  <span className="font-bold text-stone-900">
+                    ₹{deliveryCharge}
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-stone-200/80 flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-700">Total Cash to Keep Ready:</span>
-              <span className="font-heading font-extrabold text-lg text-emerald-950">
+            {/* Strict Mathematical Invariant: Items Subtotal + Delivery Charge === TOTAL PAYABLE (COD) */}
+            <div className="pt-2.5 border-t border-stone-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-stone-800 block">Total Cash to Pay:</span>
+                <span className="text-[10px] text-stone-400">Items Subtotal + Delivery Charge</span>
+              </div>
+              <span className="font-heading font-black text-xl text-emerald-950 font-mono">
                 ₹{finalPayable}
               </span>
             </div>
@@ -455,12 +500,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           )}
 
-          {/* Submit Action */}
+          {/* Submit Action - Blinkit tactile emerald green */}
           <button
             id="submit-order-btn"
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3.5 px-4 bg-[#c62828] hover:bg-[#b71c1c] active:scale-[0.99] disabled:opacity-70 text-white font-heading font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="w-full py-4 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-70 text-white font-heading font-black text-sm sm:text-base rounded-2xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all cursor-pointer border border-emerald-500/40"
           >
             {isSubmitting ? (
               <span className="inline-flex items-center gap-2">
@@ -469,7 +514,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </span>
             ) : (
               <>
-                Place Order (Cash on Delivery) • ₹{finalPayable} <ArrowRight className="w-4 h-4" />
+                Place Order (Cash on Delivery) • ₹{finalPayable} <ArrowRight className="w-4 h-4 stroke-[2.5]" />
               </>
             )}
           </button>
