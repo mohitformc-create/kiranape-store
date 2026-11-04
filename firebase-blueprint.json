@@ -18,6 +18,19 @@
       },
       "required": ["name", "category", "unit", "originalPrice", "finalPrice"]
     },
+    "Category": {
+      "title": "Category",
+      "description": "A grocery category item in Kiranapė",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "priority": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
     "Order": {
       "title": "Order",
       "description": "A customer Cash on Delivery order",
@@ -79,6 +92,10 @@
     "/products/{productId}": {
       "schema": "Product",
       "description": "Collection of grocery products managed by store owner and viewed by customers"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of categories managed by store owner and viewed by customers"
     },
     "/orders/{orderId}": {
       "schema": "Order",

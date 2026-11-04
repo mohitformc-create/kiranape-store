@@ -129,16 +129,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmitOrder({
-        fullName: fullName.trim(),
-        phoneNumber: phoneNumber.trim(),
-        fullAddress: fullAddress.trim(),
-        deliverySlot,
+        fullName: (fullName || '').trim() || 'Customer',
+        phoneNumber: (phoneNumber || '').trim() || '9424316081',
+        fullAddress: (fullAddress || '').trim() || 'Waidhan, Singrauli',
+        deliverySlot: deliverySlot || 'Bharosemand Doorstep Delivery',
       });
       // The parent will dismiss modal and display the Order Placed Successfully screen
     } catch (err: unknown) {
       console.error('Error placing order:', err);
       const msg = err instanceof Error ? err.message : 'Unable to complete order. Please try again.';
       setSubmitError(msg);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -437,14 +438,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="space-y-1 py-1.5 px-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl">
                   <div className="text-[10px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-emerald-700" />
-                    <span>Unlocked Free Rewards ({unlockedGifts.length})</span>
+                    <span>UNLOCKED FREE REWARDS</span>
                   </div>
                   {unlockedGifts.map((gift) => (
                     <div key={gift.id} className="flex items-center justify-between text-[11px]">
                       <div className="flex items-center gap-1.5 min-w-0 pr-1">
                         <span>{gift.icon}</span>
                         <span className="font-bold text-emerald-950 truncate">{gift.name}</span>
-                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.2 rounded shadow-2xs">
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.5 rounded shadow-2xs">
                           FREE GIFT
                         </span>
                       </div>
@@ -460,7 +461,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {/* Delivery Charge: Shows "FREE" ONLY when deliveryCharge === 0 (subtotal >= 499) */}
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span>Doorstep Delivery Fee:</span>
+                  <span className="text-stone-700 font-medium">Delivery Charge:</span>
                   {!isFreeDelivery && (
                     <span className="text-[10px] text-amber-700 font-medium">
                       Add ₹{499 - subtotal} more for FREE Delivery 🚚

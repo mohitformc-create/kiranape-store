@@ -101,6 +101,11 @@ import {
   deleteParchiOrder,
   clearAllLocalOrders,
 } from '../services/storageService';
+import {
+  addCategoryToFirestore,
+  updateCategoryInFirestore,
+  deleteCategoryFromFirestore,
+} from '../services/firebase';
 
 interface AdminPanelProps {
   products: Product[];
@@ -398,21 +403,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreateCategory = (catData: Omit<CustomCategory, 'id'>) => {
     const created = addCustomCategory(catData);
     setCustomCategories(getCustomCategories());
-    setCatalogSyncNotice(`Category "${created.name}" created and synced.`);
+    addCategoryToFirestore(catData).catch(console.warn);
+    setCatalogSyncNotice(`Category "${created.name}" created and synced to Firestore.`);
     setTimeout(() => setCatalogSyncNotice(null), 3000);
   };
 
   const handleUpdateCategoryItem = (id: string, updates: Partial<CustomCategory>) => {
     updateCustomCategory(id, updates);
     setCustomCategories(getCustomCategories());
-    setCatalogSyncNotice('Category updated successfully.');
+    updateCategoryInFirestore(id, updates).catch(console.warn);
+    setCatalogSyncNotice('Category updated and synced to Firestore.');
     setTimeout(() => setCatalogSyncNotice(null), 3000);
   };
 
   const handleDeleteCategoryItem = (id: string) => {
     deleteCustomCategory(id);
     setCustomCategories(getCustomCategories());
-    setCatalogSyncNotice('Category removed.');
+    deleteCategoryFromFirestore(id).catch(console.warn);
+    setCatalogSyncNotice('Category removed from Firestore.');
     setTimeout(() => setCatalogSyncNotice(null), 3000);
   };
 

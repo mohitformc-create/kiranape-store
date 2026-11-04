@@ -51,19 +51,9 @@ export const PrintOrderSlipModal: React.FC<PrintOrderSlipModalProps> = ({
   );
 
   // Exact Mathematical Delivery Rules:
-  // - const STANDARD_DELIVERY_FEE = 30;
-  // - const isFreeDelivery = subtotal >= 499;
-  // - const deliveryCharge = isFreeDelivery ? 0 : STANDARD_DELIVERY_FEE;
-  // - const totalPayable = subtotal + deliveryCharge;
+  const STANDARD_DELIVERY_FEE = 30;
   const isFreeDelivery = subtotal >= 499;
-  const deliveryCharge = isFreeDelivery
-    ? 0
-    : (order.deliveryFee !== undefined && Number(order.deliveryFee) > 0
-        ? Number(order.deliveryFee)
-        : (order.deliveryCharge !== undefined && Number(order.deliveryCharge) > 0
-            ? Number(order.deliveryCharge)
-            : 30));
-
+  const deliveryCharge = isFreeDelivery ? 0 : STANDARD_DELIVERY_FEE;
   const totalPayable = subtotal + deliveryCharge;
 
   return (

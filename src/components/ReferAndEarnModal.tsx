@@ -24,6 +24,8 @@ function getOrGenerateReferralCode(): string {
   }
 }
 
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.kiranape.waidhan';
+
 export const ReferAndEarnModal: React.FC<ReferAndEarnModalProps> = ({
   isOpen,
   onClose,
@@ -34,15 +36,7 @@ export const ReferAndEarnModal: React.FC<ReferAndEarnModalProps> = ({
 
   if (!isOpen) return null;
 
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://kiranape-store.vercel.app';
-  const referralLink = `${appUrl}/?ref=${referralCode}`;
-
-  const shareText = `🛒 *Kiranape Express Waidhan se Taaza Kirana Mangwayein!* ⚡
-
-Ghar baithe paayein taaza rashan aur stationery sabse tezi se free home delivery ke saath! 
-🎁 Mere invite code *${referralCode}* se apne pehle order (₹499+) par paayein flat ₹50 ki chhoot aur muft gifts (Free Phenyl + Harpic)!
-
-👉 Abhi order karein: ${referralLink}`;
+  const shareText = `नमस्ते! बैढ़न में घर बैठे किराना और स्टेशनरी मंगाने के लिए Kiranapė ऐप डाउनलोड करें 🛒📦\n\nGoogle Play Store से अभी डाउनलोड करें:\n${PLAY_STORE_URL}\n\nरेफ़रल कोड: ${referralCode || 'KIRANAPE50'} (पहले ऑर्डर पर विशेष छूट!)`;
 
   const handleCopyCode = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -138,6 +132,19 @@ Ghar baithe paayein taaza rashan aur stationery sabse tezi se free home delivery
             <MessageCircle className="w-5 h-5 fill-white" />
             <span>Share Invite on WhatsApp</span>
           </button>
+
+          {/* Direct Google Play Store App Download Button */}
+          <a
+            href={PLAY_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 px-4 rounded-2xl bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white font-heading font-bold text-xs shadow-md flex items-center justify-center gap-2.5 transition-all cursor-pointer border border-stone-700"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3.609 1.814L13.793 12 3.61 22.186a1.984 1.984 0 0 1-.61-.954V2.768c.15-.374.37-.7.61-.954zm11.246 11.247l2.257-2.258-11.89-6.842 9.633 9.1zm0 1.878L5.222 24.039l11.89-6.842-2.257-2.258zm1.06-1.06l2.97 1.708a1.503 1.503 0 0 0 0-2.596l-2.97-1.708-1.583 1.583 1.583 1.583z"/>
+            </svg>
+            <span>Download on Google Play Store</span>
+          </a>
 
           {/* How It Works Steps */}
           <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/80 space-y-3">

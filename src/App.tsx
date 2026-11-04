@@ -73,6 +73,12 @@ import {
   subscribeToStoreConfig,
   saveStoreSettingsToFirestore,
   saveBannersToFirestore,
+  subscribeToFirestoreProducts,
+  subscribeToFirestoreCategories,
+  addProductToFirestore,
+  updateProductInFirestore,
+  deleteProductFromFirestore,
+  createOrderInFirestore,
 } from './services/firebase';
 import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
 import {
@@ -398,14 +404,27 @@ export default function App() {
       setBanners(newBanners);
     });
 
-    // 3. Initial load of orders and products from Central Server Database with custom edits preservation
+    // 3. Real-Time Cloud Firestore products and categories listeners across all devices
+    const unsubscribeFirestoreProducts = subscribeToFirestoreProducts((liveProducts) => {
+      if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+        setProducts(liveProducts);
+      }
+    });
+
+    const unsubscribeFirestoreCategories = subscribeToFirestoreCategories((liveCategories) => {
+      if (Array.isArray(liveCategories) && liveCategories.length > 0) {
+        setCustomCategories(liveCategories);
+      }
+    });
+
+    // 4. Initial load of orders and products from Central Server Database with custom edits preservation
     fetchCentralOrders().then((serverOrders) => {
       if (serverOrders && serverOrders.length > 0) {
         setOrders(serverOrders);
       }
     }).catch(console.warn);
 
-    // 3. Initial load: Live fetch products from Supabase 'products' table
+    // 5. Initial load: Live fetch products from Supabase 'products' table
     syncProductsFromSupabase()
       .then((supabaseProducts) => {
         if (Array.isArray(supabaseProducts) && supabaseProducts.length > 0) {
@@ -465,6 +484,8 @@ export default function App() {
     return () => {
       unsubscribeLocal();
       unsubscribeStoreConfig();
+      unsubscribeFirestoreProducts();
+      unsubscribeFirestoreCategories();
       window.removeEventListener('kiranape_orders_updated', handleOrdersUpdated);
     };
   }, []);
@@ -694,6 +715,9 @@ export default function App() {
   // Checkout & Order Placement Handler:
   // Pushes customer details, cart items, delivery slot, total amount, and order ID to 'orders' collection in Firestore
   // BEFORE showing the success message
+  // Checkout & Order Placement Handler:
+  // Pushes customer details, cart items, delivery slot, total amount, and order ID
+  // Protected with try-catch-finally and payload sanitization
   const handleCheckoutSubmit = useCallback(
     async (customerDetails: {
       fullName: string;
@@ -701,130 +725,164 @@ export default function App() {
       fullAddress: string;
       deliverySlot: DeliverySlot;
     }) => {
-      // Strict mathematical calculations via centralized rewardsEngine
-      const financials = calculateCartFinancials(cartItems);
-      const subtotal = Number(financials.subtotal);
-      const subtotalOriginal = Number(financials.subtotalOriginalMRP);
-      const totalSavings = Number(financials.totalSavings);
-      const deliveryFee = Number(financials.deliveryCharge);
-      const finalPayableAmount = Number(financials.totalPayable);
+      try {
+        // Strict mathematical calculations via centralized rewardsEngine
+        const financials = calculateCartFinancials(cartItems);
+        const subtotal = Number(financials.subtotal) || 0;
+        const subtotalOriginal = Number(financials.subtotalOriginalMRP) || subtotal;
+        const totalSavings = Number(financials.totalSavings) || 0;
+        const deliveryFee = Number(financials.deliveryCharge) || 0;
+        const finalPayableAmount = Number(financials.totalPayable) || (subtotal + deliveryFee);
 
-      const orderItems: OrderItemSummary[] = cartItems.map((item) => {
-        const price = Number(item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice);
-        const unit = item.selectedVariant ? item.selectedVariant.weight_unit : item.product.unit;
-        const qty = Number(item.quantity) || 1;
-        return {
-          productId: item.product.id,
-          variantId: item.selectedVariant?.id,
-          name: item.product.name,
-          unit,
-          price,
-          quantity: qty,
-          total: price * qty,
-          isFreeGift: false,
-        };
-      });
+        // Sanitize customer details with string fallbacks
+        const sanitizedName = String(customerDetails?.fullName || '').trim() || 'Valued Customer';
+        const sanitizedPhone = String(customerDetails?.phoneNumber || '').trim() || '9424316081';
+        const sanitizedAddress = String(customerDetails?.fullAddress || '').trim() || 'Waidhan, Singrauli';
+        const sanitizedSlot = String(customerDetails?.deliverySlot || 'Bharosemand Doorstep Delivery');
 
-      // Itemize unlocked free gifts at ₹0 with isFreeGift: true
-      financials.unlockedGifts.forEach((gift) => {
-        orderItems.push({
-          productId: gift.id,
-          variantId: `gift-${gift.id}`,
-          name: `${gift.name} (${gift.badge})`,
-          unit: gift.pack,
-          price: 0,
-          quantity: 1,
-          total: 0,
-          isFreeGift: true,
+        const orderItems: OrderItemSummary[] = cartItems.map((item) => {
+          const price = Number(item.selectedVariant ? item.selectedVariant.price : item.product.finalPrice) || 0;
+          const unit = String(item.selectedVariant ? item.selectedVariant.weight_unit : item.product.unit || '1 Unit');
+          const qty = Number(item.quantity) || 1;
+          return {
+            productId: String(item.product.id),
+            variantId: item.selectedVariant ? String(item.selectedVariant.id) : undefined,
+            name: String(item.product.name),
+            unit,
+            price,
+            quantity: qty,
+            total: price * qty,
+            isFreeGift: false,
+          };
         });
-      });
 
-      // Generate the official unique Order ID
-      const orderId = 'CK-' + Math.floor(1000 + Math.random() * 9000);
-      const selectedLoc = getCustomerSelectedLocation() || storeSettings.serviceArea || 'Waidhan, Singrauli';
-
-      // 1. Instant Haptic Feedback & Audio Chime (0 milliseconds feedback)
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try {
-          navigator.vibrate([50, 50, 50]);
-        } catch {
-          // ignore if unsupported
+        // Itemize strictly ONE unlocked free gift at ₹0 if eligible under single-slab rule
+        if (financials.activeGift) {
+          const gift = financials.activeGift;
+          orderItems.push({
+            productId: String(gift.id),
+            variantId: `gift-${String(gift.id)}`,
+            name: `${String(gift.name)} (FREE GIFT)`,
+            unit: String(gift.pack || '1 Unit'),
+            price: 0,
+            quantity: 1,
+            total: 0,
+            isFreeGift: true,
+          });
         }
+
+        // Generate the official unique Order ID
+        const orderId = 'CK-' + Math.floor(1000 + Math.random() * 9000);
+        const selectedLoc = String(getCustomerSelectedLocation() || storeSettings.serviceArea || 'Waidhan, Singrauli');
+
+        // 1. Instant Haptic Feedback & Audio Chime (0 milliseconds feedback)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate([50, 50, 50]);
+          } catch {
+            // ignore if unsupported
+          }
+        }
+        playOrderChime();
+
+        // 2. Register in local storage engine for instant offline fallback
+        const localOrder = createOrder({
+          id: orderId,
+          customerName: sanitizedName,
+          phone: sanitizedPhone,
+          address: sanitizedAddress,
+          deliverySlot: sanitizedSlot,
+          deliveryLocation: selectedLoc,
+          items: orderItems,
+          itemsCount: orderItems.length,
+          subtotal: subtotal,
+          subtotalOriginal: subtotalOriginal,
+          totalSavings: totalSavings,
+          deliveryFee: deliveryFee,
+          deliveryCharge: deliveryFee,
+          finalPayableAmount: finalPayableAmount,
+          totalPayable: finalPayableAmount,
+          paymentMethod: 'Cash on Delivery (COD)',
+          unlockedRewards: financials.activeGift ? [financials.activeGift.name] : [],
+        });
+
+        // 3. OPTIMISTIC CONFIRMATION: Instantly clear Cart, close checkout modal, and display the Order Placed Successfully screen (0ms)
+        setCartQuantities({});
+        setIsCheckoutOpen(false);
+        setIsCartOpen(false);
+        setPlacedOrder(localOrder);
+        setOrders(getOrders());
+
+        // 4. Asynchronous Background Dispatch to Supabase Cloud & Central Server
+        insertSupabaseOrder({
+          id: orderId,
+          customerName: sanitizedName,
+          phone: sanitizedPhone,
+          address: sanitizedAddress,
+          items: orderItems || [],
+          total: finalPayableAmount || 0,
+          orderType: 'cart',
+          voiceData: null,
+          parchiData: null,
+          status: 'Pending',
+        }).catch((err) => {
+          console.warn('[Supabase Cart Order Error]:', err);
+        });
+
+        dispatchOrderInBackground({
+          id: orderId,
+          customerName: sanitizedName,
+          phone: sanitizedPhone,
+          address: sanitizedAddress,
+          deliverySlot: sanitizedSlot,
+          deliveryLocation: selectedLoc,
+          items: orderItems,
+          itemsCount: orderItems.length,
+          subtotalOriginal,
+          totalSavings,
+          deliveryFee,
+          finalPayableAmount,
+          isParchi: false,
+        });
+
+        // 5. Silent Cloud Firestore Order Persistence
+        createOrderInFirestore({
+          orderId,
+          fullName: sanitizedName,
+          phoneNumber: sanitizedPhone,
+          fullAddress: sanitizedAddress,
+          deliverySlot: sanitizedSlot,
+          deliveryLocation: selectedLoc,
+          cartItems: orderItems,
+          itemsCount: orderItems.length,
+          subtotalOriginal,
+          totalSavings,
+          deliveryFee,
+          finalTotal: finalPayableAmount,
+        }).catch((err) => {
+          console.warn('[Firestore Order Silent Catch]:', err);
+        });
+
+        // 6. Silent Telegram Instant Admin Alert
+        sendTelegramOrderNotification(localOrder, storeSettings).catch((err) => {
+          console.warn('[Telegram Order Alert Silent Catch]:', err);
+        });
+      } catch (orderErr) {
+        console.error('[Order Placement Critical Error]:', orderErr);
+        throw orderErr;
       }
-      playOrderChime();
-
-      // 2. Register in local storage engine for instant offline fallback
-      const localOrder = createOrder({
-        id: orderId,
-        customerName: customerDetails.fullName,
-        phone: customerDetails.phoneNumber,
-        address: customerDetails.fullAddress,
-        deliverySlot: customerDetails.deliverySlot,
-        deliveryLocation: selectedLoc,
-        items: orderItems,
-        itemsCount: orderItems.length,
-        subtotal: subtotal,
-        subtotalOriginal: subtotalOriginal,
-        totalSavings: totalSavings,
-        deliveryFee: deliveryFee,
-        deliveryCharge: deliveryFee,
-        finalPayableAmount: finalPayableAmount,
-        totalPayable: finalPayableAmount,
-        paymentMethod: 'Cash on Delivery (COD)',
-        unlockedRewards: financials.unlockedGifts.map((g) => g.name),
-      });
-
-      // 3. OPTIMISTIC CONFIRMATION: Instantly clear Cart, close checkout modal, and display the Order Placed Successfully screen (0ms)
-      setCartQuantities({});
-      setIsCheckoutOpen(false);
-      setIsCartOpen(false);
-      setPlacedOrder(localOrder);
-      setOrders(getOrders());
-
-      // 4. Asynchronous Background Dispatch to Supabase Cloud & Central Server
-      insertSupabaseOrder({
-        id: orderId,
-        customerName: customerDetails.fullName || 'Customer',
-        phone: customerDetails.phoneNumber || 'Not provided',
-        address: customerDetails.fullAddress || 'Store Pickup',
-        items: orderItems || [],
-        total: finalPayableAmount || 0,
-        orderType: 'cart',
-        voiceData: null,
-        parchiData: null,
-        status: 'Pending',
-      }).catch((err) => {
-        console.warn('[Supabase Cart Order Error]:', err);
-      });
-
-      dispatchOrderInBackground({
-        id: orderId,
-        customerName: customerDetails.fullName,
-        phone: customerDetails.phoneNumber,
-        address: customerDetails.fullAddress,
-        deliverySlot: customerDetails.deliverySlot,
-        deliveryLocation: selectedLoc,
-        items: orderItems,
-        itemsCount: orderItems.length,
-        subtotalOriginal,
-        totalSavings,
-        deliveryFee,
-        finalPayableAmount,
-        isParchi: false,
-      });
-
-      // 5. Silent Telegram Instant Admin Alert
-      sendTelegramOrderNotification(localOrder, storeSettings).catch((err) => {
-        console.warn('[Telegram Order Alert Silent Catch]:', err);
-      });
     },
     [cartItems, storeSettings]
   );
 
-  // Admin Operations with Central Server and Supabase synchronization
+  // Admin Operations with Cloud Firestore, Central Server, and Supabase synchronization
   const handleAddProduct = useCallback((data: any) => {
     const created = addProduct(data);
     setProducts(getProducts());
+    // Sync to Cloud Firestore
+    addProductToFirestore(data).catch((err) => {
+      console.warn('Could not add product to Firestore:', err);
+    });
     // Sync to Central Express Server
     saveProductToCentralInventory(created).catch((err) => {
       console.warn('Could not add product to central inventory:', err);
@@ -840,6 +898,11 @@ export default function App() {
     const updatedList = getProducts();
     setProducts(updatedList);
     const updatedItem = updatedList.find((p) => p.id === id);
+
+    // Sync to Cloud Firestore
+    updateProductInFirestore(id, updates).catch((err) => {
+      console.warn('Could not update product in Firestore:', err);
+    });
 
     // Save persistent backup to localStorage.chaurasia_custom_products
     try {
@@ -867,6 +930,10 @@ export default function App() {
   const handleDeleteProduct = useCallback((id: string) => {
     deleteProduct(id);
     setProducts(getProducts());
+    // Delete from Cloud Firestore
+    deleteProductFromFirestore(id).catch((err) => {
+      console.warn('Could not delete product from Firestore:', err);
+    });
     // Delete from Central Server
     deleteProductFromCentralInventory(id).catch((err) => {
       console.warn('Could not delete product from central inventory:', err);

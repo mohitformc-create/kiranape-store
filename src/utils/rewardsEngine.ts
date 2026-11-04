@@ -40,11 +40,11 @@ export const FREE_GIFT_ITEMS: FreeGiftReward[] = [
     icon: '🍫',
     tierNumber: 2,
     minSubtotal: REWARD_TIERS.TIER_2_MELODY_CHOCOLATE,
-    imageUrl: 'https://images.openfoodfacts.org/images/products/890/101/400/0150/front_en.3.400.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=400&auto=format&fit=crop&q=80',
   },
   {
     id: 'free-gift-tier-3-parle',
-    name: 'Parle Assorted Occasions Gift Pack',
+    name: 'Parle Assorted Occasions Pack',
     pack: 'Occasions Box',
     mrp: 150,
     price: 0,
@@ -52,7 +52,7 @@ export const FREE_GIFT_ITEMS: FreeGiftReward[] = [
     icon: '🍪',
     tierNumber: 3,
     minSubtotal: REWARD_TIERS.TIER_3_PARLE_OCCASIONS,
-    imageUrl: 'https://images.openfoodfacts.org/images/products/890/171/910/1018/front_en.10.400.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&auto=format&fit=crop&q=80',
   },
   {
     id: 'free-gift-tier-4-milano',
@@ -64,7 +64,7 @@ export const FREE_GIFT_ITEMS: FreeGiftReward[] = [
     icon: '✨',
     tierNumber: 4,
     minSubtotal: REWARD_TIERS.TIER_4_MILANO_COLLECTION,
-    imageUrl: 'https://images.openfoodfacts.org/images/products/890/171/910/8055/front_en.6.400.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=400&auto=format&fit=crop&q=80',
   },
 ];
 
@@ -77,7 +77,8 @@ export interface CartCalculationResult {
   deliveryCharge: number;
   totalPayable: number;
   unlockedGifts: FreeGiftReward[];
-  activeTierNumber: number; // 0 (none), 1 (free delivery), 2 (+melody), 3 (+parle), 4 (+milano)
+  activeGift: FreeGiftReward | null;
+  activeTierNumber: number; // 0 (none), 1 (free delivery), 2 (melody only), 3 (parle only), 4 (milano only)
   nextMilestoneAmount: number | null;
   amountNeededForNext: number;
   bannerCopy: string;
@@ -132,39 +133,59 @@ export function calculateCartFinancials(
   const deliveryCharge = isFreeDelivery ? 0 : deliveryFeeBase;
   const totalPayable = subtotal + deliveryCharge;
 
-  // Tiered gifts eligibility
-  const unlockedGifts = FREE_GIFT_ITEMS.filter((gift) => subtotal >= gift.minSubtotal);
-
+  // EXCLUSIVE SINGLE-SLAB REWARD LOGIC (NOT CUMULATIVE)
+  // At any cart value, unlock strictly ONE single free gift corresponding to the highest eligible slab.
+  // Remove all lower-tier gifts.
   let activeTierNumber = 0;
   let nextMilestoneAmount: number | null = null;
   let amountNeededForNext = 0;
   let bannerCopy = '';
+  let unlockedGifts: FreeGiftReward[] = [];
+  let activeGift: FreeGiftReward | null = null;
 
   if (subtotal < REWARD_TIERS.TIER_1_FREE_DELIVERY) {
+    // Slab 0 (< ₹499): Delivery: ₹30 | Free Gift: None
     activeTierNumber = 0;
+    unlockedGifts = [];
+    activeGift = null;
     nextMilestoneAmount = REWARD_TIERS.TIER_1_FREE_DELIVERY;
-    amountNeededForNext = REWARD_TIERS.TIER_1_FREE_DELIVERY - subtotal;
-    bannerCopy = `Add ₹${amountNeededForNext} more to unlock FREE Delivery 🚚`;
+    amountNeededForNext = Math.round((REWARD_TIERS.TIER_1_FREE_DELIVERY - subtotal) * 100) / 100;
+    bannerCopy = `Add ₹${Math.round(amountNeededForNext)} more to unlock FREE Delivery 🚚`;
   } else if (subtotal < REWARD_TIERS.TIER_2_MELODY_CHOCOLATE) {
+    // Slab 1 (₹499 to ₹1198.99): Delivery: FREE (₹0) | Free Gift: None (Only Free Delivery)
     activeTierNumber = 1;
+    unlockedGifts = [];
+    activeGift = null;
     nextMilestoneAmount = REWARD_TIERS.TIER_2_MELODY_CHOCOLATE;
-    amountNeededForNext = REWARD_TIERS.TIER_2_MELODY_CHOCOLATE - subtotal;
-    bannerCopy = `🎉 FREE Delivery unlocked! Add ₹${amountNeededForNext} more to get FREE Tiramisu Melody Chocolate 🍫`;
+    amountNeededForNext = Math.round((REWARD_TIERS.TIER_2_MELODY_CHOCOLATE - subtotal) * 100) / 100;
+    bannerCopy = `🎉 FREE Delivery unlocked! Add ₹${Math.round(amountNeededForNext)} more for FREE Tiramisu Melody Chocolate 🍫`;
   } else if (subtotal < REWARD_TIERS.TIER_3_PARLE_OCCASIONS) {
+    // Slab 2 (₹1199 to ₹1998.99): Delivery: FREE (₹0) | Free Gift: Strictly 1 item -> "Tiramisu Melody Chocolate"
     activeTierNumber = 2;
+    const melodyGift = FREE_GIFT_ITEMS.find((g) => g.tierNumber === 2) || null;
+    unlockedGifts = melodyGift ? [melodyGift] : [];
+    activeGift = melodyGift;
     nextMilestoneAmount = REWARD_TIERS.TIER_3_PARLE_OCCASIONS;
-    amountNeededForNext = REWARD_TIERS.TIER_3_PARLE_OCCASIONS - subtotal;
-    bannerCopy = `🎁 Melody Chocolate unlocked! Add ₹${amountNeededForNext} more for FREE Parle Assorted Occasions Pack 🍪`;
+    amountNeededForNext = Math.round((REWARD_TIERS.TIER_3_PARLE_OCCASIONS - subtotal) * 100) / 100;
+    bannerCopy = `🎁 Tiramisu Melody unlocked! Add ₹${Math.round(amountNeededForNext)} more to upgrade to Parle Assorted Occasions Pack 🍪`;
   } else if (subtotal < REWARD_TIERS.TIER_4_MILANO_COLLECTION) {
+    // Slab 3 (₹1999 to ₹2598.99): Delivery: FREE (₹0) | Free Gift: Strictly 1 item -> "Parle Assorted Occasions Pack" (Melody removed)
     activeTierNumber = 3;
+    const parleGift = FREE_GIFT_ITEMS.find((g) => g.tierNumber === 3) || null;
+    unlockedGifts = parleGift ? [parleGift] : [];
+    activeGift = parleGift;
     nextMilestoneAmount = REWARD_TIERS.TIER_4_MILANO_COLLECTION;
-    amountNeededForNext = REWARD_TIERS.TIER_4_MILANO_COLLECTION - subtotal;
-    bannerCopy = `🔥 Parle Pack unlocked! Add ₹${amountNeededForNext} more for FREE Hide & Seek Milano Collection ✨`;
+    amountNeededForNext = Math.round((REWARD_TIERS.TIER_4_MILANO_COLLECTION - subtotal) * 100) / 100;
+    bannerCopy = `🔥 Parle Occasions Pack unlocked! Add ₹${Math.round(amountNeededForNext)} more to upgrade to Hide & Seek Milano Collection ✨`;
   } else {
+    // Slab 4 (₹2599 and above): Delivery: FREE (₹0) | Free Gift: Strictly 1 item -> "Hide & Seek Milano Collection" (All previous removed)
     activeTierNumber = 4;
+    const milanoGift = FREE_GIFT_ITEMS.find((g) => g.tierNumber === 4) || null;
+    unlockedGifts = milanoGift ? [milanoGift] : [];
+    activeGift = milanoGift;
     nextMilestoneAmount = null;
     amountNeededForNext = 0;
-    bannerCopy = `🏆 Maximum Bumper Rewards Unlocked! (Milano Collection + Free Delivery)`;
+    bannerCopy = `🏆 Top Bumper Gift Unlocked: Hide & Seek Milano Collection + FREE Delivery!`;
   }
 
   // Calculate percentage along the 0 -> 499 -> 1199 -> 1999 -> 2599 track
@@ -202,6 +223,7 @@ export function calculateCartFinancials(
     deliveryCharge,
     totalPayable,
     unlockedGifts,
+    activeGift,
     activeTierNumber,
     nextMilestoneAmount,
     amountNeededForNext,

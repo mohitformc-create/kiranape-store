@@ -37,7 +37,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
-import { Product, Order, OrderStatus, AppUser, UserRole, StoreSettings, PromoBanner } from '../types';
+import { Product, Order, OrderStatus, AppUser, UserRole, StoreSettings, PromoBanner, CustomCategory } from '../types';
 import {
   calculateFinalPrice,
   getAdminPin,
@@ -50,6 +50,10 @@ import {
   saveProducts,
   getOrders,
   saveOrders,
+  getCustomCategories,
+  saveCustomCategories,
+  DEFAULT_CUSTOM_CATEGORIES,
+  ALL_VERIFIED_PRODUCTS,
 } from './storageService';
 import { STORE_DEFAULTS, DEFAULT_BANNERS } from '../data/initialProducts';
 import firebaseAppletConfig from '../../firebase-applet-config.json';
@@ -217,8 +221,22 @@ export async function testFirebaseConnection(): Promise<boolean> {
 
 // Firestore Collection Names
 export const PRODUCTS_COLLECTION = 'products';
+export const CATEGORIES_COLLECTION = 'categories';
 export const ORDERS_COLLECTION = 'orders';
 export const USERS_COLLECTION = 'users';
+
+/**
+ * Strips undefined properties before writing to Firestore
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 // ============================================================================
 // STATUS LABELS & LIFECYCLE PROGRESSION
@@ -526,7 +544,7 @@ export function subscribeToAuth(callback: (user: AppUser | null) => void): () =>
 }
 
 // ============================================================================
-// 2. ADMIN PANEL: FIRESTORE CRUD FUNCTIONS
+// 2. ADMIN & CATALOG: REAL-TIME FIRESTORE CRUD & SYNC
 // ============================================================================
 
 /**
@@ -538,75 +556,378 @@ export function subscribeToAuth(callback: (user: AppUser | null) => void): () =>
 export async function addProductToFirestore(
   productData: Omit<Product, 'updatedAt' | 'finalPrice'> & { id?: string }
 ): Promise<Product> {
-  const origPrice = Number(productData.originalPrice);
+  const origPrice = Number(productData.originalPrice) || 0;
   const discount = Number(productData.discountPercent) || 0;
   const finalPrice = calculateFinalPrice(origPrice, discount);
+  const id = productData.id || ('prod_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
   const product: Product = {
     ...productData,
-    id: productData.id || ('prod_' + Date.now()),
+    id,
     originalPrice: origPrice,
     discountPercent: discount,
     finalPrice,
+    isAvailable: productData.isAvailable ?? true,
     updatedAt: Date.now(),
   };
-  return Promise.resolve(product);
+
+  const db = getDb();
+  if (db) {
+    try {
+      const docRef = doc(db, PRODUCTS_COLLECTION, id);
+      await setDoc(docRef, cleanFirestoreData({
+        ...product,
+        categoryId: product.category,
+        price: finalPrice,
+        originalPrice: origPrice,
+        weight: product.unit,
+        imageUrl: product.imageUrl || '',
+        inStock: product.isAvailable,
+        priority: 0,
+        createdAt: Date.now(),
+      }), { merge: true });
+    } catch (err) {
+      console.warn('Firestore addProduct error:', err);
+    }
+  }
+
+  // Update local storage
+  const current = getProducts();
+  const exists = current.some((p) => p.id === id);
+  const updated = exists ? current.map((p) => (p.id === id ? product : p)) : [product, ...current];
+  saveProducts(updated);
+
+  return product;
 }
 
 /**
- * ADMIN: Update an existing grocery item
+ * ADMIN: Update an existing grocery item in Firestore
  */
 export async function updateProductInFirestore(
-  _id: string,
-  _updates: Partial<Product>
+  id: string,
+  updates: Partial<Product>
 ): Promise<void> {
-  return Promise.resolve();
+  const db = getDb();
+  const current = getProducts();
+  const existing = current.find((p) => p.id === id);
+
+  let finalPrice = updates.finalPrice;
+  if (updates.originalPrice !== undefined || updates.discountPercent !== undefined) {
+    const orig = updates.originalPrice !== undefined ? Number(updates.originalPrice) : (existing?.originalPrice || 0);
+    const disc = updates.discountPercent !== undefined ? Number(updates.discountPercent) : (existing?.discountPercent || 0);
+    finalPrice = calculateFinalPrice(orig, disc);
+  }
+
+  const payload: any = {
+    ...updates,
+    ...(finalPrice !== undefined ? { finalPrice, price: finalPrice } : {}),
+    ...(updates.category !== undefined ? { categoryId: updates.category } : {}),
+    ...(updates.unit !== undefined ? { weight: updates.unit } : {}),
+    ...(updates.isAvailable !== undefined ? { inStock: updates.isAvailable } : {}),
+    updatedAt: Date.now(),
+  };
+
+  if (db) {
+    try {
+      const docRef = doc(db, PRODUCTS_COLLECTION, id);
+      await updateDoc(docRef, cleanFirestoreData(payload));
+    } catch (err) {
+      console.warn('Firestore updateProduct error:', err);
+    }
+  }
+
+  const updatedList = current.map((p) =>
+    p.id === id ? { ...p, ...updates, ...(finalPrice !== undefined ? { finalPrice } : {}) } : p
+  );
+  saveProducts(updatedList);
 }
 
 /**
- * ADMIN: Delete a grocery product document
+ * ADMIN: Delete a grocery product document from Firestore
  */
-export async function deleteProductFromFirestore(_id: string): Promise<void> {
-  return Promise.resolve();
+export async function deleteProductFromFirestore(id: string): Promise<void> {
+  const db = getDb();
+  if (db) {
+    try {
+      const docRef = doc(db, PRODUCTS_COLLECTION, id);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.warn('Firestore deleteProduct error:', err);
+    }
+  }
+
+  const current = getProducts();
+  const filtered = current.filter((p) => p.id !== id);
+  saveProducts(filtered);
+}
+
+/**
+ * ADMIN: Category CRUD in Firestore
+ */
+export async function addCategoryToFirestore(
+  categoryData: Omit<CustomCategory, 'id'> & { id?: string }
+): Promise<CustomCategory> {
+  const id = categoryData.id || ('cat_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
+  const category: CustomCategory = {
+    ...categoryData,
+    id,
+    order: categoryData.order ?? 0,
+  };
+
+  const db = getDb();
+  if (db) {
+    try {
+      const docRef = doc(db, CATEGORIES_COLLECTION, id);
+      await setDoc(docRef, cleanFirestoreData({
+        ...category,
+        priority: category.order ?? 0,
+        createdAt: Date.now(),
+      }), { merge: true });
+    } catch (err) {
+      console.warn('Firestore addCategory error:', err);
+    }
+  }
+
+  const current = getCustomCategories();
+  const exists = current.some((c) => c.id === id);
+  const updated = exists ? current.map((c) => (c.id === id ? category : c)) : [...current, category];
+  saveCustomCategories(updated);
+
+  return category;
+}
+
+export async function updateCategoryInFirestore(
+  id: string,
+  updates: Partial<CustomCategory>
+): Promise<void> {
+  const db = getDb();
+  if (db) {
+    try {
+      const docRef = doc(db, CATEGORIES_COLLECTION, id);
+      await updateDoc(docRef, cleanFirestoreData({
+        ...updates,
+        priority: updates.order,
+        updatedAt: Date.now(),
+      }));
+    } catch (err) {
+      console.warn('Firestore updateCategory error:', err);
+    }
+  }
+
+  const current = getCustomCategories();
+  const updated = current.map((c) => (c.id === id ? { ...c, ...updates } : c));
+  saveCustomCategories(updated);
+}
+
+export async function deleteCategoryFromFirestore(id: string): Promise<void> {
+  const db = getDb();
+  if (db) {
+    try {
+      const docRef = doc(db, CATEGORIES_COLLECTION, id);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.warn('Firestore deleteCategory error:', err);
+    }
+  }
+
+  const current = getCustomCategories();
+  const filtered = current.filter((c) => c.id !== id || c.isSystem);
+  saveCustomCategories(filtered);
 }
 
 /**
  * ADMIN: Wipe and Purge all products
  */
 export async function wipeAllFirestoreProducts(): Promise<{ count: number; success: boolean }> {
+  const db = getDb();
+  if (db) {
+    try {
+      const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    } catch (err) {
+      console.warn('Wipe firestore error:', err);
+    }
+  }
   saveProducts([]);
-  return Promise.resolve({ count: 0, success: true });
+  return { count: 0, success: true };
 }
 
 /**
- * ADMIN: Seed or save products
+ * ADMIN: Seed products to Firestore
  */
 export async function seedProductsToFirestore(products: Product[]): Promise<{ count: number; success: boolean }> {
+  const db = getDb();
+  if (db && products.length > 0) {
+    try {
+      // Chunk into batches of 400 (Firestore limit is 500)
+      const chunkSize = 400;
+      for (let i = 0; i < products.length; i += chunkSize) {
+        const chunk = products.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((p) => {
+          const docRef = doc(db, PRODUCTS_COLLECTION, p.id);
+          batch.set(docRef, cleanFirestoreData({
+            ...p,
+            categoryId: p.category,
+            price: p.finalPrice,
+            weight: p.unit,
+            inStock: p.isAvailable ?? true,
+            priority: 0,
+            createdAt: p.updatedAt || Date.now(),
+          }), { merge: true });
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.warn('Firestore seedProducts error:', err);
+    }
+  }
   saveProducts(products);
-  return Promise.resolve({ count: products.length, success: true });
+  return { count: products.length, success: true };
 }
 
 // ============================================================================
-// 3. CUSTOMER VIEW: REAL-TIME CATALOG LISTENER (onSnapshot)
+// 3. REAL-TIME CATALOG & CATEGORY LISTENERS (onSnapshot)
 // ============================================================================
 
 /**
  * CUSTOMER & ADMIN: Real-time listener for grocery catalog
- *
- * Whenever the store owner adds, edits, or deletes an item in the Admin View,
- * this listener immediately pushes the updated catalog to the Customer View.
- *
- * @param onUpdate - Callback receiving the updated array of Products
- * @param onError - Optional error handler
- * @returns Unsubscribe function to stop listening when the component unmounts
+ * Syncs seamlessly across all customer devices and admin panels
  */
 export function subscribeToFirestoreProducts(
   onUpdate: (products: Product[]) => void,
-  _onError?: (err: Error) => void
+  onError?: (err: Error) => void
 ): () => void {
-  // Pure local & bundled JSON inventory for zero downtime & zero quota usage
+  // 1. Immediately emit cached catalog for 0ms visual render
   const localItems = getProducts();
   onUpdate(localItems);
-  return () => {};
+
+  const db = getDb();
+  if (!db) return () => {};
+
+  try {
+    const colRef = collection(db, PRODUCTS_COLLECTION);
+    const unsubscribe = onSnapshot(
+      colRef,
+      async (snapshot) => {
+        if (snapshot.empty) {
+          // If Firestore is empty, auto-seed with verified catalog so the cloud is populated
+          const baseProducts = localItems.length > 0 ? localItems : ALL_VERIFIED_PRODUCTS;
+          if (baseProducts.length > 0) {
+            seedProductsToFirestore(baseProducts).catch(console.warn);
+          }
+          return;
+        }
+
+        const firestoreProducts: Product[] = snapshot.docs.map((d) => {
+          const data = d.data();
+          const orig = Number(data.originalPrice) || Number(data.price) || 0;
+          const disc = Number(data.discountPercent) || 0;
+          const final = Number(data.finalPrice) || Number(data.price) || calculateFinalPrice(orig, disc);
+          return {
+            id: d.id,
+            name: data.name || '',
+            hindiName: data.hindiName || '',
+            category: data.category || data.categoryId || 'Snacks & Biscuits',
+            department: data.department || 'grocery',
+            unit: data.unit || data.weight || '1 Unit',
+            originalPrice: orig,
+            discountPercent: disc,
+            finalPrice: final,
+            imageUrl: data.imageUrl || data.image || '',
+            isAvailable: data.isAvailable ?? data.inStock ?? true,
+            stock: data.stock ?? data.stockCount,
+            description: data.description || '',
+            variants: data.variants || [],
+            updatedAt: data.updatedAt || Date.now(),
+          };
+        });
+
+        // Persist to local cache and update React state
+        saveProducts(firestoreProducts);
+        onUpdate(firestoreProducts);
+      },
+      (err) => {
+        console.warn('Firestore products onSnapshot warning:', err);
+        if (onError) onError(err);
+      }
+    );
+
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Failed to attach products onSnapshot:', err);
+    return () => {};
+  }
+}
+
+/**
+ * CUSTOMER & ADMIN: Real-time listener for categories collection
+ * Syncs categories and department layout across all devices
+ */
+export function subscribeToFirestoreCategories(
+  onUpdate: (categories: CustomCategory[]) => void,
+  onError?: (err: Error) => void
+): () => void {
+  // 1. Immediately emit cached categories
+  const localCats = getCustomCategories();
+  onUpdate(localCats);
+
+  const db = getDb();
+  if (!db) return () => {};
+
+  try {
+    const colRef = collection(db, CATEGORIES_COLLECTION);
+    const unsubscribe = onSnapshot(
+      colRef,
+      async (snapshot) => {
+        if (snapshot.empty) {
+          // Auto-seed with DEFAULT_CUSTOM_CATEGORIES
+          try {
+            const batch = writeBatch(db);
+            DEFAULT_CUSTOM_CATEGORIES.forEach((cat) => {
+              const docRef = doc(db, CATEGORIES_COLLECTION, cat.id);
+              batch.set(docRef, cleanFirestoreData({
+                ...cat,
+                priority: cat.order ?? 0,
+                createdAt: Date.now(),
+              }), { merge: true });
+            });
+            await batch.commit();
+          } catch (e) {
+            console.warn('Auto-seed categories warning:', e);
+          }
+          return;
+        }
+
+        const firestoreCats: CustomCategory[] = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.name || '',
+            hindiName: data.hindiName || '',
+            icon: data.icon || '📦',
+            imageUrl: data.imageUrl || data.image_url || '',
+            department: data.department || 'grocery',
+            isSystem: Boolean(data.isSystem),
+            order: data.order ?? data.priority ?? 0,
+          };
+        }).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        saveCustomCategories(firestoreCats);
+        onUpdate(firestoreCats);
+      },
+      (err) => {
+        console.warn('Firestore categories onSnapshot warning:', err);
+        if (onError) onError(err);
+      }
+    );
+
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Failed to attach categories onSnapshot:', err);
+    return () => {};
+  }
 }
 
 // ============================================================================
@@ -622,11 +943,13 @@ export interface CustomerOrderPayload {
   deliveryLocation?: string;
   cartItems: {
     productId: string;
+    variantId?: string;
     name: string;
     unit: string;
     price: number;
     quantity: number;
     total: number;
+    isFreeGift?: boolean;
   }[];
   itemsCount: number;
   subtotalOriginal: number;
@@ -668,7 +991,9 @@ export async function createOrderInFirestore(
     subtotalOriginal: orderData.subtotalOriginal,
     totalSavings: orderData.totalSavings,
     deliveryFee: orderData.deliveryFee,
+    deliveryCharge: orderData.deliveryFee,
     finalPayableAmount: orderData.finalTotal,
+    totalPayable: orderData.finalTotal,
     paymentMethod: 'Cash on Delivery (COD)',
     status: 'received' as OrderStatus,
     statusLabel: ORDER_STATUS_LABELS.received,
@@ -677,7 +1002,20 @@ export async function createOrderInFirestore(
     userId: orderData.userId || 'guest',
   };
 
-  return Promise.resolve(order);
+  const db = getDb();
+  if (db) {
+    try {
+      const docRef = doc(db, ORDERS_COLLECTION, orderId);
+      await setDoc(docRef, cleanFirestoreData({
+        ...order,
+        createdAtServer: serverTimestamp(),
+      }), { merge: true });
+    } catch (err) {
+      console.warn('Firestore createOrder warning:', err);
+    }
+  }
+
+  return order;
 }
 
 /**

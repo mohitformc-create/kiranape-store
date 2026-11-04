@@ -6,6 +6,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Categories collection
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
     // Orders collection: placed by customers with Cash on Delivery, managed by store owner
     match /orders/{orderId} {
       allow read, write: if true;

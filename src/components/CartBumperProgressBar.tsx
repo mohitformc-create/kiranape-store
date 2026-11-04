@@ -30,13 +30,13 @@ export const CartBumperProgressBar: React.FC<CartBumperProgressBarProps> = ({
   if (subtotal < REWARD_TIERS.TIER_1_FREE_DELIVERY) {
     dynamicBanner = `Add ₹${Math.round(REWARD_TIERS.TIER_1_FREE_DELIVERY - subtotal)} more to unlock FREE Delivery 🚚`;
   } else if (subtotal < REWARD_TIERS.TIER_2_MELODY_CHOCOLATE) {
-    dynamicBanner = `🎉 FREE Delivery unlocked! Add ₹${Math.round(REWARD_TIERS.TIER_2_MELODY_CHOCOLATE - subtotal)} more to get FREE Tiramisu Melody Chocolate 🍫`;
+    dynamicBanner = `🎉 FREE Delivery unlocked! Add ₹${Math.round(REWARD_TIERS.TIER_2_MELODY_CHOCOLATE - subtotal)} more for FREE Tiramisu Melody Chocolate 🍫`;
   } else if (subtotal < REWARD_TIERS.TIER_3_PARLE_OCCASIONS) {
-    dynamicBanner = `🎁 Melody Chocolate unlocked! Add ₹${Math.round(REWARD_TIERS.TIER_3_PARLE_OCCASIONS - subtotal)} more for FREE Parle Assorted Occasions Pack 🍪`;
+    dynamicBanner = `🎁 Tiramisu Melody unlocked! Add ₹${Math.round(REWARD_TIERS.TIER_3_PARLE_OCCASIONS - subtotal)} more to upgrade to Parle Assorted Occasions Pack 🍪`;
   } else if (subtotal < REWARD_TIERS.TIER_4_MILANO_COLLECTION) {
-    dynamicBanner = `🔥 Parle Pack unlocked! Add ₹${Math.round(REWARD_TIERS.TIER_4_MILANO_COLLECTION - subtotal)} more for FREE Hide & Seek Milano Collection ✨`;
+    dynamicBanner = `🔥 Parle Occasions Pack unlocked! Add ₹${Math.round(REWARD_TIERS.TIER_4_MILANO_COLLECTION - subtotal)} more to upgrade to Hide & Seek Milano Collection ✨`;
   } else {
-    dynamicBanner = `🏆 Maximum Bumper Rewards Unlocked! (Milano Collection + Free Delivery)`;
+    dynamicBanner = `🏆 Top Bumper Gift Unlocked: Hide & Seek Milano Collection + FREE Delivery!`;
   }
 
   // Smooth progressive percentage along the 4 milestones

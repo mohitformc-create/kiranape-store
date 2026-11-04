@@ -60,14 +60,9 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     ? Number(currentOrder.subtotal)
     : itemsList.reduce((sum, it) => sum + (Number(it.price) * Number(it.quantity)), 0);
   const subtotal = Math.round(Number(rawSubtotal) * 100) / 100;
+  const STANDARD_DELIVERY_FEE = 30;
   const isFreeDelivery = subtotal >= 499;
-  const deliveryCharge = isFreeDelivery
-    ? 0
-    : (currentOrder.deliveryFee !== undefined && Number(currentOrder.deliveryFee) > 0
-        ? Number(currentOrder.deliveryFee)
-        : (currentOrder.deliveryCharge !== undefined && Number(currentOrder.deliveryCharge) > 0
-            ? Number(currentOrder.deliveryCharge)
-            : 30));
+  const deliveryCharge = isFreeDelivery ? 0 : STANDARD_DELIVERY_FEE;
   const finalPayable = subtotal + deliveryCharge;
 
   return (

@@ -208,16 +208,16 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
         key={cat.id || cat.name}
         type="button"
         onClick={() => onSelectCategory(cat.name)}
-        className={`bg-gradient-to-b from-white ${gradientBottom} rounded-2xl border border-neutral-200/80 shadow-sm flex flex-col items-center justify-between overflow-hidden group select-none cursor-pointer active:scale-95 hover:shadow-md transition-all duration-200 ${extraClasses}`}
+        className={`bg-gradient-to-b from-white to-neutral-50/60 rounded-2xl border border-neutral-150 p-2 flex flex-col items-center justify-between shadow-sm overflow-hidden group select-none cursor-pointer active:scale-95 hover:shadow-md transition-all duration-200 ${extraClasses}`}
         title={`View ${cat.name}`}
       >
-        {/* Category Image - Fills 65% to 70% of card height, no tiny inner container */}
-        <div className="w-full h-[68%] flex items-center justify-center overflow-hidden pt-1">
+        {/* Category Image - Fills 65% to 70% of card height naturally without distortion, no tiny inner box */}
+        <div className="w-full h-[68%] flex items-center justify-center overflow-hidden">
           <img
             src={packshotUrl}
             alt={cat.name}
             loading="lazy"
-            className="w-full h-24 sm:h-28 object-contain p-2 transition-transform duration-200 group-hover:scale-105"
+            className="w-full h-24 sm:h-28 object-contain transition-transform duration-200 hover:scale-105"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src =
                 CURATED_PACKSHOTS[cat.name] ||
@@ -226,12 +226,10 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
           />
         </div>
 
-        {/* Category Name - Clean, bold, 2-line clamped text below the image */}
-        <div className="w-full px-1 pb-2">
-          <span className="text-xs font-semibold text-neutral-800 text-center leading-tight line-clamp-2 block">
-            {cat.name}
-          </span>
-        </div>
+        {/* Category Name Label */}
+        <span className="text-xs font-semibold text-neutral-800 text-center line-clamp-2 mt-1 block px-1">
+          {cat.name}
+        </span>
       </button>
     );
   };
