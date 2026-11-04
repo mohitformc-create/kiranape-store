@@ -13,6 +13,17 @@ interface UpsellCarouselProps {
   className?: string;
 }
 
+// Helper to normalize product image lookup across possible backend keys
+const getProductImage = (prod: any): string => {
+  return (
+    prod.image ||
+    prod.image_url ||
+    prod.imageUrl ||
+    prod.thumbnail ||
+    'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80'
+  );
+};
+
 export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
   cartItems = [],
   onAddToCart,
@@ -41,14 +52,26 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
     });
   };
 
-  const handleAddClick = (product: Product) => {
-    // 0ms instant feedback
+  const triggerHaptic = () => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
-        navigator.vibrate(30);
+        navigator.vibrate(25);
       } catch {}
     }
+  };
+
+  const handleAddClick = (product: Product) => {
+    triggerHaptic();
     onAddToCart(product);
+  };
+
+  const handleQuantityStep = (productId: string, newQty: number, product?: Product) => {
+    triggerHaptic();
+    if (onUpdateQuantity) {
+      onUpdateQuantity(productId, newQty);
+    } else if (newQty > 0 && product) {
+      onAddToCart(product);
+    }
   };
 
   return (
@@ -93,24 +116,23 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
         {UPSELL_PRODUCTS.map((prod) => {
           const inCartCount = cartQuantityMap[prod.id] || 0;
           const hasDiscount = prod.originalPrice > prod.finalPrice;
+          const imageSrc = getProductImage(prod);
 
           return (
             <div
               key={prod.id}
-              className="w-[140px] xs:w-[150px] sm:w-[165px] flex-shrink-0 snap-start bg-white rounded-2xl p-2.5 border border-stone-200 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between"
+              className="w-[140px] xs:w-[150px] sm:w-[165px] flex-shrink-0 snap-start bg-white rounded-2xl p-2.5 border border-stone-200 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
             >
-              {/* Product Image Box */}
-              <div className="relative w-full aspect-square rounded-xl bg-stone-50 overflow-hidden flex items-center justify-center mb-2 border border-stone-100/80">
+              {/* Product Image Box - Fixed Blinkit Standard Sizing & Fallback */}
+              <div className="w-full h-24 bg-white rounded-xl flex items-center justify-center p-2 relative overflow-hidden mb-2 border border-stone-100">
                 <img
-                  src={prod.imageUrl || getCategoryFallbackSvg(prod.category, prod.name)}
+                  src={imageSrc}
                   alt={prod.name}
-                  className="w-full h-full object-contain p-1.5 drop-shadow-xs"
+                  className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
                   onError={(e) => {
-                    const fallback = getCategoryFallbackSvg(prod.category, prod.name);
-                    if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                      (e.currentTarget as HTMLImageElement).src = fallback;
-                    }
+                    (e.currentTarget as HTMLImageElement).src =
+                      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80';
                   }}
                 />
 
@@ -146,7 +168,7 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
                   )}
                 </div>
 
-                {/* Blinkit-Style Green Quick "+ ADD" Button / Active Stepper */}
+                {/* Blinkit-Style Green Quick "+ ADD" Button / Sleek Quantity Stepper */}
                 {inCartCount === 0 ? (
                   <button
                     type="button"
@@ -156,35 +178,26 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
                     + ADD
                   </button>
                 ) : (
-                  <div className="h-7 flex items-center bg-[#0c831f] text-white rounded-lg px-1 shadow-xs font-bold text-xs">
-                    {onUpdateQuantity ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(prod.id, inCartCount - 1)}
-                          className="w-5 h-5 flex items-center justify-center hover:bg-black/20 rounded cursor-pointer"
-                        >
-                          <Minus className="w-3 h-3 text-white" />
-                        </button>
-                        <span className="w-5 text-center text-xs font-black">{inCartCount}</span>
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(prod.id, inCartCount + 1)}
-                          className="w-5 h-5 flex items-center justify-center hover:bg-black/20 rounded cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3 text-white" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleAddClick(prod)}
-                        className="px-2 flex items-center gap-1 text-xs font-black"
-                      >
-                        <Check className="w-3 h-3" />
-                        <span>{inCartCount} in cart</span>
-                      </button>
-                    )}
+                  <div className="h-7 min-w-[70px] flex items-center justify-between bg-[#0c831f] text-white rounded-lg px-1 shadow-xs font-bold text-xs animate-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityStep(prod.id, inCartCount - 1, prod)}
+                      className="w-5 h-5 flex items-center justify-center hover:bg-black/20 active:scale-90 rounded cursor-pointer transition-transform"
+                      title="Decrease quantity"
+                    >
+                      <Minus className="w-3 h-3 text-white stroke-[2.5]" />
+                    </button>
+                    <span className="w-5 text-center text-xs font-black text-white select-none">
+                      {inCartCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityStep(prod.id, inCartCount + 1, prod)}
+                      className="w-5 h-5 flex items-center justify-center hover:bg-black/20 active:scale-90 rounded cursor-pointer transition-transform"
+                      title="Increase quantity"
+                    >
+                      <Plus className="w-3 h-3 text-white stroke-[2.5]" />
+                    </button>
                   </div>
                 )}
               </div>

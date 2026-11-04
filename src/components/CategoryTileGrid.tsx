@@ -9,54 +9,54 @@ interface CategoryTileGridProps {
   onSelectCategory: (categoryName: string) => void;
 }
 
-// Ultra-soft subtle pastel tints (Mint, Sky, Lavender, Peach, Cream)
-const PASTEL_TINTS: Record<string, string> = {
-  'Atta & Flours': 'bg-[#fff7ed]', // peach
-  'Rice & Dal': 'bg-[#f0fdf4]', // mint
-  'Oil & Ghee': 'bg-[#fefce8]', // soft cream
-  'Spices & Salt': 'bg-[#fff1f2]', // soft rose
-  'Dairy & Bakery': 'bg-[#f0f9ff]', // sky
-  'Pooja Samagri': 'bg-[#fefce8]', // soft golden/cream
-  'Snacks & Biscuits': 'bg-[#fff7ed]', // peach
-  'Tea, Coffee & Drinks': 'bg-[#f0fdfa]', // soft teal
-  'Packaged Foods': 'bg-[#faf5ff]', // lavender
-  'Health & Nutrition': 'bg-[#f0fdf4]', // mint
-  'Household Essentials': 'bg-[#f0f9ff]', // sky
-  'Personal Care': 'bg-[#faf5ff]', // lavender
-  'Baby Care': 'bg-[#fdf2f8]', // soft pink
-  'Copies & Registers': 'bg-[#f0f9ff]', // sky
-  'Pens, Pencils & Geometry': 'bg-[#faf5ff]', // lavender
-  'Art, Craft & Fevicol': 'bg-[#fefce8]', // cream
-  'Office & Daily Stationery': 'bg-[#f0fdf4]', // mint
-};
-
-const DEFAULT_PASTEL_CYCLE = [
-  'bg-[#f0fdf4]', // mint
-  'bg-[#f0f9ff]', // sky
-  'bg-[#faf5ff]', // lavender
-  'bg-[#fff7ed]', // peach
-  'bg-[#fefce8]', // cream
+const DEFAULT_GRADIENT_CYCLE = [
+  'to-amber-50/60',
+  'to-emerald-50/60',
+  'to-sky-50/60',
+  'to-rose-50/50',
+  'to-purple-50/50',
+  'to-orange-50/50',
 ];
 
 // Curated high-res authentic packshots for instant Blinkit look
 const CURATED_PACKSHOTS: Record<string, string> = {
-  'Atta & Flours': 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg',
-  'Rice & Dal': 'https://images.openfoodfacts.org/images/products/890/171/200/1018/front_en.3.400.jpg',
-  'Oil & Ghee': 'https://images.openfoodfacts.org/images/products/890/600/728/0014/front_en.3.400.jpg',
-  'Spices & Salt': 'https://images.openfoodfacts.org/images/products/890/105/885/2160/front_en.3.400.jpg',
-  'Dairy & Bakery': 'https://images.openfoodfacts.org/images/products/890/126/201/0058/front_en.4.400.jpg',
-  'Pooja Samagri': getCategoryFallbackSvg('Pooja Samagri'),
-  'Snacks & Biscuits': 'https://images.openfoodfacts.org/images/products/890/106/301/2160/front_en.11.400.jpg',
-  'Tea, Coffee & Drinks': 'https://images.openfoodfacts.org/images/products/890/103/038/3859/front_en.4.400.jpg',
-  'Packaged Foods': 'https://images.openfoodfacts.org/images/products/890/105/884/7203/front_en.4.400.jpg',
-  'Health & Nutrition': 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg',
-  'Household Essentials': 'https://images.openfoodfacts.org/images/products/890/103/038/3866/front_en.4.400.jpg',
-  'Personal Care': 'https://images.openfoodfacts.org/images/products/871/716/364/1216/front_en.3.400.jpg',
-  'Baby Care': getCategoryFallbackSvg('Baby Care'),
+  'Atta & Flours': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=80',
+  'Rice & Dal': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&auto=format&fit=crop&q=80',
+  'Oil & Ghee': 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&auto=format&fit=crop&q=80',
+  'Spices & Salt': 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&auto=format&fit=crop&q=80',
+  'Dairy & Bakery': 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&auto=format&fit=crop&q=80',
+  'Pooja Samagri': 'https://images.unsplash.com/photo-1606293926075-69a00dbfde81?w=400&auto=format&fit=crop&q=80',
+  'Snacks & Biscuits': 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&auto=format&fit=crop&q=80',
+  'Tea, Coffee & Drinks': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400&auto=format&fit=crop&q=80',
+  'Packaged Foods': 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=400&auto=format&fit=crop&q=80',
+  'Health & Nutrition': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&auto=format&fit=crop&q=80',
+  'Household Essentials': 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=400&auto=format&fit=crop&q=80',
+  'Personal Care': 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&auto=format&fit=crop&q=80',
+  'Baby Care': 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400&auto=format&fit=crop&q=80',
   'Copies & Registers': 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&auto=format&fit=crop&q=80',
   'Pens, Pencils & Geometry': 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&auto=format&fit=crop&q=80',
   'Art, Craft & Fevicol': 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=400&auto=format&fit=crop&q=80',
   'Office & Daily Stationery': 'https://images.unsplash.com/photo-1589330694653-ded6df03f754?w=400&auto=format&fit=crop&q=80',
+};
+
+const PASTEL_BOTTOM_GRADIENTS: Record<string, string> = {
+  'Atta & Flours': 'to-amber-50/60',
+  'Rice & Dal': 'to-emerald-50/60',
+  'Oil & Ghee': 'to-yellow-50/60',
+  'Spices & Salt': 'to-rose-50/50',
+  'Dairy & Bakery': 'to-sky-50/60',
+  'Pooja Samagri': 'to-amber-50/60',
+  'Snacks & Biscuits': 'to-orange-50/50',
+  'Tea, Coffee & Drinks': 'to-teal-50/50',
+  'Packaged Foods': 'to-purple-50/50',
+  'Health & Nutrition': 'to-green-50/50',
+  'Household Essentials': 'to-blue-50/50',
+  'Personal Care': 'to-pink-50/50',
+  'Baby Care': 'to-fuchsia-50/50',
+  'Copies & Registers': 'to-sky-50/60',
+  'Pens, Pencils & Geometry': 'to-indigo-50/50',
+  'Art, Craft & Fevicol': 'to-amber-50/60',
+  'Office & Daily Stationery': 'to-emerald-50/50',
 };
 
 interface BlinkitSectionConfig {
@@ -191,9 +191,9 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
 
   // Render individual Blinkit Category Card
   const renderCategoryCard = (cat: CustomCategory, idx: number, extraClasses = '') => {
-    const bgColor =
-      PASTEL_TINTS[cat.name] ||
-      DEFAULT_PASTEL_CYCLE[idx % DEFAULT_PASTEL_CYCLE.length];
+    const gradientBottom =
+      PASTEL_BOTTOM_GRADIENTS[cat.name] ||
+      DEFAULT_GRADIENT_CYCLE[idx % DEFAULT_GRADIENT_CYCLE.length];
 
     // Prioritize custom uploaded photo set by Admin, then live product packshot, then curated fallback
     const packshotUrl =
@@ -208,25 +208,27 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
         key={cat.id || cat.name}
         type="button"
         onClick={() => onSelectCategory(cat.name)}
-        className={`${bgColor} ${extraClasses} rounded-2xl p-2 flex flex-col items-center justify-between text-center aspect-[4/5] shadow-xs active:scale-95 transition-all cursor-pointer hover:shadow-sm border border-black/[0.04] group select-none`}
+        className={`bg-gradient-to-b from-white ${gradientBottom} rounded-2xl border border-neutral-200/80 shadow-sm flex flex-col items-center justify-between overflow-hidden group select-none cursor-pointer active:scale-95 hover:shadow-md transition-all duration-200 ${extraClasses}`}
         title={`View ${cat.name}`}
       >
-        {/* Category Image - Clean centered packshot with transparent background support */}
-        <div className="w-full flex-1 flex items-center justify-center p-0.5 min-h-0">
+        {/* Category Image - Fills 65% to 70% of card height, no tiny inner container */}
+        <div className="w-full h-[68%] flex items-center justify-center overflow-hidden pt-1">
           <img
             src={packshotUrl}
             alt={cat.name}
             loading="lazy"
-            className="h-14 w-14 sm:h-16 sm:w-16 object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
+            className="w-full h-24 sm:h-28 object-contain p-2 transition-transform duration-200 group-hover:scale-105"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(cat.name);
+              (e.currentTarget as HTMLImageElement).src =
+                CURATED_PACKSHOTS[cat.name] ||
+                'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80';
             }}
           />
         </div>
 
-        {/* Category Title - Compact Blinkit styling */}
-        <div className="w-full px-0.5 mt-1">
-          <span className="text-[11px] font-semibold text-gray-800 text-center leading-3.5 line-clamp-2 block">
+        {/* Category Name - Clean, bold, 2-line clamped text below the image */}
+        <div className="w-full px-1 pb-2">
+          <span className="text-xs font-semibold text-neutral-800 text-center leading-tight line-clamp-2 block">
             {cat.name}
           </span>
         </div>

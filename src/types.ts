@@ -23,6 +23,9 @@ export interface Product {
   discountPercent: number; // e.g., 15 for 15%
   finalPrice: number; // Calculated discounted selling price in ₹
   imageUrl: string;
+  image?: string;
+  image_url?: string;
+  thumbnail?: string;
   isAvailable: boolean;
   stock?: number; // In-stock unit count
   stockCount?: number; // Alias for inventory count
