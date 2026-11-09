@@ -98,10 +98,10 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
         </div>
       )}
 
-      {/* Fixed 4-Tab Bottom Navigation: Home | Order Again | Categories | 📸 Parchi */}
+      {/* Fixed 4-Tab Bottom Navigation: Home | Order Again | Categories | Parchi (WhatsApp) */}
       <nav
         aria-label="Bottom Navigation"
-        className="w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-2xl pointer-events-auto"
+        className="w-full bg-white/95 backdrop-blur-md border-t border-stone-200/90 shadow-2xl pointer-events-auto"
       >
         <div className="max-w-md mx-auto grid grid-cols-4 items-center h-16 px-1">
           {/* 1. Home Tab */}
@@ -110,19 +110,19 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
             id="nav-tab-home"
             onClick={onGoHome}
             className={`flex flex-col items-center justify-center h-full gap-0.5 transition-colors cursor-pointer relative ${
-              isHomeActive ? 'text-emerald-700 font-black' : 'text-stone-500 hover:text-stone-800'
+              isHomeActive ? 'text-[#0c831f] font-black' : 'text-stone-500 hover:text-stone-800'
             }`}
           >
             <div
               className={`p-1 rounded-xl transition-all ${
-                isHomeActive ? 'bg-emerald-50 text-emerald-700 scale-105' : ''
+                isHomeActive ? 'bg-emerald-50 text-[#0c831f] scale-105' : ''
               }`}
             >
               <Home className="w-5 h-5" />
             </div>
-            <span className="text-[11px] tracking-tight leading-none">Home</span>
+            <span className="text-[11px] tracking-tight leading-none font-bold">Home</span>
             {isHomeActive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mt-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f] mt-0.5" />
             )}
           </button>
 
@@ -132,19 +132,19 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
             id="nav-tab-order-again"
             onClick={onOrderAgain}
             className={`flex flex-col items-center justify-center h-full gap-0.5 transition-colors cursor-pointer relative ${
-              isOrderAgainActive ? 'text-emerald-700 font-black' : 'text-stone-500 hover:text-stone-800'
+              isOrderAgainActive ? 'text-[#0c831f] font-black' : 'text-stone-500 hover:text-stone-800'
             }`}
           >
             <div
               className={`p-1 rounded-xl transition-all ${
-                isOrderAgainActive ? 'bg-emerald-50 text-emerald-700 scale-105' : ''
+                isOrderAgainActive ? 'bg-emerald-50 text-[#0c831f] scale-105' : ''
               }`}
             >
               <RotateCcw className="w-5 h-5" />
             </div>
-            <span className="text-[11px] tracking-tight leading-none">Order Again</span>
+            <span className="text-[11px] tracking-tight leading-none font-bold">Order Again</span>
             {isOrderAgainActive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mt-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f] mt-0.5" />
             )}
           </button>
 
@@ -154,23 +154,23 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
             id="nav-tab-categories"
             onClick={onOpenCategories}
             className={`flex flex-col items-center justify-center h-full gap-0.5 transition-colors cursor-pointer relative ${
-              isCategoriesActive ? 'text-emerald-700 font-black' : 'text-stone-500 hover:text-stone-800'
+              isCategoriesActive ? 'text-[#0c831f] font-black' : 'text-stone-500 hover:text-stone-800'
             }`}
           >
             <div
               className={`p-1 rounded-xl transition-all ${
-                isCategoriesActive ? 'bg-emerald-50 text-emerald-700 scale-105' : ''
+                isCategoriesActive ? 'bg-emerald-50 text-[#0c831f] scale-105' : ''
               }`}
             >
               <LayoutGrid className="w-5 h-5" />
             </div>
-            <span className="text-[11px] tracking-tight leading-none">Categories</span>
+            <span className="text-[11px] tracking-tight leading-none font-bold">Categories</span>
             {isCategoriesActive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mt-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0c831f] mt-0.5" />
             )}
           </button>
 
-          {/* 4. Order via Parchi Tab */}
+          {/* 4. Parchi (WhatsApp) Tab */}
           <button
             type="button"
             id="nav-tab-parchi"
@@ -181,11 +181,11 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
               <Camera className="w-5 h-5" />
               <span className="absolute -top-1 -right-1 flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0c831f]"></span>
               </span>
             </div>
-            <span className="text-[11px] font-black text-stone-900 tracking-tight leading-none">
-              📸 Parchi
+            <span className="text-[10px] sm:text-[11px] font-bold text-stone-900 tracking-tight leading-none truncate max-w-[90px]">
+              Parchi (WhatsApp)
             </span>
           </button>
         </div>

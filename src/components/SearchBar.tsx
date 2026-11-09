@@ -13,10 +13,10 @@ interface SearchBarProps {
 }
 
 const ROTATING_SEARCH_PLACEHOLDERS = [
+  'Search sugar, fortune oil, tea, ghee...',
   'Search for atta, dal, biscuits, surf...',
-  'Search for sugar, fortune oil, tea, ghee...',
-  'खोजें: आटा, दाल, तेल, बिस्कुट, मसाले...',
-  'Search for surf excel, maggi, colgate, soap...',
+  'Search for milk, butter, bread, curd...',
+  'खोजें: चीनी, फॉर्च्यून तेल, चाय पत्ती, घी...',
 ];
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -214,10 +214,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             }
           }}
           placeholder={activePlaceholder}
-          className={`w-full pl-10 pr-20 py-2.5 bg-white text-stone-900 placeholder:text-stone-400 text-xs sm:text-sm rounded-full border transition-all shadow-sm font-medium focus:outline-hidden ${
+          className={`w-full pl-10 pr-20 py-2.5 bg-stone-50/80 hover:bg-white focus:bg-white text-stone-900 placeholder:text-stone-400 text-xs sm:text-sm rounded-2xl border transition-all shadow-2xs font-medium focus:outline-hidden ${
             isListening
               ? 'border-red-500 ring-2 ring-red-400/30'
-              : 'border-stone-200 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600'
+              : 'border-stone-200 focus:ring-2 focus:ring-[#0c831f]/20 focus:border-[#0c831f]'
           }`}
         />
 

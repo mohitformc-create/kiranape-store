@@ -110,47 +110,29 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden shadow-md">
-      {/* Warm Butter-Yellow App Header (Blinkit Premium Aesthetic) */}
-      <div className="bg-[#fff9e6] text-stone-900 border-b border-amber-200/70 backdrop-blur-md px-3 sm:px-4 pt-2 pb-2">
-        <div className="max-w-6xl mx-auto">
-          {/* Top Row: Official Kiranape Logo + Store Name on Left, Aligned Deliver To Selector on Right */}
+    <header className="sticky top-0 z-40 w-full max-w-full overflow-x-hidden bg-white/95 backdrop-blur-md shadow-xs border-b border-stone-200/70">
+      <div className="px-3 sm:px-4 pt-2.5 pb-2.5">
+        <div className="max-w-6xl mx-auto space-y-2">
+          {/* Top Brand Bar: Brand on Left, Location Pill & Refer & Earn on Right */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left: Official Brand Identity Component */}
-            <div className="flex items-center min-w-0 flex-shrink">
-              <BrandLogo className="h-9 w-auto object-contain" subtitle={cleanDeliveryTagline} />
+            {/* Left: Brand name "Kiranapė EXPRESS" with clean badge */}
+            <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-[#0c831f] text-white flex items-center justify-center font-black shadow-xs text-base flex-shrink-0">
+                🛒
+              </div>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-heading font-black text-lg sm:text-xl text-[#0c831f] tracking-tight">
+                  Kiranapė
+                </span>
+                <span className="bg-[#ffc200] text-stone-950 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-2xs">
+                  EXPRESS
+                </span>
+              </div>
             </div>
 
-            {/* Right: Actions and Delivery Area */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {onOpenLaunchPoster && (
-                <button
-                  type="button"
-                  id="header-launch-offers-btn"
-                  onClick={onOpenLaunchPoster}
-                  className="hidden xs:flex items-center gap-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300/80 px-2 sm:px-2.5 py-1.5 rounded-full text-xs font-black cursor-pointer transition-all active:scale-95 shadow-2xs"
-                  title="View Exclusive Waidhan Launch Offers"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                  <span className="hidden sm:inline">Offers</span>
-                  <span className="sm:hidden">Offer</span>
-                </button>
-              )}
-
-              {onOpenReferAndEarn && (
-                <button
-                  type="button"
-                  id="header-refer-earn-btn"
-                  onClick={onOpenReferAndEarn}
-                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black cursor-pointer transition-all shadow-xs"
-                  title="Refer & Earn ₹50 Discount"
-                >
-                  <Gift className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Refer <span className="text-amber-200">₹50</span></span>
-                </button>
-              )}
-
-              {/* Delivery Area Selector Aligned Beside Brand */}
+            {/* Right: Location Pill "Waidhan Store" with edit icon + Gold "Refer & Earn ₹50" Pill */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              {/* Location Pill "Waidhan Store" with edit icon */}
               <button
                 type="button"
                 id="header-location-selector-btn"
@@ -158,32 +140,48 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
                   setDeliveryLocationsList(getDeliveryLocations());
                   setShowLocationModal(true);
                 }}
-                className="flex items-center gap-1.5 bg-white/95 hover:bg-white active:scale-95 text-stone-900 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-extrabold shadow-2xs border border-amber-200/80 cursor-pointer transition-all max-w-[140px] xs:max-w-[180px] sm:max-w-sm flex-shrink-0"
+                className="flex items-center gap-1 sm:gap-1.5 bg-stone-100 hover:bg-stone-200/90 active:scale-95 text-stone-900 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold border border-stone-200/90 shadow-2xs cursor-pointer transition-all max-w-[125px] xs:max-w-[160px] sm:max-w-xs flex-shrink-0"
                 title="Deliver to - Change Location"
               >
-                <MapPin className="w-3.5 h-3.5 text-emerald-700 fill-emerald-600 flex-shrink-0" />
-                <div className="flex flex-col text-left min-w-0">
-                  <span className="text-[8px] font-extrabold uppercase tracking-wider text-stone-400 leading-none">
-                    Deliver to
-                  </span>
-                  <span className="truncate text-stone-950 text-xs font-black leading-tight">
-                    {selectedLocation}
-                  </span>
-                </div>
-                <ChevronDown className="w-3 h-3 text-stone-600 flex-shrink-0 ml-0.5" />
+                <MapPin className="w-3.5 h-3.5 text-[#0c831f] fill-[#0c831f] flex-shrink-0" />
+                <span className="truncate text-stone-900 text-xs font-black">
+                  {selectedLocation || 'Waidhan Store'}
+                </span>
+                <span className="text-[10px] text-stone-500 hover:text-stone-700 flex-shrink-0">
+                  ✏️
+                </span>
               </button>
+
+              {/* Gold "Refer & Earn ₹50" Pill */}
+              {onOpenReferAndEarn && (
+                <button
+                  type="button"
+                  id="header-refer-earn-btn"
+                  onClick={onOpenReferAndEarn}
+                  className="flex items-center gap-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-yellow-500 active:scale-95 text-stone-950 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black shadow-2xs cursor-pointer transition-all flex-shrink-0 border border-amber-500/30"
+                  title="Refer & Earn ₹50 Discount"
+                >
+                  <Gift className="w-3.5 h-3.5 text-stone-950" />
+                  <span className="hidden xs:inline">Refer & Earn</span>
+                  <span className="xs:hidden">Refer</span>
+                  <span className="bg-stone-950 text-amber-300 px-1 py-0.2 rounded font-mono text-[10px]">
+                    ₹50
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Minimal White Search Bar: Clean full-width pill with Mic and Camera icons */}
+          {/* Full-Width Rounded-2xl Search Bar */}
           <SearchBar
             searchQuery={searchQuery}
             onSearchChange={onSearchChange}
+            placeholder="Search sugar, fortune oil, tea, ghee..."
             onSecretAdminTrigger={onSecretAdminTrigger}
             onOpenParchiModal={onOpenParchiModal}
             onOpenVoiceModal={onOpenVoiceModal}
             onOpenDigitalParchiModal={onOpenDigitalParchiModal}
-            className="mt-2"
+            className="w-full"
           />
 
           {/* Top Horizontal Category Tabs: Smoothly scrollable with clear icons & soft highlight */}

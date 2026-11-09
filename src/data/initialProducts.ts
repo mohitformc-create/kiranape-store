@@ -24,6 +24,20 @@ export const STORE_DEFAULTS: StoreSettings = {
 
 export const DEFAULT_BANNERS: PromoBanner[] = [
   {
+    id: 'banner-festive-dhamaka',
+    title: 'किरानापे उत्सव धमाका - Get Heavy Discounts & Gift Offers!',
+    subtitle: 'Taaza kirana, Fortune oil, Chakki Atta aur Daily Essentials par bhari bachat!',
+    badge: '🎉 FESTIVE SPECIAL',
+    imageUrl: '/src/assets/images/festive_grocery_collage_1794205029244.jpg',
+    linkCategory: 'All',
+    gradient: 'from-amber-600 via-orange-600 to-rose-700',
+    buttonText: 'ORDER NOW ➔',
+    actionType: 'shop_now',
+    targetType: 'category',
+    isActive: true,
+    order: 0,
+  },
+  {
     id: 'banner-stayfree-xl',
     title: 'Stayfree Secure XL (40 Pads) @ ₹180 Only!',
     subtitle: 'MRP ₹270 pack just at ₹180 on orders above ₹1999! (Regular Price: ₹200)',

@@ -90,6 +90,8 @@ import {
 } from './data/specialDealsCatalog';
 import { HomeBannerCarousel } from './components/HomeBannerCarousel';
 import { CustomerHeader } from './components/CustomerHeader';
+import { QuickNavStrip } from './components/QuickNavStrip';
+import { DailyEssentialsTray } from './components/DailyEssentialsTray';
 import { ProductCard } from './components/ProductCard';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
 import { CategoryDetailView } from './components/CategoryDetailView';
@@ -1228,8 +1230,21 @@ export default function App() {
               whatsappNumber={storeSettings.phone || '9424316081'}
             />
 
-            {/* Subtle Blinkit Quick Note Chips */}
-            <div className="flex items-center justify-center gap-2.5 px-3 pt-1 pb-0.5">
+            {/* 3. Quick Navigation Horizontal Icons Strip */}
+            <QuickNavStrip
+              onSelectCategory={(catName) => {
+                setSelectedCategory(catName as ProductCategory);
+                const el = document.getElementById('all-products-section');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                }
+              }}
+            />
+
+            {/* Subtle Blinkit Quick Parchi Chips */}
+            <div className="flex items-center justify-center gap-2.5 px-3 py-1">
               <button
                 type="button"
                 id="home-digital-parchi-pill"
@@ -1246,11 +1261,11 @@ export default function App() {
                 className="inline-flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-white/90 hover:bg-emerald-50/80 border border-stone-200/70 text-stone-700 hover:text-emerald-900 text-[11px] font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
                 <span className="text-xs">📸</span>
-                <span>पर्ची की फोटो</span>
+                <span>पर्ची की फोटो भेजें</span>
               </button>
             </div>
 
-            {/* Category Hub (Cards with icons) */}
+            {/* 4. "Browse Categories" Grid (3-column Blinkit/Zepto grid) */}
             <div id="category-grid-section">
               <CategoryTileGrid
                 department={selectedDepartment}
@@ -1258,20 +1273,35 @@ export default function App() {
                 products={products}
                 onSelectCategory={(catName) => {
                   setSelectedCategory(catName as ProductCategory);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  const el = document.getElementById('all-products-section');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    window.scrollTo({ top: 400, behavior: 'smooth' });
+                  }
                 }}
               />
             </div>
 
-            {/* Direct Products Grid (Amazon Fresh / Zepto Style) */}
-            <div>
+            {/* 5. "Taaza Samaan & Daily Essentials" Horizontal Product Tray */}
+            <div id="daily-essentials-section">
+              <DailyEssentialsTray
+                products={products}
+                cartQuantities={cartQuantities}
+                onAddToCart={handleAddToCart}
+                onUpdateQuantity={handleUpdateQuantity}
+              />
+            </div>
+
+            {/* All Products Grid */}
+            <div id="all-products-section" className="pt-2">
               <div className="flex items-center justify-between mb-3 px-1">
                 <div>
                   <h3 className="font-heading font-black text-base sm:text-lg text-stone-900 tracking-tight">
-                    Taaza Samaan & Daily Essentials
+                    Explore All Kirana Products
                   </h3>
                   <p className="text-xs text-stone-500 font-medium">
-                    Shuddh kirana, seedhe aapke ghar tak
+                    Shuddh kirana & daily essentials, seedhe aapke ghar tak
                   </p>
                 </div>
                 <span className="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">

@@ -138,7 +138,15 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
     }
 
     // 2. Named deals
-    if (banner.actionType === 'stayfree_deal' || banner.id === 'banner-stayfree-xl') {
+    if (banner.actionType === 'shop_now' || banner.id === 'banner-festive-dhamaka') {
+      if (onSelectCategory) {
+        onSelectCategory('All');
+        setTimeout(() => {
+          const el = document.getElementById('daily-essentials-section') || document.getElementById('category-grid-section');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 50);
+      }
+    } else if (banner.actionType === 'stayfree_deal' || banner.id === 'banner-stayfree-xl') {
       if (onClaimStayfreeDeal) {
         onClaimStayfreeDeal();
       } else if (onSelectCategory) {
@@ -300,27 +308,37 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
                           </button>
                         </div>
                       )
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => handleBannerAction(banner, e)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white text-stone-900 hover:bg-stone-100 active:scale-95 text-xs font-heading font-extrabold shadow-md transition-all cursor-pointer group"
-                      >
-                        <span>{banner.buttonText || 'Claim Deal ➔'}</span>
-                        <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                      </button>
-                    )}
+                    ) : (() => {
+                      const isOrderNow =
+                        banner.id === 'banner-festive-dhamaka' ||
+                        (banner.buttonText && banner.buttonText.toUpperCase().includes('ORDER NOW'));
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => handleBannerAction(banner, e)}
+                          className={`inline-flex items-center gap-1.5 active:scale-95 text-xs sm:text-sm font-heading font-black shadow-md transition-all cursor-pointer group ${
+                            isOrderNow
+                              ? 'px-4 py-2 sm:px-5 sm:py-2.5 rounded-full bg-[#0c831f] hover:bg-[#0a731b] text-white border border-emerald-400/40'
+                              : 'px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white text-stone-900 hover:bg-stone-100'
+                          }`}
+                        >
+                          <span>{banner.buttonText || (isOrderNow ? 'ORDER NOW ➔' : 'Claim Deal ➔')}</span>
+                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform stroke-[2.5]" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
 
-                {/* Right: Authentic Packshot Graphic with Drop Shadow */}
+                {/* Right: Authentic Packshot / Product Collage Graphic with Drop Shadow */}
                 <div className="flex-shrink-0 w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center relative z-10">
-                  <div className="w-full h-full p-1 bg-white/10 backdrop-blur-xs rounded-2xl border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <div className="w-full h-full p-1 bg-white/10 backdrop-blur-xs rounded-2xl border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform overflow-hidden">
                     {banner.imageUrl ? (
                       <img
                         src={banner.imageUrl}
                         alt={banner.title}
-                        className="w-full h-full object-contain drop-shadow-md rounded-xl"
+                        className="w-full h-full object-cover sm:object-contain drop-shadow-md rounded-xl"
                         loading="lazy"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).style.display = 'none';

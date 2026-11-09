@@ -219,7 +219,7 @@ export interface PromoBanner {
   createdAt?: number;
   gradient?: string;
   buttonText?: string;
-  actionType?: 'stayfree_deal' | 'parle_deal' | 'free_delivery' | 'parchi' | 'stationery' | 'category' | 'whatsapp' | 'product';
+  actionType?: 'stayfree_deal' | 'parle_deal' | 'free_delivery' | 'parchi' | 'stationery' | 'category' | 'whatsapp' | 'product' | 'shop_now';
   actionPayload?: string;
   targetType?: BannerTargetType;
   productId?: string;
