@@ -16,6 +16,7 @@ interface BottomNavBarProps {
   onOpenParchi: () => void;
   onOpenCart: () => void;
   isOrderAgainActive?: boolean;
+  isCategoriesActive?: boolean;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
@@ -30,9 +31,14 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   onOpenParchi,
   onOpenCart,
   isOrderAgainActive = false,
+  isCategoriesActive: propIsCategoriesActive,
 }) => {
-  const isHomeActive = currentCategory === 'All' && !isSearching && !isOrderAgainActive;
-  const isCategoriesActive = currentCategory !== 'All' && !isSearching && !isOrderAgainActive;
+  const isCategoriesActive =
+    propIsCategoriesActive !== undefined
+      ? propIsCategoriesActive
+      : currentCategory !== 'All' && !isSearching && !isOrderAgainActive;
+  const isHomeActive =
+    !isCategoriesActive && currentCategory === 'All' && !isSearching && !isOrderAgainActive;
 
   // Up to 3 preview thumbnails of items in cart
   const previewThumbnails = cartItems.slice(0, 3);

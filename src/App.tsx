@@ -94,6 +94,7 @@ import { QuickNavStrip } from './components/QuickNavStrip';
 import { DailyEssentialsTray } from './components/DailyEssentialsTray';
 import { ProductCard } from './components/ProductCard';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
+import { CategoriesScreen } from './components/CategoriesScreen';
 import { CategoryDetailView } from './components/CategoryDetailView';
 import { BottomNavBar } from './components/BottomNavBar';
 import { CartDrawer } from './components/CartDrawer';
@@ -153,6 +154,7 @@ export default function App() {
   const [selectedDepartment, setSelectedDepartment] = useState<'grocery' | 'stationery'>('grocery');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('All');
+  const [isCategoriesScreenOpen, setIsCategoriesScreenOpen] = useState(false);
   const [cartQuantities, setCartQuantities] = useState<Record<string, number>>(() => getSavedCart());
 
   // Auto-sync products state safely to permanent storage on state changes
@@ -1073,42 +1075,64 @@ export default function App() {
         </div>
       )}
 
-      {/* Customer Header with brand, search, category pills */}
-      <CustomerHeader
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        selectedDepartment={selectedDepartment}
-        onSelectDepartment={(dept) => {
-          setSelectedDepartment(dept);
-          setSelectedCategory('All');
-        }}
-        totalCartItems={totalCartCount}
-        cartTotalAmount={cartTotalAmount}
-        onOpenCart={() => setIsCartOpen(true)}
-        onSecretAdminTrigger={handleSecretAdminAccess}
-        currentUser={currentUser}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onLogout={async () => {
-          await logoutUser();
-          setCurrentUser(null);
-        }}
-        onOpenTracker={() => setIsTrackerOpen(true)}
-        hasActiveOrders={orders.some(
-          (o) => o.status !== 'delivered' && o.status !== 'Delivered' && o.status !== 'cancelled' && o.status !== 'Cancelled'
-        )}
-        storeSettings={storeSettings}
-        categories={customCategories}
-        onOpenParchiModal={() => setIsParchiModalOpen(true)}
-        onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
-        onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
-        onOpenReferAndEarn={() => setIsReferModalOpen(true)}
-        onOpenLaunchPoster={() => setIsLaunchModalOpen(true)}
-      />
+      {/* CONDITIONAL RENDERING: 3D BLINKIT/ZEPTO CATEGORIES SCREEN OR HOME EXPERIENCE */}
+      {isCategoriesScreenOpen && selectedCategory === 'All' && !searchQuery ? (
+        <CategoriesScreen
+          onSelectCategory={(cat) => {
+            setSelectedCategory(cat);
+            setIsCategoriesScreenOpen(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
+          onGlobalSearch={(q) => {
+            setSearchQuery(q);
+            setIsCategoriesScreenOpen(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          products={products}
+        />
+      ) : (
+        <>
+          {/* Customer Header with brand, search, category pills */}
+          <CustomerHeader
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedCategory={selectedCategory}
+            onSelectCategory={(cat) => {
+              setSelectedCategory(cat);
+              setIsCategoriesScreenOpen(false);
+            }}
+            selectedDepartment={selectedDepartment}
+            onSelectDepartment={(dept) => {
+              setSelectedDepartment(dept);
+              setSelectedCategory('All');
+              setIsCategoriesScreenOpen(false);
+            }}
+            totalCartItems={totalCartCount}
+            cartTotalAmount={cartTotalAmount}
+            onOpenCart={() => setIsCartOpen(true)}
+            onSecretAdminTrigger={handleSecretAdminAccess}
+            currentUser={currentUser}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onLogout={async () => {
+              await logoutUser();
+              setCurrentUser(null);
+            }}
+            onOpenTracker={() => setIsTrackerOpen(true)}
+            hasActiveOrders={orders.some(
+              (o) => o.status !== 'delivered' && o.status !== 'Delivered' && o.status !== 'cancelled' && o.status !== 'Cancelled'
+            )}
+            storeSettings={storeSettings}
+            categories={customCategories}
+            onOpenParchiModal={() => setIsParchiModalOpen(true)}
+            onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
+            onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
+            onOpenReferAndEarn={() => setIsReferModalOpen(true)}
+            onOpenLaunchPoster={() => setIsLaunchModalOpen(true)}
+          />
 
-      {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto w-full px-2 sm:px-4 pt-1 sm:pt-2 flex-1">
+          {/* Main Content Area */}
+          <main className="max-w-6xl mx-auto w-full px-2 sm:px-4 pt-1 sm:pt-2 flex-1">
 
         {/* CONDITIONAL RENDERING: 
             1. Search Results (if user entered search text)
@@ -1198,7 +1222,11 @@ export default function App() {
             categories={customCategories}
             products={products}
             cartQuantities={cartQuantities}
-            onBackToCategories={() => setSelectedCategory('All')}
+            onBackToCategories={() => {
+              setSelectedCategory('All');
+              setIsCategoriesScreenOpen(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onAddToCart={handleAddToCart}
             onUpdateQuantity={handleUpdateQuantity}
             onSelectCategory={(cat) => setSelectedCategory(cat as ProductCategory)}
@@ -1217,11 +1245,13 @@ export default function App() {
               onOpenParchiUpload={() => setIsParchiModalOpen(true)}
               onSelectCategory={(catName) => {
                 setSelectedCategory(catName as ProductCategory);
+                setIsCategoriesScreenOpen(false);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onSelectProduct={(prod) => {
                 if (prod.category) {
                   setSelectedCategory(prod.category as ProductCategory);
+                  setIsCategoriesScreenOpen(false);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
               }}
@@ -1234,6 +1264,7 @@ export default function App() {
             <QuickNavStrip
               onSelectCategory={(catName) => {
                 setSelectedCategory(catName as ProductCategory);
+                setIsCategoriesScreenOpen(false);
                 const el = document.getElementById('all-products-section');
                 if (el) {
                   el.scrollIntoView({ behavior: 'smooth' });
@@ -1273,12 +1304,18 @@ export default function App() {
                 products={products}
                 onSelectCategory={(catName) => {
                   setSelectedCategory(catName as ProductCategory);
+                  setIsCategoriesScreenOpen(false);
                   const el = document.getElementById('all-products-section');
                   if (el) {
                     el.scrollIntoView({ behavior: 'smooth' });
                   } else {
                     window.scrollTo({ top: 400, behavior: 'smooth' });
                   }
+                }}
+                onViewAllClick={() => {
+                  setIsCategoriesScreenOpen(true);
+                  setSelectedCategory('All');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               />
             </div>
@@ -1325,6 +1362,8 @@ export default function App() {
           </div>
         )}
       </main>
+      </>
+      )}
 
       {/* Fixed Bottom Navigation Bar: Home | Order Again | Categories | 📸 Order via Parchi */}
       <BottomNavBar
@@ -1334,7 +1373,9 @@ export default function App() {
         cartTotalAmount={cartTotalAmount}
         cartItems={cartItems}
         isOrderAgainActive={isTrackerOpen}
+        isCategoriesActive={isCategoriesScreenOpen || (selectedCategory !== 'All' && !searchQuery.trim() && !isTrackerOpen)}
         onGoHome={() => {
+          setIsCategoriesScreenOpen(false);
           setSelectedCategory('All');
           setSearchQuery('');
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1343,22 +1384,17 @@ export default function App() {
           setIsTrackerOpen(true);
         }}
         onOpenCategories={() => {
-          if (selectedCategory !== 'All') {
-            setSelectedCategory('All');
-          }
+          setIsCategoriesScreenOpen(true);
+          setSelectedCategory('All');
           setSearchQuery('');
-          setTimeout(() => {
-            const el = document.getElementById('category-grid-section');
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth' });
-            }
-          }, 50);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenParchi={() => setIsParchiModalOpen(true)}
         onOpenCart={() => setIsCartOpen(true)}
       />
 
       {/* Customer Footer with dynamic store settings */}
+      {!isCategoriesScreenOpen && (
       <footer className="mt-16 bg-white border-t border-stone-200 pt-8 pb-24 sm:pb-12 px-4 text-xs text-stone-500">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div>
@@ -1443,6 +1479,7 @@ export default function App() {
           <CreatorCredits />
         </div>
       </footer>
+      )}
 
       {/* MODALS */}
 
