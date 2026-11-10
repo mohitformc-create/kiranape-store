@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Product, ProductVariant, CustomCategory } from '../types';
 import { ProductCard } from './ProductCard';
-import { ArrowLeft, Search, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, Search, X, Sparkles, ShoppingBasket } from 'lucide-react';
 
 interface CategoryDetailViewProps {
   categoryName: string;
@@ -158,19 +158,20 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
 
       {/* 3. FULL-WIDTH SPACIOUS ULTRA-CLEAN PRODUCT GRID (NO CLUTTER, NO SIDEBARS) */}
       {categoryProducts.length === 0 ? (
-        <div className="bg-white rounded-3xl p-8 sm:p-12 text-center border border-stone-200 shadow-xs my-4">
-          <div className="w-14 h-14 rounded-2xl bg-stone-100 flex items-center justify-center mx-auto mb-3 text-stone-400">
-            <Search className="w-7 h-7" />
+        <div className="bg-white rounded-3xl p-8 sm:p-12 text-center border border-stone-200 shadow-xs my-4 max-w-md mx-auto">
+          {/* Clean shopping basket illustration */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-2xs">
+            <ShoppingBasket className="w-8 h-8 sm:w-10 sm:h-10 stroke-[1.8] text-emerald-600" />
           </div>
-          <h4 className="font-heading font-bold text-stone-900 text-base sm:text-lg">
+          <h4 className="font-heading font-black text-stone-900 text-base sm:text-lg">
             {internalSearch
               ? `No items match "${internalSearch}" in ${categoryName}`
-              : `No items available in ${categoryName} right now`}
+              : 'इस कैटेगरी में नए प्रोडक्ट्स जल्द जोड़े जा रहे हैं!'}
           </h4>
-          <p className="text-xs text-stone-500 max-w-sm mx-auto mt-1">
+          <p className="text-xs text-stone-500 max-w-sm mx-auto mt-1.5 font-medium leading-relaxed">
             {internalSearch
               ? 'Try searching with general keywords or check other categories.'
-              : 'Our inventory is being restocked. Please browse other departments.'}
+              : 'Fresh stocks arriving soon at Waidhan store.'}
           </p>
 
           <div className="mt-5 flex items-center justify-center gap-2">
@@ -186,7 +187,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             <button
               type="button"
               onClick={onBackToCategories}
-              className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs active:scale-95"
             >
               Return to All Categories
             </button>

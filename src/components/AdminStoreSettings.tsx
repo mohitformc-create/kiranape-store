@@ -38,6 +38,7 @@ import {
   saveDeliveryLocations,
   DEFAULT_DELIVERY_LOCATIONS,
 } from '../services/storageService';
+import { purgeAllFirestoreProducts } from '../services/firebase';
 
 interface AdminStoreSettingsProps {
   storeSettings: StoreSettings;
@@ -45,6 +46,7 @@ interface AdminStoreSettingsProps {
   onSaveSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   onSaveBanners: (banners: PromoBanner[]) => Promise<void>;
   isFirebaseConnected?: boolean;
+  onPurgeProducts?: () => Promise<void> | void;
 }
 
 const PRESET_BANNER_IMAGES = [
@@ -76,7 +78,30 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
   onSaveSettings,
   onSaveBanners,
   isFirebaseConnected = false,
+  onPurgeProducts,
 }) => {
+  // Purge Catalog State
+  const [isPurgingAllProducts, setIsPurgingAllProducts] = useState(false);
+  const [purgeNotice, setPurgeNotice] = useState<string | null>(null);
+  const [showPurgeModal, setShowPurgeModal] = useState(false);
+
+  const handleExecutePurgeProducts = async () => {
+    setIsPurgingAllProducts(true);
+    try {
+      if (onPurgeProducts) {
+        await onPurgeProducts();
+      } else {
+        await purgeAllFirestoreProducts();
+      }
+      setShowPurgeModal(false);
+      setPurgeNotice('All products removed successfully.');
+      setTimeout(() => setPurgeNotice(null), 5000);
+    } catch (err: any) {
+      alert('Error purging products: ' + (err?.message || 'Failed'));
+    } finally {
+      setIsPurgingAllProducts(false);
+    }
+  };
   // Store Settings Form State
   const [name, setName] = useState(storeSettings.name || '');
   const [tagline, setTagline] = useState(storeSettings.tagline || '');
@@ -916,6 +941,104 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* ================= SECTION 3: STORE MAINTENANCE & CATALOG RESET ================= */}
+      <section className="bg-white rounded-2xl p-6 border border-rose-200 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+              <Trash2 className="w-5 h-5 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="font-heading font-extrabold text-stone-900 text-lg flex items-center gap-2">
+                <span>Store Maintenance & Catalog Reset</span>
+                <span className="text-[11px] font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full">
+                  Admin Action
+                </span>
+              </h3>
+              <p className="text-xs text-stone-500">
+                Purge corrupted, test, or obsolete items from the master Cloud Firestore products collection.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {purgeNotice && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold flex items-center gap-2 animate-in fade-in">
+            <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{purgeNotice}</span>
+          </div>
+        )}
+
+        <div className="p-4 bg-rose-50/60 border border-rose-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-rose-950 uppercase tracking-wide">
+              Danger Zone: Purge All Products
+            </h4>
+            <p className="text-xs text-rose-700 max-w-xl">
+              Permanently delete all product documents from the Firestore database and reset the catalog. Store categories, banners, and settings remain untouched.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            id="admin-settings-purge-all-products-btn"
+            onClick={() => setShowPurgeModal(true)}
+            disabled={isPurgingAllProducts}
+            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-heading font-extrabold shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Purge & Delete All Products</span>
+          </button>
+        </div>
+
+        {showPurgeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/75 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-rose-200 text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+                <Trash2 className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-heading font-black text-stone-900 text-lg">
+                  Purge & Delete All Products?
+                </h4>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  Are you sure you want to completely purge and delete all products from the <strong>Firestore Database</strong> and <strong>Kiranape Catalog</strong>?
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPurgeModal(false)}
+                  disabled={isPurgingAllProducts}
+                  className="flex-1 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel (रद्द करें)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecutePurgeProducts}
+                  disabled={isPurgingAllProducts}
+                  className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-heading font-black transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isPurgingAllProducts ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Purging Products...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Purge & Delete All Products</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>

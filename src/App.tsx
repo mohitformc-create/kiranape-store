@@ -20,6 +20,7 @@ import {
   Key,
   PenLine,
   X,
+  ShoppingBasket,
 } from 'lucide-react';
 import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderItemSummary, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
 import {
@@ -60,7 +61,6 @@ import {
   updateProductInSupabase,
   deleteProductFromSupabase,
   wipeAllProductsFromSupabase,
-  syncProductsFromSupabase,
 } from './services/supabaseClient';
 import { dispatchOrderInBackground } from './services/orderQueueService';
 import { sendTelegramOrderNotification } from './services/telegramNotificationService';
@@ -79,6 +79,7 @@ import {
   updateProductInFirestore,
   deleteProductFromFirestore,
   createOrderInFirestore,
+  purgeAllFirestoreProducts,
 } from './services/firebase';
 import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
 import {
@@ -143,8 +144,8 @@ export default function App() {
   // Custom Categories State (Dynamic Super-Store)
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => getCustomCategories());
 
-  // Core Data State - Rock-Solid Permanent Storage for Kiranape Catalog (105 Wholesale Catalog)
-  const [products, setProducts] = useState<Product[]>(() => getProducts());
+  // Core Data State - Initial product list defaults to empty array []
+  const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>(() => getOrders());
   const [adminPin, setAdminPinState] = useState<string>(() => getAdminPin());
 
@@ -401,7 +402,7 @@ export default function App() {
 
     // 3. Real-Time Cloud Firestore products and categories listeners across all devices
     const unsubscribeFirestoreProducts = subscribeToFirestoreProducts((liveProducts) => {
-      if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+      if (Array.isArray(liveProducts)) {
         setProducts(liveProducts);
       }
     });
@@ -412,64 +413,12 @@ export default function App() {
       }
     });
 
-    // 4. Initial load of orders and products from Central Server Database with custom edits preservation
+    // 4. Initial load of orders from Central Server Database
     fetchCentralOrders().then((serverOrders) => {
       if (serverOrders && serverOrders.length > 0) {
         setOrders(serverOrders);
       }
     }).catch(console.warn);
-
-    // 5. Initial load: Live fetch products from Supabase 'products' table
-    syncProductsFromSupabase()
-      .then((supabaseProducts) => {
-        if (Array.isArray(supabaseProducts) && supabaseProducts.length > 0) {
-          console.log(`[Kiranape] Loaded ${supabaseProducts.length} live products directly from Supabase`);
-          setProducts(supabaseProducts);
-          saveProducts(supabaseProducts);
-          return;
-        }
-
-        // Fallback to central server database if Supabase has not been seeded yet
-        fetchCentralInventory()
-          .then((serverInventory) => {
-            let localCustomProducts: Record<string, Partial<Product>> = {};
-            try {
-              const storedCustom = localStorage.getItem('chaurasia_custom_products');
-              if (storedCustom) {
-                localCustomProducts = JSON.parse(storedCustom) || {};
-              }
-            } catch {}
-
-            const baseList =
-              Array.isArray(serverInventory) && serverInventory.length > 0
-                ? serverInventory
-                : getProducts();
-
-            const merged = baseList.map((p) => {
-              const customOverride = localCustomProducts[p.id];
-              if (customOverride) {
-                return {
-                  ...p,
-                  ...customOverride,
-                  imageUrl: customOverride.imageUrl || p.imageUrl,
-                };
-              }
-              return p;
-            });
-
-            setProducts(merged);
-            saveProducts(merged);
-          })
-          .catch(() => {
-            const current = getProducts();
-            setProducts(current);
-          });
-      })
-      .catch((err) => {
-        console.warn('Supabase fetch notice:', err);
-        const current = getProducts();
-        setProducts(current);
-      });
 
     const handleOrdersUpdated = () => {
       setOrders(getOrders());
@@ -957,9 +906,11 @@ export default function App() {
       clearAllProducts();
       setProducts([]);
       setCartQuantities({});
+      // Wipe all products from Firebase Firestore
+      await purgeAllFirestoreProducts();
       // Wipe all products from Supabase and Central Server
-      await wipeAllProductsFromSupabase();
-      await clearAllProductsFromCentralServer();
+      await wipeAllProductsFromSupabase().catch(() => {});
+      await clearAllProductsFromCentralServer().catch(() => {});
     } catch (err) {
       console.warn('Error wiping catalog:', err);
     }
@@ -1324,18 +1275,32 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
-                {products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    quantityInCart={cartQuantities[product.id] || 0}
-                    cartQuantities={cartQuantities}
-                    onAddToCart={handleAddToCart}
-                    onUpdateQuantity={handleUpdateQuantity}
-                  />
-                ))}
-              </div>
+              {products.length === 0 ? (
+                <div className="bg-white rounded-3xl p-8 sm:p-12 text-center border border-stone-200 shadow-xs my-4 max-w-md mx-auto">
+                  <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3.5 border border-emerald-100 shadow-2xs">
+                    <ShoppingBasket className="w-8 h-8 stroke-[1.8] text-emerald-600" />
+                  </div>
+                  <h4 className="font-heading font-black text-stone-900 text-base sm:text-lg">
+                    इस कैटेगरी में नए प्रोडक्ट्स जल्द जोड़े जा रहे हैं!
+                  </h4>
+                  <p className="text-xs text-stone-500 max-w-sm mx-auto mt-1 font-medium leading-relaxed">
+                    Fresh stocks arriving soon at Waidhan store.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      quantityInCart={cartQuantities[product.id] || 0}
+                      cartQuantities={cartQuantities}
+                      onAddToCart={handleAddToCart}
+                      onUpdateQuantity={handleUpdateQuantity}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -105,6 +105,7 @@ import {
   addCategoryToFirestore,
   updateCategoryInFirestore,
   deleteCategoryFromFirestore,
+  purgeAllFirestoreProducts,
 } from '../services/firebase';
 
 interface AdminPanelProps {
@@ -669,17 +670,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleExecuteWipeCatalog = async () => {
     setIsWipingAllProducts(true);
     try {
-      // 1. Wipe Supabase table 'products'
-      await wipeAllProductsFromSupabase();
-      // 2. Wipe Central Express Server inventory
-      await clearAllProductsFromCentralServer();
-      // 3. Wipe local storage and reset state
+      // 1. Wipe Firebase Firestore 'products' collection & local store
+      await purgeAllFirestoreProducts();
+      // 2. Wipe Supabase table 'products'
+      await wipeAllProductsFromSupabase().catch(() => {});
+      // 3. Wipe Central Express Server inventory
+      await clearAllProductsFromCentralServer().catch(() => {});
+      // 4. Wipe local storage and reset state
       onResetDefaultProducts();
       if (onRefreshProducts) {
         onRefreshProducts([]);
       }
       setShowWipeCatalogModal(false);
-      setWipeNotification('✓ Saare purane/dummy products Supabase database aur catalog se safalta-purvak clean ho gaye! Ab aap naye products fresh add kar sakte hain.');
+      setWipeNotification('All products removed successfully.');
       setTimeout(() => setWipeNotification(null), 5000);
     } catch (err: any) {
       console.warn('Error wiping products:', err);
@@ -1422,16 +1425,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <span>{isSyncingDefaultCatalog ? 'Syncing to Supabase...' : '⚡ Sync Default Catalog to Supabase'}</span>
                   </button>
 
-                  {/* Clean/Wipe Old Broken Products from Supabase & Store */}
+                  {/* Purge & Delete All Products from Firestore & Store */}
                   <button
                     type="button"
-                    id="admin-wipe-inventory-btn"
+                    id="admin-purge-all-products-btn"
                     onClick={() => setShowWipeCatalogModal(true)}
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-800 border border-rose-300 text-xs font-heading font-extrabold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                    title="Purane ya broken dummy products ko Supabase database se ek click mein wipe/delete karein"
+                    title="Purge & Delete All Products from Firestore and local store"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    <span>🗑️ Purane Products Wipe Karein</span>
+                    <span>Purge & Delete All Products</span>
                   </button>
 
                   {/* Manual Add Item */}
@@ -3137,6 +3140,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onSaveSettings={onSaveSettings}
               onSaveBanners={onSaveBanners}
               isFirebaseConnected={isFirebaseConnected}
+              onPurgeProducts={handleExecuteWipeCatalog}
             />
 
             {/* PIN Management */}
@@ -3245,21 +3249,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
             <div className="space-y-1">
               <h4 className="font-heading font-black text-stone-900 text-lg">
-                Purane / Dummy Products Wipe Karein?
+                Purge & Delete All Products?
               </h4>
               <p className="text-xs text-stone-600 leading-relaxed">
-                Kya aap sach mein saare purane, dummy ya broken products ko <strong>Supabase Database</strong> aur <strong>Kiranape Catalog</strong> se ek click mein wipe/delete karna chahte hain?
+                Are you sure you want to completely purge and delete all products from the <strong>Firestore Database</strong> and <strong>Kiranape Catalog</strong>?
               </p>
             </div>
             
             <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[11px] text-rose-800 text-left space-y-1">
               <p className="font-bold flex items-center gap-1">
                 <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
-                <span>Wipe karne ke baad:</span>
+                <span>Action details:</span>
               </p>
               <ul className="list-disc pl-4 space-y-0.5 text-rose-700">
-                <li>Database ke saare {products.length} products delete ho jayenge.</li>
-                <li>Aap seedhe <strong>&apos;+ Add New Grocery Item&apos;</strong> se apne genuine items fresh upload kar sakenge.</li>
+                <li>Saare {products.length} products Firestore collection se permanently delete ho jayenge.</li>
+                <li>Categories aur store layout safe rahenge.</li>
+                <li>Aap seedhe <strong>&apos;+ Add New Grocery Item&apos;</strong> se genuine products add kar sakenge.</li>
               </ul>
             </div>
 
@@ -3281,12 +3286,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {isWipingAllProducts ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Wiping Database...</span>
+                    <span>Purging Products...</span>
                   </>
                 ) : (
                   <>
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Haan, Wipe Karein</span>
+                    <span>Purge & Delete All Products</span>
                   </>
                 )}
               </button>

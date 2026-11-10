@@ -48,6 +48,7 @@ import {
   isObsoleteDeliveryBanner,
   getProducts,
   saveProducts,
+  clearAllProducts,
   getOrders,
   saveOrders,
   getCustomCategories,
@@ -738,23 +739,37 @@ export async function deleteCategoryFromFirestore(id: string): Promise<void> {
 }
 
 /**
- * ADMIN: Wipe and Purge all products
+ * ADMIN: Runs a batch delete across the Firebase Firestore 'products' collection
+ * to safely and completely wipe out all existing product documents.
  */
-export async function wipeAllFirestoreProducts(): Promise<{ count: number; success: boolean }> {
+export async function purgeAllFirestoreProducts(): Promise<{ count: number; success: boolean }> {
+  let count = 0;
   const db = getDb();
   if (db) {
     try {
       const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
-      const batch = writeBatch(db);
-      snap.docs.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
+      count = snap.size;
+      const docs = snap.docs;
+      const chunkSize = 400; // Firestore limit per batch is 500
+      for (let i = 0; i < docs.length; i += chunkSize) {
+        const chunk = docs.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
     } catch (err) {
-      console.warn('Wipe firestore error:', err);
+      console.warn('Firestore purgeAllProducts error:', err);
     }
   }
+
+  // Clear local storage and IndexedDB
+  clearAllProducts();
   saveProducts([]);
-  return { count: 0, success: true };
+
+  return { count, success: true };
 }
+
+export const wipeAllFirestoreProducts = purgeAllFirestoreProducts;
 
 /**
  * ADMIN: Seed products to Firestore
@@ -815,45 +830,35 @@ export function subscribeToFirestoreProducts(
       colRef,
       async (snapshot) => {
         if (snapshot.empty) {
-          // If Firestore is empty, auto-seed with verified catalog so the cloud is populated
-          const baseProducts = localItems.length > 0 ? localItems : ALL_VERIFIED_PRODUCTS;
-          if (baseProducts.length > 0) {
-            seedProductsToFirestore(baseProducts).catch(console.warn);
-          }
+          saveProducts([]);
+          onUpdate([]);
           return;
         }
 
-        const masterMap = new Map(ALL_VERIFIED_PRODUCTS.map((p) => [p.id, p]));
-
-        snapshot.docs.forEach((d) => {
+        const firestoreProducts: Product[] = snapshot.docs.map((d) => {
           const data = d.data();
           const orig = Number(data.originalPrice) || Number(data.price) || 0;
           const disc = Number(data.discountPercent) || 0;
           const final = Number(data.finalPrice) || Number(data.price) || calculateFinalPrice(orig, disc);
-          const existing = masterMap.get(d.id);
-          const fallbackImg = existing?.imageUrl || '';
 
-          const product: Product = {
+          return {
             id: d.id,
-            name: data.name || existing?.name || '',
-            hindiName: data.hindiName || existing?.hindiName || '',
-            category: data.category || data.categoryId || existing?.category || 'Snacks & Biscuits',
-            department: data.department || existing?.department || 'grocery',
-            unit: data.unit || data.weight || existing?.unit || '1 Unit',
-            originalPrice: orig || existing?.originalPrice || 0,
-            discountPercent: disc || existing?.discountPercent || 0,
-            finalPrice: final || existing?.finalPrice || 0,
-            imageUrl: data.imageUrl || data.image || fallbackImg,
+            name: data.name || '',
+            hindiName: data.hindiName || '',
+            category: data.category || data.categoryId || 'Snacks & Biscuits',
+            department: data.department || 'grocery',
+            unit: data.unit || data.weight || '1 Unit',
+            originalPrice: orig,
+            discountPercent: disc,
+            finalPrice: final,
+            imageUrl: data.imageUrl || data.image || '',
             isAvailable: data.isAvailable ?? data.inStock ?? true,
-            stock: data.stock ?? data.stockCount ?? existing?.stock ?? 100,
-            description: data.description || existing?.description || '',
-            variants: data.variants || existing?.variants || [],
+            stock: data.stock ?? data.stockCount ?? 100,
+            description: data.description || '',
+            variants: data.variants || [],
             updatedAt: data.updatedAt || Date.now(),
           };
-          masterMap.set(d.id, product);
         });
-
-        const firestoreProducts: Product[] = Array.from(masterMap.values());
 
         // Persist to local cache and update React state
         saveProducts(firestoreProducts);

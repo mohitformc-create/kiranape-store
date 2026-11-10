@@ -179,6 +179,7 @@ export function calculateFinalPrice(originalPrice: number, discountPercent: numb
 // ---------------- PRODUCTS REPOSITORY (ROCK-SOLID PERMANENT STORAGE) ---------------- //
 
 export function resetCatalogToCleanSlate(): void {
+  inMemoryProductsCache = [];
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(PERMANENT_CATALOG_KEY, JSON.stringify([]));
@@ -189,6 +190,7 @@ export function resetCatalogToCleanSlate(): void {
     localStorage.removeItem('chaurasia_custom_products');
     localStorage.removeItem('kirana_custom_products');
     localStorage.removeItem(WHOLESALE_INJECTED_FLAG);
+    idbDelete(PERMANENT_CATALOG_KEY).catch(() => {});
     notifySync();
   } catch (e) {
     console.error('Error resetting catalog to clean slate:', e);
@@ -335,10 +337,10 @@ function safeSaveProductsToLocalStorage(products: Product[]): void {
 }
 
 export function getProducts(): Product[] {
-  if (typeof window === 'undefined') return MASTER_199_PRODUCTS;
+  if (typeof window === 'undefined') return [];
 
-  // Return in-memory cache if available and populated
-  if (inMemoryProductsCache !== null && inMemoryProductsCache.length > 0) {
+  // Return in-memory cache if available
+  if (inMemoryProductsCache !== null) {
     return inMemoryProductsCache;
   }
 
@@ -348,7 +350,7 @@ export function getProducts(): Product[] {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           loadedProducts = parsed;
         }
       } catch {
@@ -356,48 +358,14 @@ export function getProducts(): Product[] {
       }
     }
 
-    // MASTER 199 CATALOG: Always ensure all 199 products are fully populated without omission
-    const existingMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
-    let hasMissingProducts = false;
-    MASTER_199_PRODUCTS.forEach((item) => {
-      if (!existingMap.has(item.id)) {
-        existingMap.set(item.id, item);
-        hasMissingProducts = true;
-      }
-    });
-
-    if (hasMissingProducts || loadedProducts.length < 199) {
-      loadedProducts = Array.from(existingMap.values());
-      safeSaveProductsToLocalStorage(loadedProducts);
-    }
-
-    // Merge persistent custom edits (custom images, titles, pricing) from chaurasia_custom_products
-    try {
-      const rawCustom = localStorage.getItem('chaurasia_custom_products');
-      if (rawCustom) {
-        const customOverrides: Record<string, Partial<Product>> = JSON.parse(rawCustom) || {};
-        loadedProducts = loadedProducts.map((p) => {
-          const override = customOverrides[p.id];
-          if (override) {
-            return {
-              ...p,
-              ...override,
-              imageUrl: override.imageUrl || p.imageUrl,
-            };
-          }
-          return p;
-        });
-      }
-    } catch {}
-
     inMemoryProductsCache = loadedProducts;
 
-    // Asynchronously hydrate from IndexedDB in case high-res images or more items are stored there
+    // Asynchronously hydrate from IndexedDB in case high-res images or items are stored there
     if (!isHydratingFromIdb) {
       isHydratingFromIdb = true;
       idbGet<Product[]>(PERMANENT_CATALOG_KEY)
         .then((idbProducts) => {
-          if (Array.isArray(idbProducts) && idbProducts.length > 0) {
+          if (Array.isArray(idbProducts)) {
             inMemoryProductsCache = idbProducts;
             notifySync();
           }
@@ -410,8 +378,7 @@ export function getProducts(): Product[] {
 
     return inMemoryProductsCache;
   } catch (e) {
-    console.warn('Notice reading products from storage, using master 199 catalog:', e);
-    return MASTER_199_PRODUCTS;
+    return [];
   }
 }
 
