@@ -113,26 +113,35 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
     <header className="sticky top-0 z-40 w-full max-w-full overflow-x-hidden bg-white/95 backdrop-blur-md shadow-xs border-b border-stone-200/70">
       <div className="px-3 sm:px-4 pt-2.5 pb-2.5">
         <div className="max-w-6xl mx-auto space-y-2">
-          {/* Top Brand Bar: Brand on Left, Location Pill & Refer & Earn on Right */}
+          {/* Top Brand Bar: Brand on Left, Location Pill on Right */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left: Brand name "Kiranapė EXPRESS" with clean badge */}
-            <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
-              <div className="w-8 h-8 rounded-xl bg-[#0c831f] text-white flex items-center justify-center font-black shadow-xs text-base flex-shrink-0">
-                🛒
-              </div>
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-heading font-black text-lg sm:text-xl text-[#0c831f] tracking-tight">
-                  Kiranapė
-                </span>
-                <span className="bg-[#ffc200] text-stone-950 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-2xs">
-                  EXPRESS
-                </span>
+            {/* Left: Brand name "Kiranapė EXPRESS" with customizable image logo */}
+            <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
+              <img
+                src="/logo.png"
+                alt="Kiranapė Logo"
+                className="w-8 h-8 rounded-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <div className="leading-tight min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-heading font-black text-lg sm:text-xl text-[#0c831f] tracking-tight">
+                    Kiranapė
+                  </span>
+                  <span className="bg-[#ffc200] text-stone-950 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-2xs">
+                    EXPRESS
+                  </span>
+                </div>
+                <p className="text-[10px] sm:text-[11px] font-semibold text-stone-500 tracking-wide">
+                  SUPERSTORE • 10-15 MIN
+                </p>
               </div>
             </div>
 
-            {/* Right: Location Pill "Waidhan Store" with edit icon + Gold "Refer & Earn ₹50" Pill */}
+            {/* Right: Location Pill "Waidhan Store" with edit icon */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              {/* Location Pill "Waidhan Store" with edit icon */}
               <button
                 type="button"
                 id="header-location-selector-btn"
@@ -151,24 +160,6 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
                   ✏️
                 </span>
               </button>
-
-              {/* Gold "Refer & Earn ₹50" Pill */}
-              {onOpenReferAndEarn && (
-                <button
-                  type="button"
-                  id="header-refer-earn-btn"
-                  onClick={onOpenReferAndEarn}
-                  className="flex items-center gap-1 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-yellow-500 active:scale-95 text-stone-950 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black shadow-2xs cursor-pointer transition-all flex-shrink-0 border border-amber-500/30"
-                  title="Refer & Earn ₹50 Discount"
-                >
-                  <Gift className="w-3.5 h-3.5 text-stone-950" />
-                  <span className="hidden xs:inline">Refer & Earn</span>
-                  <span className="xs:hidden">Refer</span>
-                  <span className="bg-stone-950 text-amber-300 px-1 py-0.2 rounded font-mono text-[10px]">
-                    ₹50
-                  </span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -195,18 +186,6 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
               >
                 <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
                 <span>🔥 Launch Offers</span>
-              </button>
-            )}
-
-            {onOpenReferAndEarn && (
-              <button
-                type="button"
-                id="tab-refer-earn-pill"
-                onClick={onOpenReferAndEarn}
-                className="px-3 py-1 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs hover:bg-emerald-200 active:scale-95"
-              >
-                <Gift className="w-3.5 h-3.5 text-emerald-700" />
-                <span>🎁 Refer & Earn ₹50</span>
               </button>
             )}
 

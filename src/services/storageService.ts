@@ -790,24 +790,17 @@ export function getSavedBanners(): PromoBanner[] {
     if (!raw) return DEFAULT_BANNERS;
     const parsed: PromoBanner[] = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_BANNERS;
-    const cleaned = parsed.filter((b) => !isObsoleteDeliveryBanner(b));
+    const cleaned = parsed.filter(
+      (b) =>
+        !isObsoleteDeliveryBanner(b) &&
+        b.id !== 'banner-stayfree-xl' &&
+        !b.title?.toLowerCase().includes('stayfree')
+    );
     if (cleaned.length === 0) {
       saveStoredBanners(DEFAULT_BANNERS);
       return DEFAULT_BANNERS;
     }
-    // Ensure stayfree deal slide has targetType and productId populated
-    const hydrated = cleaned.map((b) => {
-      if (b.id === 'banner-stayfree-xl') {
-        return {
-          ...b,
-          targetType: b.targetType || 'product',
-          productId: b.productId || 'prod-stayfree-secure-xl-40',
-          showDirectAdd: b.showDirectAdd ?? true,
-        };
-      }
-      return b;
-    });
-    return hydrated;
+    return cleaned;
   } catch {
     return DEFAULT_BANNERS;
   }

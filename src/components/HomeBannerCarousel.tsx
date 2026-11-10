@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -44,7 +44,15 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
   onSelectProduct,
   whatsappNumber = '9424316081',
 }) => {
-  const activeBanners = banners && banners.length > 0 ? banners : DEFAULT_BANNERS;
+  const activeBanners = useMemo(() => {
+    const raw = banners && banners.length > 0 ? banners : DEFAULT_BANNERS;
+    return raw.filter(
+      (b) =>
+        b.isActive !== false &&
+        b.id !== 'banner-stayfree-xl' &&
+        !b.title?.toLowerCase().includes('stayfree')
+    );
+  }, [banners]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartXRef = useRef<number | null>(null);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CustomCategory, Product, ProductCategory } from '../types';
-import { MASTER_CATEGORIES } from './CategoriesScreen';
+import { useCategories, CATEGORIES_DATA } from '../data/categoriesData';
 
 interface CategoryTileGridProps {
   categories: CustomCategory[];
@@ -12,12 +12,14 @@ interface CategoryTileGridProps {
 }
 
 export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
-  categories,
-  products,
+  products = [],
   onSelectCategory,
   onViewAllClick,
 }) => {
   const [showAll, setShowAll] = useState(false);
+  const { categories: unifiedCategories } = useCategories(products);
+
+  const displayCategories = unifiedCategories.length > 0 ? unifiedCategories : CATEGORIES_DATA;
 
   const handleTileClick = (target: ProductCategory | string) => {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -61,7 +63,9 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
 
       {/* Grid Layout: 3-column responsive grid (grid grid-cols-3 gap-2.5 sm:gap-3.5) */}
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
-        {(showAll ? MASTER_CATEGORIES : MASTER_CATEGORIES.slice(0, 6)).map((tile) => {
+        {(showAll ? displayCategories : displayCategories.slice(0, 6)).map((tile) => {
+          const mainImage = tile.imageUrl || tile.primaryImage || tile.fallbackSvg;
+
           return (
             <div
               key={tile.id}
@@ -99,12 +103,15 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
                   />
                 )}
                 <img
-                  src={tile.primaryImage}
+                  src={mainImage}
                   alt={tile.name}
                   loading="lazy"
                   className="w-full h-full object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105 relative z-1"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.opacity = '0.8';
+                    const target = e.currentTarget as HTMLImageElement;
+                    if (target.src !== tile.fallbackSvg) {
+                      target.src = tile.fallbackSvg;
+                    }
                   }}
                 />
               </div>

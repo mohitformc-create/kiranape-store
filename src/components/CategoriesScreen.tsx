@@ -1,122 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Mic, Pencil, ChevronRight, Sparkles, MapPin, Check, X } from 'lucide-react';
-import { CustomCategory, Product, ProductCategory } from '../types';
-import { subscribeToFirestoreCategories } from '../services/firebase';
+import React, { useState, useMemo } from 'react';
+import { Search, Mic, Pencil, ChevronRight, MapPin, Check, X } from 'lucide-react';
+import { Product, ProductCategory } from '../types';
 import { getCustomerSelectedLocation, setCustomerSelectedLocation, getDeliveryLocations } from '../services/storageService';
+import { useCategories, CATEGORIES_DATA, UnifiedCategoryTile } from '../data/categoriesData';
 
-export interface MasterCategoryTile {
-  id: string;
-  name: string;
-  hindiName: string;
-  categoryTarget: ProductCategory;
-  badge: string;
-  gradient: string;
-  primaryImage: string;
-  secondaryImage?: string;
-  keywords: string[];
-}
-
-// Exact 9 Master Category Definitions specified in requirements
-export const MASTER_CATEGORIES: MasterCategoryTile[] = [
-  {
-    id: 'cat-atta-flours',
-    name: 'Atta, Besan & Flours',
-    hindiName: 'आटा & बेसन & सूजी',
-    categoryTarget: 'Atta & Flours',
-    badge: 'Up to 15% OFF',
-    gradient: 'from-amber-50 to-orange-100/50 border-amber-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/103/001/0173/front_en.24.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/106/301/2136/front_en.8.400.jpg',
-    keywords: ['atta', 'besan', 'flours', 'flour', 'sooji', 'suji', 'maida', 'aashirvaad', 'आटा', 'बेसन', 'सूजी'],
-  },
-  {
-    id: 'cat-oil-ghee-masalas',
-    name: 'Oil, Ghee & Masalas',
-    hindiName: 'तेल, घी & मसाले',
-    categoryTarget: 'Oil & Ghee',
-    badge: 'Festival Deals',
-    gradient: 'from-yellow-50 to-amber-100/60 border-yellow-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/600/728/0014/front_en.10.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/126/201/0114/front_en.22.400.jpg',
-    keywords: ['oil', 'ghee', 'masalas', 'masala', 'mustard', 'refined', 'everest', 'haldi', 'mirch', 'fortune', 'sikka', 'तेल', 'घी', 'मसाले'],
-  },
-  {
-    id: 'cat-rice-dals-grains',
-    name: 'Rice, Dals & Grains',
-    hindiName: 'चावल, दाल & अनाज',
-    categoryTarget: 'Rice & Dal',
-    badge: 'Bulk Savings',
-    gradient: 'from-blue-50 to-sky-100/60 border-blue-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/601/305/0014/front_en.15.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/106/500/0315/front_en.14.400.jpg',
-    keywords: ['rice', 'dals', 'dal', 'grains', 'basmati', 'toor', 'chana', 'moong', 'arhar', 'rajma', 'चावल', 'दाल', 'अनाज'],
-  },
-  {
-    id: 'cat-personal-care',
-    name: 'Personal Care',
-    hindiName: 'नहाने, बाल & त्वचा',
-    categoryTarget: 'Personal Care',
-    badge: 'Up to 30% OFF',
-    gradient: 'from-rose-50 to-pink-100/60 border-rose-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/103/038/3828/front_en.10.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/101/211/3509/front_en.12.400.jpg',
-    keywords: ['personal care', 'soap', 'shampoo', 'skin', 'hair', 'dove', 'vaseline', 'ponds', 'stayfree', 'dettol', 'नहाने', 'बाल', 'त्वचा'],
-  },
-  {
-    id: 'cat-snacks-biscuits',
-    name: 'Snacks & Biscuits',
-    hindiName: 'नाश्ता & बिस्कुट',
-    categoryTarget: 'Snacks & Biscuits',
-    badge: 'Crispy Deals',
-    gradient: 'from-orange-50 to-red-100/50 border-orange-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/171/910/1012/front_en.16.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/105/800/0111/front_en.25.400.jpg',
-    keywords: ['snacks', 'biscuits', 'parle-g', 'good day', 'haldiram', 'bhujia', 'lays', 'chips', 'maggi', 'namkeen', 'नाश्ता', 'बिस्कुट'],
-  },
-  {
-    id: 'cat-household-cleaning',
-    name: 'Household & Cleaning',
-    hindiName: 'सफाई & जरूरतें',
-    categoryTarget: 'Household Essentials',
-    badge: 'Best Price',
-    gradient: 'from-cyan-50 to-teal-100/60 border-cyan-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/103/002/0165/front_en.14.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/139/600/0118/front_en.15.400.jpg',
-    keywords: ['household', 'cleaning', 'surf excel', 'vim', 'comfort', 'harpic', 'detergent', 'dishwash', 'सफाई', 'जरूरतें'],
-  },
-  {
-    id: 'cat-tea-coffee-drinks',
-    name: 'Tea, Coffee & Drinks',
-    hindiName: 'चाय, कॉफी & पेय',
-    categoryTarget: 'Tea, Coffee & Drinks',
-    badge: 'Best Price',
-    gradient: 'from-amber-50 to-yellow-100/60 border-amber-200/80',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/106/500/0216/front_en.12.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/761/303/494/2800/front_en.10.400.jpg',
-    keywords: ['tea', 'coffee', 'drinks', 'chai', 'tata tea', 'nescafe', 'bournvita', 'beverages', 'चाय', 'कॉफी', 'पेय'],
-  },
-  {
-    id: 'cat-dairy-pooja',
-    name: 'Dairy & Pooja Samagri',
-    hindiName: 'डेयरी, ब्रेड & पूजा',
-    categoryTarget: 'Dairy & Bakery',
-    badge: 'Best Price',
-    gradient: 'from-yellow-50/70 to-lime-100/50 border-yellow-200/70',
-    primaryImage: 'https://images.openfoodfacts.org/images/products/890/126/201/0213/front_en.19.400.jpg',
-    secondaryImage: 'https://images.openfoodfacts.org/images/products/890/126/201/0114/front_en.22.400.jpg',
-    keywords: ['dairy', 'pooja', 'samagri', 'amul', 'milk', 'butter', 'bread', 'agarbatti', 'diya', 'dhoop', 'डेयरी', 'ब्रेड', 'पूजा'],
-  },
-  {
-    id: 'cat-school-stationery',
-    name: 'School & Office Stationery',
-    hindiName: 'स्टेशनरी & कॉपी',
-    categoryTarget: 'Copies & Registers',
-    badge: 'Best Price',
-    gradient: 'from-purple-50 to-violet-100/60 border-purple-200/80',
-    primaryImage: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&auto=format&fit=crop&q=80',
-    keywords: ['school', 'office', 'stationery', 'notebook', 'register', 'classmate', 'pen', 'pencil', 'a4', 'स्टेशनरी', 'कॉपी'],
-  },
-];
+export type MasterCategoryTile = UnifiedCategoryTile;
+export const MASTER_CATEGORIES = CATEGORIES_DATA;
 
 interface CategoriesScreenProps {
   onSelectCategory: (categoryTarget: ProductCategory) => void;
@@ -132,63 +21,27 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
   products = [],
 }) => {
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
-  const [firestoreCategories, setFirestoreCategories] = useState<CustomCategory[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>(() => {
     return getCustomerSelectedLocation() || 'Waidhan Store';
   });
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const deliveryLocations = useMemo(() => getDeliveryLocations(), []);
 
-  // 1. Listen directly to Firebase Cloud Firestore 'categories' collection with fallback
-  useEffect(() => {
-    const unsubscribe = subscribeToFirestoreCategories(
-      (cats) => {
-        if (cats && cats.length > 0) {
-          setFirestoreCategories(cats);
-        }
-      },
-      (err) => {
-        console.warn('Firestore categories subscription error in CategoriesScreen:', err);
-      }
-    );
-    return () => unsubscribe();
-  }, []);
-
-  // Merge Firestore categories data or custom photos into the 9 Master tiles
-  const renderedCategories = useMemo(() => {
-    return MASTER_CATEGORIES.map((master) => {
-      // Find matching custom category from Firestore if any
-      const matchedFirestore = firestoreCategories.find(
-        (fc) =>
-          fc.name.toLowerCase() === master.name.toLowerCase() ||
-          fc.name.toLowerCase() === master.categoryTarget.toLowerCase() ||
-          (fc.hindiName && master.hindiName.includes(fc.hindiName))
-      );
-
-      // Check if any product in catalog has an authentic photo to reinforce cluster
-      const firstCatProduct = products.find(
-        (p) => p.category && p.category.toLowerCase() === master.categoryTarget.toLowerCase() && p.imageUrl
-      );
-
-      return {
-        ...master,
-        customImageUrl: matchedFirestore?.imageUrl || matchedFirestore?.image_url,
-        catalogPhotoFallback: firstCatProduct?.imageUrl,
-      };
-    });
-  }, [firestoreCategories, products]);
+  // Unified categories synchronized identically with Home screen
+  const { categories: unifiedCategories } = useCategories(products);
+  const displayCategories = unifiedCategories.length > 0 ? unifiedCategories : CATEGORIES_DATA;
 
   // Filter categories by local search query
   const filteredCategories = useMemo(() => {
-    if (!categorySearchQuery.trim()) return renderedCategories;
+    if (!categorySearchQuery.trim()) return displayCategories;
     const q = categorySearchQuery.trim().toLowerCase();
-    return renderedCategories.filter((cat) => {
+    return displayCategories.filter((cat) => {
       const matchName = cat.name.toLowerCase().includes(q);
       const matchHindi = cat.hindiName.toLowerCase().includes(q);
       const matchKeyword = cat.keywords.some((k) => k.toLowerCase().includes(q));
       return matchName || matchHindi || matchKeyword;
     });
-  }, [renderedCategories, categorySearchQuery]);
+  }, [displayCategories, categorySearchQuery]);
 
   const handleTileClick = (target: ProductCategory) => {
     // Tactile haptic feedback on mobile devices
@@ -218,9 +71,14 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
           {/* Brand Row + Store Selector */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center shadow-xs flex-shrink-0">
-                <span className="text-emerald-950 font-black text-sm">KP</span>
-              </div>
+              <img
+                src="/logo.png"
+                alt="Kiranapė Logo"
+                className="w-8 h-8 rounded-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
               <div className="leading-tight">
                 <div className="flex items-center gap-1.5">
                   <span className="font-heading font-black text-base sm:text-lg tracking-tight text-white">
@@ -288,24 +146,16 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
       </header>
 
       {/* =========================================================================
-          2. CATEGORY PAGE TITLE & OFFERS BADGE
+          2. CATEGORY PAGE TITLE (Offers pill removed per request)
       ========================================================================= */}
       <section className="max-w-4xl mx-auto px-3 sm:px-4 pt-3.5 pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h1 className="font-heading font-black text-lg sm:text-xl text-neutral-900 tracking-tight leading-tight">
-              सब सामान व कैटेगरीज़
-            </h1>
-            <p className="text-xs text-neutral-500 font-medium mt-0.5">
-              Waidhan's Fresh & Daily Superstore
-            </p>
-          </div>
-
-          {/* Right Corner Offers Badge */}
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-2.5 py-1 text-xs font-semibold flex items-center gap-1 shadow-2xs flex-shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span className="whitespace-nowrap">Offers: Flat 20% OFF on first order</span>
-          </div>
+        <div>
+          <h1 className="font-heading font-black text-lg sm:text-xl text-neutral-900 tracking-tight leading-tight">
+            सब सामान व कैटेगरीज़
+          </h1>
+          <p className="text-xs text-neutral-500 font-medium mt-0.5">
+            Waidhan's Fresh & Daily Superstore
+          </p>
         </div>
       </section>
 
@@ -325,7 +175,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
             <button
               type="button"
               onClick={() => setCategorySearchQuery('')}
-              className="mt-4 px-4 py-1.5 rounded-full bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800"
+              className="mt-4 px-4 py-1.5 rounded-full bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer"
             >
               Show all 9 categories
             </button>
@@ -333,8 +183,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
         ) : (
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
             {filteredCategories.map((tile) => {
-              const displayImage =
-                tile.customImageUrl || tile.catalogPhotoFallback || tile.primaryImage;
+              const displayImage = tile.imageUrl || tile.primaryImage || tile.fallbackSvg;
 
               return (
                 <div
@@ -381,8 +230,8 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
                       loading="lazy"
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
-                        if (target.src !== tile.primaryImage) {
-                          target.src = tile.primaryImage;
+                        if (target.src !== tile.fallbackSvg) {
+                          target.src = tile.fallbackSvg;
                         }
                       }}
                     />
@@ -422,7 +271,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setShowLocationPicker(false)}
-                className="p-1 text-stone-400 hover:text-stone-700 rounded-lg"
+                className="p-1 text-stone-400 hover:text-stone-700 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -444,7 +293,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
                       setCustomerSelectedLocation(loc);
                       setShowLocationPicker(false);
                     }}
-                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-xs font-bold transition-all ${
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-xs font-bold transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-600 shadow-2xs'
                         : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border border-stone-200/80'
