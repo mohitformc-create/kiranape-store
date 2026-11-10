@@ -805,6 +805,192 @@ export async function seedProductsToFirestore(products: Product[]): Promise<{ co
   return { count: products.length, success: true };
 }
 
+/**
+ * ADMIN: Execute Firestore batch writes in clean chunks of 100 documents
+ * Strictly validates, sanitizes and retains Supabase CDN / external URLs
+ */
+export async function batchUpsertProductsToFirestore(
+  products: Product[],
+  chunkSize: number = 100,
+  onProgress?: (processed: number, total: number) => void
+): Promise<{ count: number; success: boolean }> {
+  const db = getDb();
+  if (db && products.length > 0) {
+    try {
+      const total = products.length;
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = products.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((p) => {
+          const docRef = doc(db, PRODUCTS_COLLECTION, p.id);
+          const mrp = Number(p.originalPrice) || Number(p.finalPrice) || 0;
+          const sellingPrice = Number(p.finalPrice) || mrp;
+          const discountPercent = mrp > sellingPrice && mrp > 0 ? Math.round(((mrp - sellingPrice) / mrp) * 100) : (p.discountPercent || 0);
+
+          batch.set(
+            docRef,
+            cleanFirestoreData({
+              id: p.id,
+              name: p.name,
+              hindiName: p.hindiName || '',
+              category: p.category,
+              categoryId: p.category,
+              department: p.department || 'grocery',
+              price: sellingPrice,
+              finalPrice: sellingPrice,
+              originalPrice: mrp,
+              discountPercent,
+              unit: p.unit || '1 pc',
+              weight: p.unit || '1 pc',
+              inStock: p.isAvailable !== false,
+              isAvailable: p.isAvailable !== false,
+              stockCount: Number(p.stockCount ?? p.stock ?? 50),
+              stock: Number(p.stockCount ?? p.stock ?? 50),
+              imageUrl: p.imageUrl || '',
+              description: p.description || '',
+              martBasePrice: p.martBasePrice !== undefined ? Number(p.martBasePrice) : undefined,
+              isMartItem: Boolean(p.isMartItem),
+              priority: 0,
+              updatedAt: Date.now(),
+              createdAt: p.updatedAt || Date.now(),
+            }),
+            { merge: true }
+          );
+        });
+
+        await batch.commit();
+        if (onProgress) {
+          onProgress(Math.min(i + chunk.length, total), total);
+        }
+      }
+    } catch (err) {
+      console.error('Firestore batchUpsertProducts error:', err);
+      throw err;
+    }
+  }
+
+  // Persist directly to local cache and notify listeners
+  saveProducts(products);
+  return { count: products.length, success: true };
+}
+
+/**
+ * ADMIN: In-App Inline Direct Firestore Quick-Edit
+ * Writes directly to doc(db, 'products', id) and updates local store
+ */
+export async function updateProductDirectlyInFirestore(
+  id: string,
+  updates: Partial<Product>
+): Promise<Product> {
+  const db = getDb();
+  const current = getProducts();
+  const target = current.find((p) => p.id === id);
+
+  const mrp = updates.originalPrice !== undefined ? Number(updates.originalPrice) : (target?.originalPrice || 0);
+  const sellingPrice = updates.finalPrice !== undefined ? Number(updates.finalPrice) : (target?.finalPrice || mrp);
+  const discountPercent = mrp > sellingPrice && mrp > 0 ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+  const inStock = updates.isAvailable !== undefined ? updates.isAvailable : (target?.isAvailable ?? true);
+  const stockCount = updates.stockCount !== undefined ? Number(updates.stockCount) : (target?.stockCount ?? target?.stock ?? 50);
+
+  const sanitizedUpdates: Partial<Product> = {
+    ...updates,
+    originalPrice: mrp,
+    finalPrice: sellingPrice,
+    discountPercent,
+    isAvailable: inStock,
+    stockCount,
+    stock: stockCount,
+    updatedAt: Date.now(),
+  };
+
+  if (db) {
+    try {
+      const docRef = doc(db, PRODUCTS_COLLECTION, id);
+      await setDoc(
+        docRef,
+        cleanFirestoreData({
+          ...sanitizedUpdates,
+          price: sellingPrice,
+          inStock,
+          weight: updates.unit || target?.unit,
+        }),
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('Firestore updateProductDirectly error:', err);
+      throw err;
+    }
+  }
+
+  const updatedProduct: Product = target
+    ? { ...target, ...sanitizedUpdates }
+    : ({
+        id,
+        name: updates.name || 'Product',
+        category: updates.category || 'Household Essentials',
+        unit: updates.unit || '1 pc',
+        originalPrice: mrp,
+        finalPrice: sellingPrice,
+        discountPercent,
+        imageUrl: updates.imageUrl || '',
+        isAvailable: inStock,
+        stockCount,
+        stock: stockCount,
+        updatedAt: Date.now(),
+      } as Product);
+
+  const updatedList = current.some((p) => p.id === id)
+    ? current.map((p) => (p.id === id ? updatedProduct : p))
+    : [...current, updatedProduct];
+
+  saveProducts(updatedList);
+  return updatedProduct;
+}
+
+/**
+ * ADMIN: Global Toggle to Mark All Mart Items Available or Out of Stock
+ */
+export async function batchToggleMartProductsStock(inStock: boolean): Promise<number> {
+  const current = getProducts();
+  const martItems = current.filter((p) => p.isMartItem || p.id.startsWith('vmart-'));
+  if (martItems.length === 0) return 0;
+
+  const db = getDb();
+  if (db) {
+    try {
+      const chunkSize = 100;
+      for (let i = 0; i < martItems.length; i += chunkSize) {
+        const chunk = martItems.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((p) => {
+          const docRef = doc(db, PRODUCTS_COLLECTION, p.id);
+          batch.set(
+            docRef,
+            cleanFirestoreData({
+              isAvailable: inStock,
+              inStock: inStock,
+              updatedAt: Date.now(),
+            }),
+            { merge: true }
+          );
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.warn('batchToggleMartProductsStock error:', err);
+      throw err;
+    }
+  }
+
+  const updatedList = current.map((p) =>
+    p.isMartItem || p.id.startsWith('vmart-')
+      ? { ...p, isAvailable: inStock, updatedAt: Date.now() }
+      : p
+  );
+  saveProducts(updatedList);
+  return martItems.length;
+}
+
 // ============================================================================
 // 3. REAL-TIME CATALOG & CATEGORY LISTENERS (onSnapshot)
 // ============================================================================
@@ -854,6 +1040,9 @@ export function subscribeToFirestoreProducts(
             imageUrl: data.imageUrl || data.image || '',
             isAvailable: data.isAvailable ?? data.inStock ?? true,
             stock: data.stock ?? data.stockCount ?? 100,
+            stockCount: data.stockCount ?? data.stock ?? 100,
+            martBasePrice: data.martBasePrice !== undefined ? Number(data.martBasePrice) : undefined,
+            isMartItem: Boolean(data.isMartItem),
             description: data.description || '',
             variants: data.variants || [],
             updatedAt: data.updatedAt || Date.now(),

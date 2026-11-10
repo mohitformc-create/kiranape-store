@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Minus, X } from 'lucide-react';
+import { Plus, Minus, X, Pencil } from 'lucide-react';
 import { Product, ProductVariant } from '../types';
 import { getCategoryFallbackSvg, getValidImageUrl } from '../utils/productImageUtils';
 
@@ -9,6 +9,8 @@ interface ProductCardProps {
   cartQuantities?: Record<string, number>;
   onAddToCart: (product: Product, variant?: ProductVariant) => void;
   onUpdateQuantity: (itemKey: string, newQuantity: number) => void;
+  isAdmin?: boolean;
+  onQuickEdit?: (product: Product) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -17,6 +19,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   cartQuantities,
   onAddToCart,
   onUpdateQuantity,
+  isAdmin = false,
+  onQuickEdit,
 }) => {
   const [imageError, setImageError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -87,6 +91,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       >
         {/* Product Image & Badges */}
         <div className="relative w-full bg-stone-50/60 overflow-hidden flex items-center justify-center pt-2">
+          {/* Discreet Admin Phone Controller Quick-Edit Button */}
+          {isAdmin && onQuickEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onQuickEdit(product);
+              }}
+              className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-stone-900/80 hover:bg-stone-950 text-amber-300 hover:text-amber-200 shadow-md flex items-center justify-center transition-transform active:scale-90 cursor-pointer pointer-events-auto"
+              title="Quick Edit Product (Selling Price, MRP, Stock, Unit, Image)"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+
           {/* Top-left red discount badge & Top-right FSSAI veg badge */}
           <div className="absolute top-2 inset-x-2 flex items-center justify-between z-10 pointer-events-none">
             {/* Top-left discount badge: 50% Parle Steal Deal or Stayfree Reward or regular OFF */}

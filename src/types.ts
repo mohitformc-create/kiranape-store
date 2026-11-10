@@ -34,6 +34,8 @@ export interface Product {
   variants?: ProductVariant[];
   updatedAt: number;
   isRewardItem?: boolean;
+  martBasePrice?: number;
+  isMartItem?: boolean;
 }
 
 export interface ScannedBillItem {

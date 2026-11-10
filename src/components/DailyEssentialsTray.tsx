@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Minus, ChevronRight, Zap } from 'lucide-react';
+import { Plus, Minus, ChevronRight, Zap, Pencil } from 'lucide-react';
 import { Product } from '../types';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 
@@ -9,6 +9,8 @@ interface DailyEssentialsTrayProps {
   onAddToCart: (product: Product) => void;
   onUpdateQuantity: (itemKey: string, newQuantity: number) => void;
   onViewAll?: () => void;
+  isAdmin?: boolean;
+  onQuickEdit?: (product: Product) => void;
 }
 
 export const DailyEssentialsTray: React.FC<DailyEssentialsTrayProps> = ({
@@ -17,6 +19,8 @@ export const DailyEssentialsTray: React.FC<DailyEssentialsTrayProps> = ({
   onAddToCart,
   onUpdateQuantity,
   onViewAll,
+  isAdmin = false,
+  onQuickEdit,
 }) => {
   // Filter for high-impulse daily kitchen essentials (Atta, Oil, Sugar, Salt, Biscuits, Tea, Dal, Ghee)
   const dailyEssentials = React.useMemo(() => {
@@ -75,6 +79,22 @@ export const DailyEssentialsTray: React.FC<DailyEssentialsTrayProps> = ({
               key={product.id}
               className="w-36 sm:w-44 flex-shrink-0 bg-white rounded-2xl border border-stone-200/90 p-2.5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between select-none relative group"
             >
+              {/* Discreet Pencil Edit Button */}
+              {isAdmin && onQuickEdit && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onQuickEdit(product);
+                  }}
+                  className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-stone-900/80 hover:bg-stone-950 text-amber-300 hover:text-amber-200 shadow-md flex items-center justify-center transition-transform active:scale-90 cursor-pointer pointer-events-auto"
+                  title="Quick Edit Product"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+
               {/* Top: Red/Orange Discount Badge */}
               <div className="flex items-center justify-between w-full mb-1">
                 <span className="bg-gradient-to-r from-red-600 to-orange-500 text-white text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-2xs">

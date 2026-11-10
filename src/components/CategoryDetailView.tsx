@@ -12,6 +12,8 @@ interface CategoryDetailViewProps {
   onAddToCart: (product: Product, variant?: ProductVariant) => void;
   onUpdateQuantity: (itemKey: string, newQuantity: number) => void;
   onSelectCategory: (categoryName: string) => void;
+  isAdmin?: boolean;
+  onQuickEdit?: (product: Product) => void;
 }
 
 export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
@@ -23,6 +25,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   onAddToCart,
   onUpdateQuantity,
   onSelectCategory,
+  isAdmin = false,
+  onQuickEdit,
 }) => {
   const [internalSearch, setInternalSearch] = useState<string>('');
 
@@ -203,6 +207,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
               cartQuantities={cartQuantities}
               onAddToCart={onAddToCart}
               onUpdateQuantity={onUpdateQuantity}
+              isAdmin={isAdmin}
+              onQuickEdit={onQuickEdit}
             />
           ))}
         </div>

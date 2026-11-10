@@ -93,6 +93,7 @@ import { HomeBannerCarousel } from './components/HomeBannerCarousel';
 import { CustomerHeader } from './components/CustomerHeader';
 import { DailyEssentialsTray } from './components/DailyEssentialsTray';
 import { ProductCard } from './components/ProductCard';
+import { ProductQuickEditModal } from './components/ProductQuickEditModal';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
 import { CategoriesScreen } from './components/CategoriesScreen';
 import { CategoryDetailView } from './components/CategoryDetailView';
@@ -196,6 +197,16 @@ export default function App() {
     setTimeout(() => {
       setRewardToast((prev) => (prev === msg ? null : prev));
     }, 2800);
+  }, []);
+
+  // Admin Mode & Direct In-App Inline Quick-Edit State
+  const isAdminMode = Boolean(isAdminPinVerified || currentUser?.role === 'admin');
+  const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
+  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
+
+  const handleOpenQuickEdit = useCallback((p: Product) => {
+    setQuickEditProduct(p);
+    setIsQuickEditOpen(true);
   }, []);
 
   const handleOpenPrivacy = useCallback(() => {
@@ -1151,6 +1162,8 @@ export default function App() {
                     cartQuantities={cartQuantities}
                     onAddToCart={handleAddToCart}
                     onUpdateQuantity={handleUpdateQuantity}
+                    isAdmin={isAdminMode}
+                    onQuickEdit={handleOpenQuickEdit}
                   />
                 ))}
               </div>
@@ -1171,6 +1184,8 @@ export default function App() {
             onAddToCart={handleAddToCart}
             onUpdateQuantity={handleUpdateQuantity}
             onSelectCategory={(cat) => setSelectedCategory(cat as ProductCategory)}
+            isAdmin={isAdminMode}
+            onQuickEdit={handleOpenQuickEdit}
           />
         ) : (
           /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
@@ -1256,6 +1271,8 @@ export default function App() {
                 cartQuantities={cartQuantities}
                 onAddToCart={handleAddToCart}
                 onUpdateQuantity={handleUpdateQuantity}
+                isAdmin={isAdminMode}
+                onQuickEdit={handleOpenQuickEdit}
               />
             </div>
 
@@ -1297,6 +1314,8 @@ export default function App() {
                       cartQuantities={cartQuantities}
                       onAddToCart={handleAddToCart}
                       onUpdateQuantity={handleUpdateQuantity}
+                      isAdmin={isAdminMode}
+                      onQuickEdit={handleOpenQuickEdit}
                     />
                   ))}
                 </div>
@@ -1537,6 +1556,20 @@ export default function App() {
 
       {/* 9. Instant Brand Splash Screen */}
       <SplashScreen />
+
+      {/* 10. Direct In-App Inline Product Quick Edit Controller */}
+      <ProductQuickEditModal
+        product={quickEditProduct}
+        isOpen={isQuickEditOpen}
+        onClose={() => {
+          setIsQuickEditOpen(false);
+          setQuickEditProduct(null);
+        }}
+        onProductUpdated={(updated) => {
+          setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          showRewardToast(`Product "${updated.name}" updated successfully in store!`);
+        }}
+      />
     </div>
   );
 }

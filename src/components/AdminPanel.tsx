@@ -53,6 +53,9 @@ import { AdminStoreSettings } from './AdminStoreSettings';
 import { AdminOffersAndSettings } from './AdminOffersAndSettings';
 import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
+import { AdminCsvRestoreModal } from './AdminCsvRestoreModal';
+import { AdminHypermarketManager } from './AdminHypermarketManager';
+import { ProductQuickEditModal } from './ProductQuickEditModal';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
 import { CreatorCredits } from './CreatorCredits';
@@ -151,10 +154,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveBanners,
   onRefreshProducts,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'parchi_orders' | 'offers_settings' | 'categories' | 'settings'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'parchi_orders' | 'hypermarket' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [showCsvRestoreModal, setShowCsvRestoreModal] = useState(false);
+  const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
+  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
   
   // Custom Categories & strictly empty initial liveOrders (no mock/demo orders)
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>(() => getCustomCategories());

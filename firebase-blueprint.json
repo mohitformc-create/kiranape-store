@@ -5,6 +5,7 @@
       "description": "A grocery staple item in Chaurasia Kirana Store",
       "type": "object",
       "properties": {
+        "hindiName": { "type": "string" },
         "name": { "type": "string" },
         "category": { "type": "string" },
         "unit": { "type": "string" },
@@ -13,6 +14,9 @@
         "finalPrice": { "type": "number" },
         "imageUrl": { "type": "string" },
         "isAvailable": { "type": "boolean" },
+        "stockCount": { "type": "number" },
+        "martBasePrice": { "type": "number" },
+        "isMartItem": { "type": "boolean" },
         "description": { "type": "string" },
         "updatedAt": { "type": "number" }
       },
