@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { CustomCategory, Product } from '../types';
-import { uploadCategoryImageToSupabase, updateCategoryInSupabase } from '../services/supabaseClient';
+import { updateCategoryInFirestore } from '../services/firebase';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 
 interface AdminCategoryManagerProps {
@@ -94,9 +94,9 @@ const PASTEL_COLORS = [
 ];
 
 /**
- * Client-side canvas image compression to keep mobile uploads fast and lightweight (<250KB)
+ * Client-side canvas image compression to keep mobile uploads fast and lightweight (<150KB, max 400x400)
  */
-async function compressImageToBlob(file: File, maxDim = 600, quality = 0.88): Promise<{ blob: Blob; dataUrl: string }> {
+async function compressImageToBlob(file: File, maxDim = 400, quality = 0.8): Promise<{ blob: Blob; dataUrl: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -118,10 +118,10 @@ async function compressImageToBlob(file: File, maxDim = 600, quality = 0.88): Pr
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          return resolve({ blob: file, dataUrl: e.target?.result as string });
+          return resolve({ blob: file, dataUrl: (e.target?.result as string) || '' });
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const mimeType = file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
         const dataUrl = canvas.toDataURL(mimeType, quality);
         canvas.toBlob(
           (blob) => {
@@ -283,29 +283,14 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
     setPhotoModalError(null);
   };
 
-  // Commit & Save Category Photo
+  // Commit & Save Category Photo directly to Firestore & local state
   const handleSaveCategoryPhoto = async () => {
     if (!photoModalCategory) return;
     setIsUploadingPhoto(true);
     setPhotoModalError(null);
 
     try {
-      let finalImageUrl = previewImageUrl.trim();
-
-      // Case 1: Uploading a file to Supabase Storage
-      if (compressedBlob && selectedFile) {
-        const uploadResult = await uploadCategoryImageToSupabase(
-          compressedBlob,
-          `${photoModalCategory.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${selectedFile.name}`
-        );
-
-        if (uploadResult.publicUrl) {
-          finalImageUrl = uploadResult.publicUrl;
-        } else if (previewImageUrl.startsWith('data:image/')) {
-          // Fallback to data URL so image is never lost
-          finalImageUrl = previewImageUrl;
-        }
-      }
+      const finalImageUrl = previewImageUrl.trim();
 
       if (!finalImageUrl) {
         setPhotoModalError('Please choose an image file or paste an image URL first.');
@@ -313,18 +298,20 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
         return;
       }
 
-      // Update custom category state (syncs to LocalStorage & notifies storefront reactive subscribers)
+      // 1. Persist directly to Firebase Firestore ('categories' collection with merge: true)
+      await updateCategoryInFirestore(photoModalCategory.id, {
+        name: photoModalCategory.name,
+        hindiName: photoModalCategory.hindiName || '',
+        imageUrl: finalImageUrl,
+        image_url: finalImageUrl,
+        order: photoModalCategory.order ?? 0,
+      });
+
+      // 2. Update local state so both Home and Categories views update immediately
       onUpdateCategory(photoModalCategory.id, {
         imageUrl: finalImageUrl,
         image_url: finalImageUrl,
       });
-
-      // Background safe upsert to Supabase 'categories' table if active
-      updateCategoryInSupabase(photoModalCategory.id, {
-        name: photoModalCategory.name,
-        imageUrl: finalImageUrl,
-        image_url: finalImageUrl,
-      }).catch((err) => console.warn('Supabase category update notice:', err));
 
       setPhotoSuccessNotice(`✓ Category "${photoModalCategory.name}" photo updated! Storefront par live render ho gayi hai.`);
       setTimeout(() => {
@@ -344,16 +331,17 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
     if (!photoModalCategory) return;
     setIsUploadingPhoto(true);
     try {
-      onUpdateCategory(photoModalCategory.id, {
+      // 1. Remove from Firebase Firestore
+      await updateCategoryInFirestore(photoModalCategory.id, {
         imageUrl: '',
         image_url: '',
       });
 
-      updateCategoryInSupabase(photoModalCategory.id, {
-        name: photoModalCategory.name,
+      // 2. Update local state
+      onUpdateCategory(photoModalCategory.id, {
         imageUrl: '',
         image_url: '',
-      }).catch(console.warn);
+      });
 
       setPhotoSuccessNotice('✓ Category photo removed. Default icon/packshot restored.');
       setTimeout(() => {
@@ -828,7 +816,7 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      accept="image/png, image/jpeg, image/webp"
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -844,7 +832,7 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
                         Tap to Choose Photo (फ़ोन गैलरी से चुनें)
                       </h5>
                       <p className="text-xs text-stone-500 mt-1">
-                        PNG, JPG, WebP supported. File automatically optimized to ultra-fast &lt;200KB.
+                        PNG, JPG, WebP supported. File automatically optimized to ultra-fast &lt;150KB (400x400).
                       </p>
                       {selectedFile && (
                         <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-emerald-300 text-xs font-bold text-emerald-800 shadow-2xs">

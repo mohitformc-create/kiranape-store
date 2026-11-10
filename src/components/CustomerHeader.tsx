@@ -33,7 +33,6 @@ interface CustomerHeaderProps {
   onOpenParchiModal?: () => void;
   onOpenVoiceModal?: () => void;
   onOpenDigitalParchiModal?: () => void;
-  onOpenReferAndEarn?: () => void;
   onOpenLaunchPoster?: () => void;
 }
 
@@ -53,7 +52,6 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onOpenParchiModal,
   onOpenVoiceModal,
   onOpenDigitalParchiModal,
-  onOpenReferAndEarn,
   onOpenLaunchPoster,
 }) => {
   const dynamicCategories = categories && categories.length > 0 ? categories : getCustomCategories();

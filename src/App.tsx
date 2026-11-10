@@ -90,7 +90,6 @@ import {
 } from './data/specialDealsCatalog';
 import { HomeBannerCarousel } from './components/HomeBannerCarousel';
 import { CustomerHeader } from './components/CustomerHeader';
-import { QuickNavStrip } from './components/QuickNavStrip';
 import { DailyEssentialsTray } from './components/DailyEssentialsTray';
 import { ProductCard } from './components/ProductCard';
 import { CategoryTileGrid } from './components/CategoryTileGrid';
@@ -119,7 +118,6 @@ import { filterProductsUniversally } from './utils/universalSearch';
 import { insertSupabaseOrder } from './services/supabaseOrderService';
 import { UPSELL_PRODUCTS } from './data/upsellCatalog';
 import { LaunchOfferModal } from './components/LaunchOfferModal';
-import { ReferAndEarnModal } from './components/ReferAndEarnModal';
 import { calculateCartFinancials } from './utils/rewardsEngine';
 
 export default function App() {
@@ -173,7 +171,6 @@ export default function App() {
   const [isParchiModalOpen, setIsParchiModalOpen] = useState(false);
   const [isDigitalParchiOpen, setIsDigitalParchiOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const [isReferModalOpen, setIsReferModalOpen] = useState(false);
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
@@ -340,11 +337,6 @@ export default function App() {
         window.history.pushState({ app: 'kiranape', page: 'home' }, '');
         return;
       }
-      if (isReferModalOpen) {
-        setIsReferModalOpen(false);
-        window.history.pushState({ app: 'kiranape', page: 'home' }, '');
-        return;
-      }
       if (isLaunchModalOpen) {
         setIsLaunchModalOpen(false);
         window.history.pushState({ app: 'kiranape', page: 'home' }, '');
@@ -374,7 +366,6 @@ export default function App() {
     isAuthModalOpen,
     isParchiModalOpen,
     isDigitalParchiOpen,
-    isReferModalOpen,
     isLaunchModalOpen,
     placedOrder,
     currentView,
@@ -1127,7 +1118,6 @@ export default function App() {
             onOpenParchiModal={() => setIsParchiModalOpen(true)}
             onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
             onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
-            onOpenReferAndEarn={() => setIsReferModalOpen(true)}
             onOpenLaunchPoster={() => setIsLaunchModalOpen(true)}
           />
 
@@ -1260,19 +1250,7 @@ export default function App() {
               whatsappNumber={storeSettings.phone || '9424316081'}
             />
 
-            {/* 3. Quick Navigation Horizontal Icons Strip */}
-            <QuickNavStrip
-              onSelectCategory={(catName) => {
-                setSelectedCategory(catName as ProductCategory);
-                setIsCategoriesScreenOpen(false);
-                const el = document.getElementById('all-products-section');
-                if (el) {
-                  el.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  window.scrollTo({ top: 400, behavior: 'smooth' });
-                }
-              }}
-            />
+
 
             {/* Subtle Blinkit Quick Parchi Chips */}
             <div className="flex items-center justify-center gap-2.5 px-3 py-1">
@@ -1438,14 +1416,7 @@ export default function App() {
               🔥 Launch Offers
             </button>
             <span>•</span>
-            <button
-              id="footer-refer-earn-btn"
-              onClick={() => setIsReferModalOpen(true)}
-              className="text-emerald-700 hover:text-emerald-800 font-bold transition-colors cursor-pointer"
-            >
-              🎁 Refer & Earn ₹50
-            </button>
-            <span>•</span>
+
             <button
               id="footer-privacy-policy-btn"
               onClick={handleOpenPrivacy}
@@ -1520,7 +1491,6 @@ export default function App() {
         onRepeatOrder={handleRepeatOrder}
         onAddStayfreeReward={handleAddStayfreeReward}
         onAddToCart={handleAddToCart}
-        onOpenReferAndEarn={() => setIsReferModalOpen(true)}
       />
 
       {/* 4.5. Handwritten Grocery List / Parchi Photo Upload Modal */}
@@ -1588,12 +1558,7 @@ export default function App() {
         }}
       />
 
-      {/* 9. Waidhan Community Refer & Earn ₹50 Modal */}
-      <ReferAndEarnModal
-        isOpen={isReferModalOpen}
-        onClose={() => setIsReferModalOpen(false)}
-        storeSettings={storeSettings}
-      />
+
 
       {/* 7.5. Store Owner Admin Password Gate Modal */}
       <AdminPinModal

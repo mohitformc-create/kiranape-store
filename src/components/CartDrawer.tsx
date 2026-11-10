@@ -20,7 +20,6 @@ interface CartDrawerProps {
   onRepeatOrder?: (order: Order) => void;
   onAddStayfreeReward?: () => void;
   onAddToCart?: (product: Product) => void;
-  onOpenReferAndEarn?: () => void;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -35,7 +34,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onRepeatOrder,
   onAddStayfreeReward,
   onAddToCart,
-  onOpenReferAndEarn,
 }) => {
   const [repeatSuccessNotice, setRepeatSuccessNotice] = useState<string | null>(null);
 
@@ -370,31 +368,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               onUpdateQuantity={onUpdateQuantity}
             />
 
-            {/* Refer & Earn Promotion Strip */}
-            {onOpenReferAndEarn && (
-              <button
-                type="button"
-                onClick={onOpenReferAndEarn}
-                className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-amber-500/15 border border-amber-300/80 flex items-center justify-between text-left hover:border-amber-400 transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-bold text-base shadow-xs flex-shrink-0">
-                    🎁
-                  </div>
-                  <div>
-                    <h5 className="font-heading font-black text-xs text-stone-900 group-hover:text-amber-900 transition-colors">
-                      Refer Neighbors & Earn ₹50 Cash Off
-                    </h5>
-                    <p className="text-[10px] text-stone-600 font-medium">
-                      Invite friends in Waidhan to shop fresh groceries
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs font-black text-amber-800 bg-white/90 px-2 py-1 rounded-lg border border-amber-300 shadow-2xs whitespace-nowrap ml-1 flex-shrink-0">
-                  Invite ➔
-                </span>
-              </button>
-            )}
+
 
             {/* Bill Details */}
             <div className="bg-white rounded-2xl border border-stone-200/90 p-4 space-y-2.5 shadow-xs">

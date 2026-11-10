@@ -697,17 +697,20 @@ export async function addCategoryToFirestore(
 
 export async function updateCategoryInFirestore(
   id: string,
-  updates: Partial<CustomCategory>
+  updates: Partial<CustomCategory> & { image_url?: string }
 ): Promise<void> {
   const db = getDb();
   if (db) {
     try {
       const docRef = doc(db, CATEGORIES_COLLECTION, id);
-      await updateDoc(docRef, cleanFirestoreData({
+      const img = updates.imageUrl || updates.image_url;
+      await setDoc(docRef, cleanFirestoreData({
         ...updates,
+        imageUrl: img,
+        image_url: img,
         priority: updates.order,
         updatedAt: Date.now(),
-      }));
+      }), { merge: true });
     } catch (err) {
       console.warn('Firestore updateCategory error:', err);
     }
@@ -820,29 +823,37 @@ export function subscribeToFirestoreProducts(
           return;
         }
 
-        const firestoreProducts: Product[] = snapshot.docs.map((d) => {
+        const masterMap = new Map(ALL_VERIFIED_PRODUCTS.map((p) => [p.id, p]));
+
+        snapshot.docs.forEach((d) => {
           const data = d.data();
           const orig = Number(data.originalPrice) || Number(data.price) || 0;
           const disc = Number(data.discountPercent) || 0;
           const final = Number(data.finalPrice) || Number(data.price) || calculateFinalPrice(orig, disc);
-          return {
+          const existing = masterMap.get(d.id);
+          const fallbackImg = existing?.imageUrl || '';
+
+          const product: Product = {
             id: d.id,
-            name: data.name || '',
-            hindiName: data.hindiName || '',
-            category: data.category || data.categoryId || 'Snacks & Biscuits',
-            department: data.department || 'grocery',
-            unit: data.unit || data.weight || '1 Unit',
-            originalPrice: orig,
-            discountPercent: disc,
-            finalPrice: final,
-            imageUrl: data.imageUrl || data.image || '',
+            name: data.name || existing?.name || '',
+            hindiName: data.hindiName || existing?.hindiName || '',
+            category: data.category || data.categoryId || existing?.category || 'Snacks & Biscuits',
+            department: data.department || existing?.department || 'grocery',
+            unit: data.unit || data.weight || existing?.unit || '1 Unit',
+            originalPrice: orig || existing?.originalPrice || 0,
+            discountPercent: disc || existing?.discountPercent || 0,
+            finalPrice: final || existing?.finalPrice || 0,
+            imageUrl: data.imageUrl || data.image || fallbackImg,
             isAvailable: data.isAvailable ?? data.inStock ?? true,
-            stock: data.stock ?? data.stockCount,
-            description: data.description || '',
-            variants: data.variants || [],
+            stock: data.stock ?? data.stockCount ?? existing?.stock ?? 100,
+            description: data.description || existing?.description || '',
+            variants: data.variants || existing?.variants || [],
             updatedAt: data.updatedAt || Date.now(),
           };
+          masterMap.set(d.id, product);
         });
+
+        const firestoreProducts: Product[] = Array.from(masterMap.values());
 
         // Persist to local cache and update React state
         saveProducts(firestoreProducts);

@@ -7,11 +7,9 @@ import { SPECIAL_DEAL_PRODUCTS } from '../data/specialDealsCatalog';
 import { idbGet, idbSet, idbDelete } from './idbStorage';
 import { sendTelegramOrderNotification } from './telegramNotificationService';
 
-export const ALL_VERIFIED_PRODUCTS: Product[] = [
-  ...WHOLESALE_105_PRODUCTS,
-  ...FORTUNE_OIL_PRODUCTS,
-  ...SPECIAL_DEAL_PRODUCTS,
-];
+import { MASTER_199_PRODUCTS } from '../data/master199Catalog';
+
+export const ALL_VERIFIED_PRODUCTS: Product[] = MASTER_199_PRODUCTS;
 
 export const PERMANENT_CATALOG_KEY = 'kiranape_permanent_catalog';
 export const SETTINGS_STORAGE_KEY = 'kiranape_store_settings';
@@ -337,7 +335,7 @@ function safeSaveProductsToLocalStorage(products: Product[]): void {
 }
 
 export function getProducts(): Product[] {
-  if (typeof window === 'undefined') return INITIAL_PRODUCTS;
+  if (typeof window === 'undefined') return MASTER_199_PRODUCTS;
 
   // Return in-memory cache if available and populated
   if (inMemoryProductsCache !== null && inMemoryProductsCache.length > 0) {
@@ -358,43 +356,18 @@ export function getProducts(): Product[] {
       }
     }
 
-    // ZERO INVENTORY DOWNTIME: Always fallback/rehydrate to bundled 162 items catalog if storage is empty or incomplete
-    if (!loadedProducts || loadedProducts.length < 162) {
-      const existingMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
-      INITIAL_PRODUCTS.forEach((item) => {
-        if (!existingMap.has(item.id)) {
-          existingMap.set(item.id, item);
-        }
-      });
+    // MASTER 199 CATALOG: Always ensure all 199 products are fully populated without omission
+    const existingMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
+    let hasMissingProducts = false;
+    MASTER_199_PRODUCTS.forEach((item) => {
+      if (!existingMap.has(item.id)) {
+        existingMap.set(item.id, item);
+        hasMissingProducts = true;
+      }
+    });
+
+    if (hasMissingProducts || loadedProducts.length < 199) {
       loadedProducts = Array.from(existingMap.values());
-      localStorage.setItem(PERMANENT_CATALOG_KEY, JSON.stringify(loadedProducts));
-    }
-
-    // Ensure all starter stationery products are present in the catalog
-    const existingStationeryMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
-    let hasNewStationery = false;
-    STATIONERY_PRODUCTS.forEach((statItem) => {
-      if (!existingStationeryMap.has(statItem.id)) {
-        existingStationeryMap.set(statItem.id, statItem);
-        hasNewStationery = true;
-      }
-    });
-    if (hasNewStationery) {
-      loadedProducts = Array.from(existingStationeryMap.values());
-      safeSaveProductsToLocalStorage(loadedProducts);
-    }
-
-    // Ensure all special deal products (Stayfree XL reward & Parle 50% deals) are present in the catalog
-    const existingDealsMap = new Map((loadedProducts || []).map((p) => [p.id, p]));
-    let hasNewDeals = false;
-    SPECIAL_DEAL_PRODUCTS.forEach((dealItem) => {
-      if (!existingDealsMap.has(dealItem.id)) {
-        existingDealsMap.set(dealItem.id, dealItem);
-        hasNewDeals = true;
-      }
-    });
-    if (hasNewDeals) {
-      loadedProducts = Array.from(existingDealsMap.values());
       safeSaveProductsToLocalStorage(loadedProducts);
     }
 
@@ -437,8 +410,8 @@ export function getProducts(): Product[] {
 
     return inMemoryProductsCache;
   } catch (e) {
-    console.warn('Notice reading products from storage, using bundled catalog:', e);
-    return INITIAL_PRODUCTS;
+    console.warn('Notice reading products from storage, using master 199 catalog:', e);
+    return MASTER_199_PRODUCTS;
   }
 }
 
