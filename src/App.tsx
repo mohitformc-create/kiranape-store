@@ -81,6 +81,7 @@ import {
   deleteProductFromFirestore,
   createOrderInFirestore,
   purgeAllFirestoreProducts,
+  updateProductDirectlyInFirestore,
 } from './services/firebase';
 import { STORE_DEFAULTS, DEFAULT_BANNERS, INITIAL_PRODUCTS } from './data/initialProducts';
 import {
@@ -111,6 +112,7 @@ import { SplashScreen } from './components/SplashScreen';
 import { ParchiUploadModal } from './components/ParchiUploadModal';
 import { DigitalParchiModal } from './components/DigitalParchiModal';
 import { VoiceGroceryModal } from './components/VoiceGroceryModal';
+import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { QuickOrderActionBar } from './components/QuickOrderActionBar';
 import { CreatorCredits } from './components/CreatorCredits';
 import { AdminPinModal } from './components/AdminPinModal';
@@ -187,6 +189,85 @@ export default function App() {
   // Admin Mode & Direct In-App Inline Quick-Edit State (strictly locked behind isAdminAuthenticated)
   const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
+
+  // Camera Barcode / SKU Scanner State
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+  const [barcodeScannerMode, setBarcodeScannerMode] = useState<'search' | 'bind'>('search');
+  const [productToBind, setProductToBind] = useState<Product | null>(null);
+
+  const handleOpenCustomerBarcodeScanner = useCallback(() => {
+    setBarcodeScannerMode('search');
+    setProductToBind(null);
+    setIsBarcodeScannerOpen(true);
+  }, []);
+
+  const handleOpenAdminBarcodeScanner = useCallback((p?: Product) => {
+    setBarcodeScannerMode('bind');
+    setProductToBind(p || null);
+    setIsBarcodeScannerOpen(true);
+  }, []);
+
+  const handleBarcodeDetected = useCallback(
+    async (code: string, matchedProduct?: Product) => {
+      setIsBarcodeScannerOpen(false);
+
+      if (barcodeScannerMode === 'bind' && productToBind) {
+        try {
+          const updated = await updateProductDirectlyInFirestore(productToBind.id, {
+            barcode: code,
+            sku: code,
+            updatedAt: Date.now(),
+          });
+          setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          if (quickEditProduct && quickEditProduct.id === updated.id) {
+            setQuickEditProduct(updated);
+          }
+          showRewardToast(`बारकोड "${code}" उत्पाद "${productToBind.name}" से लिंक हो गया!`);
+        } catch (err) {
+          console.error('Failed to bind barcode in Firestore:', err);
+          setProducts((prev) =>
+            prev.map((p) => (p.id === productToBind.id ? { ...p, barcode: code, sku: code } : p))
+          );
+          showRewardToast(`बारकोड "${code}" लिंक हो गया!`);
+        }
+        setProductToBind(null);
+        return;
+      }
+
+      // Customer or Admin general barcode search
+      const matched =
+        matchedProduct ||
+        products.find(
+          (p) =>
+            (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) ||
+            (p.sku && p.sku.toLowerCase() === code.toLowerCase()) ||
+            p.id === code ||
+            p.name.toLowerCase().includes(code.toLowerCase())
+        );
+
+      if (matched) {
+        if (currentView === 'admin') {
+          setQuickEditProduct(matched);
+          setIsQuickEditOpen(true);
+          showRewardToast(`उत्पाद मिला: "${matched.name}"`);
+        } else {
+          setSearchQuery(matched.name);
+          setSelectedCategory('All');
+          setIsCategoriesScreenOpen(false);
+          showRewardToast(`मिल गया: "${matched.name}" (${matched.unit}) - ₹${matched.finalPrice}`);
+          window.scrollTo({ top: 350, behavior: 'smooth' });
+        }
+      } else {
+        if (currentView === 'admin') {
+          showRewardToast(`बारकोड "${code}" कैटलॉग में नहीं मिला। किसी उत्पाद से लिंक करें।`);
+        } else {
+          setSearchQuery(code);
+          showRewardToast(`स्कैन कोड "${code}" खोजा जा रहा है...`);
+        }
+      }
+    },
+    [barcodeScannerMode, productToBind, products, currentView, quickEditProduct, showRewardToast]
+  );
 
   const handleOpenQuickEdit = useCallback((p: Product) => {
     if (!isAdminAuthenticated) return;
@@ -1013,6 +1094,7 @@ export default function App() {
           setProducts(newProds);
           saveProducts(newProds);
         }}
+        onOpenBarcodeScanner={handleOpenAdminBarcodeScanner}
       />
     );
   }
@@ -1045,6 +1127,7 @@ export default function App() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
+          onOpenBarcodeScanner={handleOpenCustomerBarcodeScanner}
           onGlobalSearch={(q) => {
             if (isMasterAdminPin(q)) {
               handleSecretAdminAccess();
@@ -1094,6 +1177,7 @@ export default function App() {
             onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
             onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
             onOpenLaunchPoster={() => setIsLaunchModalOpen(true)}
+            onOpenBarcodeScanner={handleOpenCustomerBarcodeScanner}
           />
 
           {/* Main Content Area */}
@@ -1516,6 +1600,8 @@ export default function App() {
         isOpen={isParchiModalOpen}
         onClose={() => setIsParchiModalOpen(false)}
         storeSettings={storeSettings}
+        catalogProducts={products}
+        onAddToCart={handleAddToCart}
       />
 
       {/* 4.55. Interactive Digital Parchi (Type Grocery List) Notepad Modal */}
@@ -1577,8 +1663,6 @@ export default function App() {
         }}
       />
 
-
-
       {/* 7.5. Store Owner Admin Password Gate Modal */}
       <AdminPinModal
         isOpen={isAdminPinModalOpen}
@@ -1604,6 +1688,20 @@ export default function App() {
           setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
           showRewardToast(`Product "${updated.name}" updated successfully in store!`);
         }}
+        onOpenBarcodeScanner={(p) => handleOpenAdminBarcodeScanner(p)}
+      />
+
+      {/* 11. Camera-Based FMCG SKU Barcode Scanner */}
+      <BarcodeScannerModal
+        isOpen={isBarcodeScannerOpen}
+        onClose={() => {
+          setIsBarcodeScannerOpen(false);
+          setProductToBind(null);
+        }}
+        onDetected={handleBarcodeDetected}
+        products={products}
+        mode={barcodeScannerMode}
+        productToBind={productToBind}
       />
     </div>
   );

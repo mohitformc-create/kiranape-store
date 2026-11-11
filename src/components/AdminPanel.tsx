@@ -47,6 +47,7 @@ import {
   FileSpreadsheet,
   Pencil,
   Lock,
+  Barcode,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -133,6 +134,7 @@ interface AdminPanelProps {
   onSaveSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   onSaveBanners: (banners: PromoBanner[]) => Promise<void>;
   onRefreshProducts?: (products: Product[]) => void;
+  onOpenBarcodeScanner?: (productToBind?: Product) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -155,6 +157,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveSettings,
   onSaveBanners,
   onRefreshProducts,
+  onOpenBarcodeScanner,
 }) => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'parchi_orders' | 'hypermarket' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
@@ -1391,6 +1394,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <span>Classic Table</span>
                     </button>
                   </div>
+
+                  {/* Dedicated Barcode / SKU Scanner for FMCG physical package */}
+                  {onOpenBarcodeScanner && (
+                    <button
+                      type="button"
+                      id="admin-scan-barcode-btn"
+                      onClick={() => onOpenBarcodeScanner()}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-heading font-black shadow-xs hover:shadow-md transition-all cursor-pointer"
+                      title="Scan any physical product barcode to edit or bind"
+                    >
+                      <Barcode className="w-4 h-4 text-white" />
+                      <span>📷 Scan Barcode / SKU</span>
+                    </button>
+                  )}
 
                   {/* Dedicated CSV Restore & Ingestion Dropzone (196 Core Products) */}
                   <button

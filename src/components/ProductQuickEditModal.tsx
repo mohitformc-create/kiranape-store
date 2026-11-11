@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Upload, Check, RefreshCw, AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { X, Save, Upload, Check, RefreshCw, AlertCircle, Eye, EyeOff, Sparkles, Barcode, Camera } from 'lucide-react';
 import { Product } from '../types';
 import { updateProductDirectlyInFirestore } from '../services/firebase';
 import { compressImageFile } from '../utils/imageUtils';
@@ -10,6 +10,7 @@ interface ProductQuickEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductUpdated?: (updated: Product) => void;
+  onOpenBarcodeScanner?: (product: Product) => void;
 }
 
 const UNIT_PRESETS = [
@@ -37,12 +38,14 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
   isOpen,
   onClose,
   onProductUpdated,
+  onOpenBarcodeScanner,
 }) => {
   const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [mrp, setMrp] = useState<number>(0);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [stockCount, setStockCount] = useState<number>(50);
   const [unit, setUnit] = useState<string>('1 pc');
+  const [barcode, setBarcode] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isCartRecommended, setIsCartRecommended] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -59,6 +62,7 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
       setIsAvailable(product.isAvailable !== false);
       setStockCount(Number(product.stockCount ?? product.stock ?? 50));
       setUnit(product.unit || '1 pc');
+      setBarcode(product.barcode || product.sku || '');
       setImageUrl(product.imageUrl || '');
       setIsCartRecommended(Boolean(product.isCartRecommended || product.featuredInCart));
       setErrorNotice(null);
@@ -113,6 +117,8 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
         stockCount: Number(stockCount),
         stock: Number(stockCount),
         unit: unit.trim(),
+        barcode: barcode.trim() || undefined,
+        sku: barcode.trim() || undefined,
         imageUrl: imageUrl.trim(),
         isCartRecommended,
         featuredInCart: isCartRecommended,
@@ -361,6 +367,43 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 3.5. BARCODE / SKU CODE WITH CAMERA SCANNER */}
+          <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+            <div className="flex items-center justify-between text-[11px]">
+              <label className="font-bold text-stone-800 uppercase flex items-center gap-1.5">
+                <Barcode className="w-4 h-4 text-emerald-700" />
+                <span>Barcode / SKU (बारकोड नंबर)</span>
+              </label>
+              <span className="text-[10px] text-stone-400">EAN-13, UPC or QR</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Scan or type barcode (e.g. 8901030383120)"
+                className="flex-1 px-3 py-2 text-xs font-mono bg-white border border-stone-300 rounded-xl font-bold text-stone-900 focus:border-emerald-600 focus:outline-hidden"
+              />
+              {onOpenBarcodeScanner && (
+                <button
+                  type="button"
+                  onClick={() => onOpenBarcodeScanner(product)}
+                  className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs font-heading font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer flex-shrink-0"
+                  title="Scan physical product package with phone camera"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Scan</span>
+                </button>
+              )}
+            </div>
+            {barcode && (
+              <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-600" />
+                <span>Barcode linked to this SKU</span>
+              </p>
+            )}
           </div>
 
           {/* 4. IMAGE URL & DEVICE UPLOAD */}

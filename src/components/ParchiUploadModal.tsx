@@ -14,12 +14,16 @@ import {
   RefreshCw,
   Trash2,
   Image as ImageIcon,
+  ShoppingBag,
+  Plus,
+  Minus,
+  Check,
 } from 'lucide-react';
 import { compressImageFile, formatWhatsAppPhone } from '../utils/imageUtils';
 import { saveParchiOrder, getCustomerSelectedLocation, saveCustomerPhone } from '../services/storageService';
 import { dispatchOrderInBackground } from '../services/orderQueueService';
 import { playOrderChime } from '../utils/sound';
-import { StoreSettings } from '../types';
+import { StoreSettings, Product } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getStoreOwnerWhatsAppNotificationUrl } from '../utils/orderUtils';
 import { CreatorCredits } from './CreatorCredits';
@@ -30,12 +34,24 @@ interface ParchiUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   storeSettings?: StoreSettings;
+  catalogProducts?: Product[];
+  onAddToCart?: (product: Product, quantity?: number) => void;
+}
+
+interface ParsedParchiItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  matchedProduct?: Product;
+  selected: boolean;
 }
 
 export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
   isOpen,
   onClose,
   storeSettings = STORE_DEFAULTS,
+  catalogProducts = [],
+  onAddToCart,
 }) => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +66,75 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
   const [submittedWhatsAppUrl, setSubmittedWhatsAppUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Smart AI handwritten slip parsing state
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
+  const [parsedItems, setParsedItems] = useState<ParsedParchiItem[]>([]);
+  const [aiRawNotes, setAiRawNotes] = useState('');
+  const [itemsAddedCount, setItemsAddedCount] = useState<number | null>(null);
+
   if (!isOpen) return null;
+
+  const runAiAnalysis = async (base64Img: string) => {
+    setIsAnalyzingAi(true);
+    setItemsAddedCount(null);
+    try {
+      const payloadProducts = catalogProducts.slice(0, 200).map((p) => ({
+        id: p.id,
+        name: p.name,
+        hindiName: p.hindiName || '',
+        category: p.category,
+        finalPrice: p.finalPrice,
+        originalPrice: p.originalPrice,
+        unit: p.unit,
+        imageUrl: p.imageUrl,
+      }));
+
+      const response = await fetch('/api/ai/parse-parchi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Img,
+          catalogProducts: payloadProducts,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.extractedItems && Array.isArray(data.extractedItems)) {
+          const mapped: ParsedParchiItem[] = data.extractedItems.map((item: any) => {
+            let matched: Product | undefined;
+            if (item.matchedProductId) {
+              matched = catalogProducts.find((p) => p.id === item.matchedProductId);
+            }
+            if (!matched && item.name) {
+              const lower = item.name.toLowerCase();
+              matched = catalogProducts.find(
+                (p) =>
+                  p.name.toLowerCase().includes(lower) ||
+                  (p.hindiName && p.hindiName.includes(item.name))
+              );
+            }
+            return {
+              name: item.name,
+              quantity: Math.max(1, Number(item.quantity) || 1),
+              unit: item.unit || 'pack',
+              matchedProduct: matched,
+              selected: Boolean(matched),
+            };
+          });
+          setParsedItems(mapped);
+          if (data.rawText) {
+            setAiRawNotes(data.rawText);
+            setNotes((prev) => prev || `Parchi Items: ${data.rawText.slice(0, 100)}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('AI parchi parse error:', err);
+    } finally {
+      setIsAnalyzingAi(false);
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,14 +148,58 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       if (errors.image) {
         setErrors((prev) => ({ ...prev, image: '' }));
       }
+      // Trigger AI parsing automatically for seamless experience
+      runAiAnalysis(base64);
     } catch (err) {
       console.error('Error compressing parchi image:', err);
       const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
+      reader.onload = () => {
+        const b64 = reader.result as string;
+        setImagePreview(b64);
+        runAiAnalysis(b64);
+      };
       reader.readAsDataURL(file);
     } finally {
       setIsCompressing(false);
     }
+  };
+
+  const handleToggleItemSelect = (index: number) => {
+    setParsedItems((prev) =>
+      prev.map((it, idx) => (idx === index ? { ...it, selected: !it.selected } : it))
+    );
+  };
+
+  const handleUpdateItemQty = (index: number, delta: number) => {
+    setParsedItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== index) return it;
+        const newQty = Math.max(1, it.quantity + delta);
+        return { ...it, quantity: newQty };
+      })
+    );
+  };
+
+  const handleAddAllMatchedToCart = () => {
+    if (!onAddToCart) return;
+    const itemsToAdd = parsedItems.filter((i) => i.selected && i.matchedProduct);
+    if (itemsToAdd.length === 0) return;
+
+    itemsToAdd.forEach((item) => {
+      if (item.matchedProduct) {
+        onAddToCart(item.matchedProduct, item.quantity);
+      }
+    });
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([40, 40, 80]);
+      } catch {
+        // ignore
+      }
+    }
+    playOrderChime();
+    setItemsAddedCount(itemsToAdd.length);
   };
 
   const validate = () => {
@@ -195,6 +323,10 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
     setDeliveryAddress('');
     setNotes('');
     setErrors({});
+    setParsedItems([]);
+    setAiRawNotes('');
+    setItemsAddedCount(null);
+    setIsAnalyzingAi(false);
     onClose();
   };
 
@@ -359,13 +491,197 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setImagePreview(null)}
+                      onClick={() => {
+                        setImagePreview(null);
+                        setParsedItems([]);
+                        setItemsAddedCount(null);
+                      }}
                       className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-[11px] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>हटाएं</span>
                     </button>
                   </div>
+
+                  {/* SMART AI PARCHI RECOGNITION & 1-TAP BASKET CARD */}
+                  {isAnalyzingAi && (
+                    <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-emerald-950 text-white rounded-2xl p-4 shadow-lg border border-emerald-500/40 space-y-2 animate-in fade-in">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-black text-sm flex-shrink-0 animate-pulse">
+                          ✨
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-heading font-black text-xs text-amber-300">
+                            🤖 Smart AI Analyzing Slip... / AI पर्ची पढ़ रहा है
+                          </h4>
+                          <p className="text-[10px] text-stone-300 leading-tight">
+                            Gemini 3.8 Flash reading handwritten items & matching with store inventory...
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-gradient-to-r from-amber-400 to-emerald-400 h-full w-2/3 animate-pulse"></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isAnalyzingAi && parsedItems.length > 0 && (
+                    <div className="bg-emerald-50/90 border-2 border-emerald-500/70 rounded-2xl p-3.5 space-y-3 shadow-xs animate-in zoom-in-95">
+                      <div className="flex items-center justify-between pb-2 border-b border-emerald-200/80">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
+                            ✓
+                          </span>
+                          <span className="font-heading font-black text-xs text-emerald-950">
+                            AI Found {parsedItems.filter((i) => i.matchedProduct).length} Store Items
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          {parsedItems.length} parsed on slip
+                        </span>
+                      </div>
+
+                      {/* Success confirmation badge */}
+                      {itemsAddedCount !== null && (
+                        <div className="p-2.5 bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs">
+                          <Check className="w-4 h-4 text-emerald-200 flex-shrink-0" />
+                          <span>✅ {itemsAddedCount} आइटम आपके बास्केट (Cart) में जोड़ दिए गए हैं!</span>
+                        </div>
+                      )}
+
+                      {/* Parsed Items List */}
+                      <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                        {parsedItems.map((item, idx) => {
+                          const p = item.matchedProduct;
+                          return (
+                            <div
+                              key={idx}
+                              className={`p-2 rounded-xl border text-xs flex items-center justify-between gap-2 transition-all ${
+                                p
+                                  ? item.selected
+                                    ? 'bg-white border-emerald-400 shadow-2xs'
+                                    : 'bg-stone-50 border-stone-200 opacity-60'
+                                  : 'bg-stone-100/70 border-stone-200 text-stone-600'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                {p ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={item.selected}
+                                    onChange={() => handleToggleItemSelect(idx)}
+                                    className="w-4 h-4 text-emerald-600 rounded-sm focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                ) : (
+                                  <span className="text-[10px] text-stone-400 font-bold px-1">•</span>
+                                )}
+
+                                {p?.imageUrl && (
+                                  <img
+                                    src={p.imageUrl}
+                                    alt={p.name}
+                                    className="w-7 h-7 object-contain rounded-md bg-stone-50 border border-stone-200 flex-shrink-0"
+                                  />
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-bold text-stone-900 truncate">
+                                      {p ? p.name : item.name}
+                                    </span>
+                                    {p && (
+                                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded-xs flex-shrink-0">
+                                        Matched
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-stone-500 truncate">
+                                    {p ? `${p.hindiName || ''} • ${p.unit}` : `Special Item (${item.quantity} ${item.unit})`}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {p ? (
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="font-heading font-black text-emerald-800 text-xs">
+                                    ₹{Number(p.finalPrice) * item.quantity}
+                                  </span>
+                                  <div className="flex items-center bg-stone-100 border border-stone-200 rounded-lg overflow-hidden">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItemQty(idx, -1)}
+                                      className="px-1.5 py-0.5 text-stone-600 hover:bg-stone-200 font-bold"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="px-1.5 text-[11px] font-bold text-stone-800">
+                                      {item.quantity}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItemQty(idx, 1)}
+                                      className="px-1.5 py-0.5 text-stone-600 hover:bg-stone-200 font-bold"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold flex-shrink-0">
+                                  Manual Pick
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* 1-Tap Add to Basket Action */}
+                      {onAddToCart && parsedItems.some((i) => i.selected && i.matchedProduct) && (
+                        <button
+                          type="button"
+                          onClick={handleAddAllMatchedToCart}
+                          className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-heading font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <ShoppingBag className="w-4 h-4 text-emerald-200" />
+                          <span>
+                            🛒 Add Matched Items to Basket (
+                            {parsedItems.filter((i) => i.selected && i.matchedProduct).length} items • ₹
+                            {parsedItems.reduce(
+                              (sum, it) =>
+                                it.selected && it.matchedProduct
+                                  ? sum + Number(it.matchedProduct.finalPrice) * it.quantity
+                                  : sum,
+                              0
+                            )}
+                            )
+                          </span>
+                        </button>
+                      )}
+
+                      <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1">
+                        <span>Items will appear directly in your basket</span>
+                        <button
+                          type="button"
+                          onClick={() => imagePreview && runAiAnalysis(imagePreview)}
+                          className="text-emerald-700 font-bold hover:underline"
+                        >
+                          🔄 Re-analyze Slip
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isAnalyzingAi && parsedItems.length === 0 && imagePreview && (
+                    <button
+                      type="button"
+                      onClick={() => runAiAnalysis(imagePreview)}
+                      className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      <span>🤖 AI से पर्ची के सामान पहचानें (Smart Read Slip)</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2.5">

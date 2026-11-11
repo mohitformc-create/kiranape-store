@@ -31,6 +31,7 @@ export interface Product {
   stockCount?: number; // Alias for inventory count
   description?: string;
   barcode?: string;
+  sku?: string;
   variants?: ProductVariant[];
   updatedAt: number;
   isRewardItem?: boolean;

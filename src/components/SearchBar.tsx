@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Mic, Camera, PenLine } from 'lucide-react';
+import { Search, X, Mic, Camera, PenLine, Barcode } from 'lucide-react';
 import { isMasterAdminPin } from '../config/adminConfig';
 
 interface SearchBarProps {
@@ -7,6 +7,7 @@ interface SearchBarProps {
   onSearchChange: (query: string) => void;
   placeholder?: string;
   onSecretAdminTrigger?: () => void;
+  onOpenBarcodeScanner?: () => void;
   onOpenParchiModal?: () => void;
   onOpenVoiceModal?: () => void;
   onOpenDigitalParchiModal?: () => void;
@@ -25,6 +26,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSearchChange,
   placeholder,
   onSecretAdminTrigger,
+  onOpenBarcodeScanner,
   onOpenParchiModal,
   onOpenVoiceModal,
   onOpenDigitalParchiModal,
@@ -252,6 +254,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           >
             <Mic className={`w-4 h-4 ${isListening ? 'text-white animate-pulse' : 'text-stone-700'}`} />
           </button>
+
+          {/* Barcode Scanner Icon for Instant Package Scanning */}
+          {onOpenBarcodeScanner && (
+            <button
+              type="button"
+              onClick={onOpenBarcodeScanner}
+              className="p-1.5 rounded-full text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+              title="📷 Barcode / SKU Scan Karein (Scan Empty Packet to Re-Order)"
+            >
+              <Barcode className="w-4 h-4 text-stone-700 hover:text-emerald-700" />
+            </button>
+          )}
 
           {/* Digital Parchi (Type List) Notepad Icon */}
           {onOpenDigitalParchiModal && (

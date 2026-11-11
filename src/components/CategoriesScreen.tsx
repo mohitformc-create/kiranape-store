@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Search, Mic, Pencil, ChevronRight, MapPin, Check, X } from 'lucide-react';
+import { Search, Mic, Pencil, ChevronRight, MapPin, Check, X, Barcode } from 'lucide-react';
 import { Product, ProductCategory } from '../types';
 import { getCustomerSelectedLocation, setCustomerSelectedLocation, getDeliveryLocations } from '../services/storageService';
 import { useCategories, CATEGORIES_DATA, UnifiedCategoryTile } from '../data/categoriesData';
@@ -11,6 +11,7 @@ export const MASTER_CATEGORIES = CATEGORIES_DATA;
 interface CategoriesScreenProps {
   onSelectCategory: (categoryTarget: ProductCategory) => void;
   onOpenVoiceModal?: () => void;
+  onOpenBarcodeScanner?: () => void;
   onGlobalSearch?: (query: string) => void;
   onSecretAdminTrigger?: () => void;
   products?: Product[];
@@ -19,6 +20,7 @@ interface CategoriesScreenProps {
 export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
   onSelectCategory,
   onOpenVoiceModal,
+  onOpenBarcodeScanner,
   onGlobalSearch,
   onSecretAdminTrigger,
   products = [],
@@ -154,6 +156,20 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+              {/* Barcode Search Scanner Icon */}
+              {onOpenBarcodeScanner && (
+                <button
+                  type="button"
+                  id="category-barcode-scan-btn"
+                  onClick={onOpenBarcodeScanner}
+                  className="p-1.5 rounded-full text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 active:scale-90 transition-transform cursor-pointer flex-shrink-0"
+                  title="Scan Barcode / SKU"
+                  aria-label="Scan Barcode"
+                >
+                  <Barcode className="w-4 h-4 text-emerald-700" />
+                </button>
+              )}
+
               {/* Voice Search Microphone Icon */}
               <button
                 type="button"

@@ -34,6 +34,7 @@ interface CustomerHeaderProps {
   onOpenVoiceModal?: () => void;
   onOpenDigitalParchiModal?: () => void;
   onOpenLaunchPoster?: () => void;
+  onOpenBarcodeScanner?: () => void;
 }
 
 export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
@@ -53,6 +54,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onOpenVoiceModal,
   onOpenDigitalParchiModal,
   onOpenLaunchPoster,
+  onOpenBarcodeScanner,
 }) => {
   const dynamicCategories = categories && categories.length > 0 ? categories : getCustomCategories();
 
@@ -170,6 +172,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
             onOpenParchiModal={onOpenParchiModal}
             onOpenVoiceModal={onOpenVoiceModal}
             onOpenDigitalParchiModal={onOpenDigitalParchiModal}
+            onOpenBarcodeScanner={onOpenBarcodeScanner}
             className="w-full"
           />
 
