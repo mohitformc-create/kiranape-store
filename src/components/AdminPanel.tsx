@@ -45,6 +45,7 @@ import {
   VolumeX,
   Upload,
   FileSpreadsheet,
+  Pencil,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -1228,6 +1229,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
 
           <button
+            id="admin-hypermarket-tab-btn"
+            onClick={() => setActiveTab('hypermarket')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
+              activeTab === 'hypermarket'
+                ? 'bg-stone-100 text-stone-900 shadow-xs'
+                : 'text-purple-300 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>🤖 AI Hypermarket (Vishal Mart)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('categories')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
               activeTab === 'categories'
@@ -1374,6 +1388,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <span>Classic Table</span>
                     </button>
                   </div>
+
+                  {/* Dedicated CSV Restore & Ingestion Dropzone (196 Core Products) */}
+                  <button
+                    type="button"
+                    id="admin-csv-restore-modal-btn"
+                    onClick={() => setShowCsvRestoreModal(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 active:scale-95 text-purple-900 border border-purple-300 text-xs font-heading font-extrabold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                    title="Open dedicated CSV Dropzone for mohitkiranape.csv with 100-batch Firestore ingestion"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-purple-700" />
+                    <span>📥 CSV Restore & Import (196 Items)</span>
+                  </button>
 
                   {/* Download Inventory as Excel (CSV) */}
                   <button
@@ -2077,6 +2103,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               {/* Actions: Edit Modal & Delete */}
                               <td className="py-3 px-4 text-right whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-1.5">
+                                   <button
+                                    onClick={() => {
+                                      setQuickEditProduct(product);
+                                      setIsQuickEditOpen(true);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-900 transition-colors cursor-pointer"
+                                    title="Quick Edit (Price, Stock & Image)"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
                                   <button
                                     onClick={() => handleOpenEdit(product)}
                                     className="p-1.5 rounded-lg bg-stone-100 hover:bg-amber-100 text-stone-600 hover:text-amber-800 transition-colors cursor-pointer"
@@ -3112,6 +3148,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           />
         )}
 
+        {/* ================= TAB: AI HYPERMARKET (VISHAL MEGA MART) ================= */}
+        {activeTab === 'hypermarket' && (
+          <AdminHypermarketManager
+            products={products}
+            onRefreshProducts={(next) => {
+              if (onRefreshProducts) onRefreshProducts(next);
+            }}
+          />
+        )}
+
         {/* ================= TAB 4: DYNAMIC CATEGORY MANAGER ================= */}
         {activeTab === 'categories' && (
           <AdminCategoryManager
@@ -3513,6 +3559,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Enterprise CSV Ingestion & Restoration Dropzone Modal (196 Core Products) */}
+      <AdminCsvRestoreModal
+        isOpen={showCsvRestoreModal}
+        onClose={() => setShowCsvRestoreModal(false)}
+        onCatalogRestored={(restored) => {
+          if (onRefreshProducts) {
+            onRefreshProducts(restored);
+          }
+        }}
+      />
+
+      {/* Product Quick-Edit Modal (Direct Controller) */}
+      <ProductQuickEditModal
+        product={quickEditProduct}
+        isOpen={isQuickEditOpen}
+        onClose={() => {
+          setIsQuickEditOpen(false);
+          setQuickEditProduct(null);
+        }}
+        onProductUpdated={(updated) => {
+          const next = products.map((p) => (p.id === updated.id ? updated : p));
+          if (onRefreshProducts) {
+            onRefreshProducts(next);
+          }
+        }}
+      />
     </div>
   );
 };
