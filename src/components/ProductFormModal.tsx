@@ -42,6 +42,8 @@ interface ProductFormModalProps {
     stock?: number;
     description?: string;
     variants?: ProductVariant[];
+    isCartRecommended?: boolean;
+    featuredInCart?: boolean;
   }) => void;
   editingProduct?: Product | null;
   categories?: CustomCategory[];
@@ -67,6 +69,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [imageUrl, setImageUrl] = useState('');
   const [directImageUrlInput, setDirectImageUrlInput] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
+  const [isCartRecommended, setIsCartRecommended] = useState(false);
   const [description, setDescription] = useState('');
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -299,6 +302,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setStock(editingProduct.stock !== undefined ? editingProduct.stock : 50);
       setImageUrl(editingProduct.imageUrl);
       setIsAvailable(editingProduct.isAvailable);
+      setIsCartRecommended(Boolean(editingProduct.isCartRecommended || editingProduct.featuredInCart));
       setDescription(editingProduct.description || '');
       setVariants(editingProduct.variants ? [...editingProduct.variants] : []);
     } else {
@@ -313,6 +317,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setStock('50');
       setImageUrl(getCategoryFallbackSvg('Atta & Flours', 'Atta & Flours'));
       setIsAvailable(true);
+      setIsCartRecommended(false);
       setDescription('');
       setVariants([]);
     }
@@ -376,6 +381,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       stock: Number(stock) || 50,
       description: description.trim(),
       variants: validVariants.length > 0 ? validVariants : undefined,
+      isCartRecommended,
+      featuredInCart: isCartRecommended,
     });
     onClose();
   };
@@ -1003,6 +1010,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               }`}
             >
               {isAvailable ? '● In Stock' : '✕ Out of Stock'}
+            </button>
+          </div>
+
+          {/* Cart Suggestion (You Might Also Like) Toggle */}
+          <div className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/90 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                Show in &apos;You Might Also Like&apos; (कार्ट सुझाव में दिखाएं)
+              </span>
+              <span className="text-[11px] text-amber-800 block mt-0.5">
+                Highlight this item in the customer cart suggestions carousel
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCartRecommended(!isCartRecommended)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                isCartRecommended
+                  ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                  : 'bg-stone-100 text-stone-600 border-stone-300 hover:bg-stone-200'
+              }`}
+            >
+              {isCartRecommended ? '⭐ Featured in Cart' : '✕ Not Featured'}
             </button>
           </div>
         </form>

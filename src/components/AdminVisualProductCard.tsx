@@ -338,6 +338,32 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
             </span>
 
             <div className="flex items-center gap-1">
+              {/* Cart Suggestion (You might also like) Toggle */}
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateProduct(product.id, {
+                    isCartRecommended: !product.isCartRecommended,
+                    featuredInCart: !product.isCartRecommended,
+                  })
+                }
+                className={`p-1 rounded-md transition-colors cursor-pointer ${
+                  product.isCartRecommended
+                    ? 'text-amber-600 bg-amber-100 ring-1 ring-amber-400'
+                    : 'text-stone-300 hover:text-amber-500 hover:bg-stone-100'
+                }`}
+                title={
+                  product.isCartRecommended
+                    ? "In Cart 'You Might Also Like' (Click to remove)"
+                    : "Add to Cart 'You Might Also Like'"
+                }
+              >
+                <Sparkles
+                  className={`w-3 h-3 ${
+                    product.isCartRecommended ? 'fill-amber-500 text-amber-600' : ''
+                  }`}
+                />
+              </button>
               {/* Full Edit Modal */}
               <button
                 type="button"

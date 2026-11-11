@@ -17,6 +17,8 @@
         "stockCount": { "type": "number" },
         "martBasePrice": { "type": "number" },
         "isMartItem": { "type": "boolean" },
+        "isCartRecommended": { "type": "boolean" },
+        "featuredInCart": { "type": "boolean" },
         "description": { "type": "string" },
         "updatedAt": { "type": "number" }
       },

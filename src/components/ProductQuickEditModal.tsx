@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Upload, Check, RefreshCw, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { X, Save, Upload, Check, RefreshCw, AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { Product } from '../types';
 import { updateProductDirectlyInFirestore } from '../services/firebase';
 import { compressImageFile } from '../utils/imageUtils';
@@ -44,6 +44,7 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
   const [stockCount, setStockCount] = useState<number>(50);
   const [unit, setUnit] = useState<string>('1 pc');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [isCartRecommended, setIsCartRecommended] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
@@ -59,6 +60,7 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
       setStockCount(Number(product.stockCount ?? product.stock ?? 50));
       setUnit(product.unit || '1 pc');
       setImageUrl(product.imageUrl || '');
+      setIsCartRecommended(Boolean(product.isCartRecommended || product.featuredInCart));
       setErrorNotice(null);
       setSuccessNotice(null);
     }
@@ -112,6 +114,8 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
         stock: Number(stockCount),
         unit: unit.trim(),
         imageUrl: imageUrl.trim(),
+        isCartRecommended,
+        featuredInCart: isCartRecommended,
         updatedAt: Date.now(),
       });
 
@@ -414,6 +418,35 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* 5. CART RECOMMENDATION TOGGLE (You Might Also Like) */}
+          <div className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/90 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="block text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600 fill-amber-500 flex-shrink-0" />
+                <span>Show in &apos;You Might Also Like&apos; (कार्ट सुझाव में दिखाएं)</span>
+              </span>
+              <span className="text-[10px] text-amber-800 font-medium block mt-0.5">
+                Feature as 1-tap impulse add recommendation inside customer cart drawer
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCartRecommended(!isCartRecommended)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                isCartRecommended ? 'bg-amber-600' : 'bg-stone-300'
+              }`}
+              role="switch"
+              aria-checked={isCartRecommended}
+              title="Toggle cart recommendation"
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  isCartRecommended ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Submit Actions */}

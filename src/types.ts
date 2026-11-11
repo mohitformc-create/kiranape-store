@@ -36,6 +36,8 @@ export interface Product {
   isRewardItem?: boolean;
   martBasePrice?: number;
   isMartItem?: boolean;
+  isCartRecommended?: boolean; // When true, featured in Cart 'You Might Also Like'
+  featuredInCart?: boolean; // Alias for cart suggestion
 }
 
 export interface ScannedBillItem {

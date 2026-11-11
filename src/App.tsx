@@ -1508,6 +1508,7 @@ export default function App() {
         onRepeatOrder={handleRepeatOrder}
         onAddStayfreeReward={handleAddStayfreeReward}
         onAddToCart={handleAddToCart}
+        catalogProducts={products}
       />
 
       {/* 4.5. Handwritten Grocery List / Parchi Photo Upload Modal */}
@@ -1541,6 +1542,7 @@ export default function App() {
         onAddStayfreeReward={handleAddStayfreeReward}
         onAddToCart={handleAddToCart}
         onUpdateQuantity={handleUpdateQuantity}
+        catalogProducts={products}
         initialCustomer={
           currentUser
             ? {

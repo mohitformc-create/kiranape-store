@@ -1,10 +1,10 @@
-import React, { useRef } from 'react';
-import { Plus, Minus, Check, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useRef, useMemo } from 'react';
+import { Plus, Minus, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product, CartItem } from '../types';
-import { UPSELL_PRODUCTS } from '../data/upsellCatalog';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
 
 interface UpsellCarouselProps {
+  products?: Product[];
   cartItems?: CartItem[];
   onAddToCart: (product: Product) => void;
   onUpdateQuantity?: (itemKey: string, quantity: number) => void;
@@ -14,17 +14,18 @@ interface UpsellCarouselProps {
 }
 
 // Helper to normalize product image lookup across possible backend keys
-const getProductImage = (prod: any): string => {
+const getProductImage = (prod: Product): string => {
   return (
+    prod.imageUrl ||
     prod.image ||
     prod.image_url ||
-    prod.imageUrl ||
     prod.thumbnail ||
-    'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80'
+    getCategoryFallbackSvg(prod.category, prod.name)
   );
 };
 
 export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
+  products = [],
   cartItems = [],
   onAddToCart,
   onUpdateQuantity,
@@ -34,8 +35,20 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Filter ONLY products where isCartRecommended === true (or featuredInCart === true) and in-stock
+  const recommendedProducts = useMemo(() => {
+    return products.filter(
+      (prod) => Boolean(prod.isCartRecommended || prod.featuredInCart) && prod.isAvailable !== false
+    );
+  }, [products]);
+
+  // STRICT REQUIREMENT: If NO products are flagged as recommended by Admin, HIDE the entire section completely
+  if (recommendedProducts.length === 0) {
+    return null;
+  }
+
   // Map of product quantities currently in the cart
-  const cartQuantityMap = React.useMemo(() => {
+  const cartQuantityMap = useMemo(() => {
     const map: Record<string, number> = {};
     cartItems.forEach((item) => {
       map[item.product.id] = (map[item.product.id] || 0) + item.quantity;
@@ -113,9 +126,12 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
         className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 pt-1 snap-x snap-mandatory touch-pan-x"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {UPSELL_PRODUCTS.map((prod) => {
+        {recommendedProducts.map((prod) => {
           const inCartCount = cartQuantityMap[prod.id] || 0;
-          const hasDiscount = prod.originalPrice > prod.finalPrice;
+          const mrp = prod.originalPrice || prod.finalPrice;
+          const sellingPrice = prod.finalPrice;
+          const hasDiscount = mrp > sellingPrice;
+          const discountPercent = prod.discountPercent || (hasDiscount ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0);
           const imageSrc = getProductImage(prod);
 
           return (
@@ -123,23 +139,22 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
               key={prod.id}
               className="w-[140px] xs:w-[150px] sm:w-[165px] flex-shrink-0 snap-start bg-white rounded-2xl p-2.5 border border-stone-200 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
             >
-              {/* Product Image Box - Fixed Blinkit Standard Sizing & Fallback */}
+              {/* Product Image Box - Packshot Sizing & Fallback */}
               <div className="w-full h-24 bg-white rounded-xl flex items-center justify-center p-2 relative overflow-hidden mb-2 border border-stone-100">
                 <img
                   src={imageSrc}
                   alt={prod.name}
-                  className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+                  className="w-full h-full object-contain mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80';
+                    (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(prod.category, prod.name);
                   }}
                 />
 
                 {/* Discount Badge */}
                 {hasDiscount && (
                   <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-xs">
-                    {prod.discountPercent || Math.round(((prod.originalPrice - prod.finalPrice) / prod.originalPrice) * 100)}% OFF
+                    {discountPercent}% OFF
                   </span>
                 )}
               </div>
@@ -152,6 +167,11 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
                 <h5 className="font-heading font-bold text-xs text-stone-900 line-clamp-2 leading-tight">
                   {prod.name}
                 </h5>
+                {prod.hindiName && (
+                  <p className="text-[10px] text-stone-500 font-medium truncate mt-0.5">
+                    {prod.hindiName}
+                  </p>
+                )}
               </div>
 
               {/* Price & Action Button Row */}
@@ -159,11 +179,11 @@ export const UpsellCarousel: React.FC<UpsellCarouselProps> = ({
                 {/* Price Display */}
                 <div className="flex flex-col leading-none">
                   <span className="font-heading font-extrabold text-xs sm:text-sm text-stone-950">
-                    ₹{prod.finalPrice}
+                    ₹{sellingPrice}
                   </span>
                   {hasDiscount && (
                     <span className="text-[10px] text-stone-400 line-through">
-                      ₹{prod.originalPrice}
+                      ₹{mrp}
                     </span>
                   )}
                 </div>

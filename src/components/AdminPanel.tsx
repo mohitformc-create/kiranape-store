@@ -1803,13 +1803,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <th className="py-3 px-3">Customer Price</th>
                       <th className="py-3 px-3">Stock Qty</th>
                       <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3 text-center">Cart Suggestion</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {filteredProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-stone-400">
+                        <td colSpan={10} className="py-12 text-center text-stone-400">
                           <Package className="w-8 h-8 mx-auto mb-2 text-stone-300" />
                           <p className="font-semibold text-stone-600">No grocery items in store</p>
                           <p className="text-xs text-stone-400 mt-0.5">
@@ -2099,6 +2100,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   </span>
                                   <span className="whitespace-nowrap">
                                     {product.isAvailable ? 'In Stock' : 'Out of Stock'}
+                                  </span>
+                                </button>
+                              </td>
+
+                              {/* Cart Suggestion (You Might Also Like) Toggle */}
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onUpdateProduct(product.id, {
+                                      isCartRecommended: !product.isCartRecommended,
+                                      featuredInCart: !product.isCartRecommended,
+                                    })
+                                  }
+                                  className={`h-7 px-2.5 rounded-full text-[10px] font-black inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs border ${
+                                    product.isCartRecommended
+                                      ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 ring-2 ring-amber-400/20'
+                                      : 'bg-stone-100 hover:bg-stone-200 text-stone-600 border-stone-300'
+                                  }`}
+                                  title={
+                                    product.isCartRecommended
+                                      ? "Remove from 'You Might Also Like' cart recommendations"
+                                      : "Feature in 'You Might Also Like' cart recommendations"
+                                  }
+                                >
+                                  <Sparkles
+                                    className={`w-3 h-3 ${
+                                      product.isCartRecommended ? 'text-amber-100 fill-amber-100' : 'text-stone-400'
+                                    }`}
+                                  />
+                                  <span className="whitespace-nowrap">
+                                    {product.isCartRecommended ? 'Suggested ⭐' : 'Off'}
                                   </span>
                                 </button>
                               </td>
