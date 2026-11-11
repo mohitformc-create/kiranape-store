@@ -10,6 +10,7 @@ interface ProductCardProps {
   onAddToCart: (product: Product, variant?: ProductVariant) => void;
   onUpdateQuantity: (itemKey: string, newQuantity: number) => void;
   isAdmin?: boolean;
+  isAdminAuthenticated?: boolean;
   onQuickEdit?: (product: Product) => void;
 }
 
@@ -20,6 +21,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   onUpdateQuantity,
   isAdmin = false,
+  isAdminAuthenticated,
   onQuickEdit,
 }) => {
   const [imageError, setImageError] = useState(false);
@@ -91,16 +93,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       >
         {/* Product Image & Badges */}
         <div className="relative w-full bg-stone-50/60 overflow-hidden flex items-center justify-center pt-2">
-          {/* Discreet Admin Phone Controller Quick-Edit Button */}
-          {isAdmin && onQuickEdit && (
+          {/* Discreet Admin Phone Controller Quick-Edit Button - strictly hidden unless isAdminAuthenticated is true */}
+          {(isAdminAuthenticated !== undefined ? isAdminAuthenticated : isAdmin) && onQuickEdit && (
             <button
               type="button"
+              id={`quick-edit-${product.id}`}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 onQuickEdit(product);
               }}
-              className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-stone-900/80 hover:bg-stone-950 text-amber-300 hover:text-amber-200 shadow-md flex items-center justify-center transition-transform active:scale-90 cursor-pointer pointer-events-auto"
+              className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-stone-900/90 hover:bg-stone-950 text-amber-300 hover:text-amber-200 shadow-md flex items-center justify-center transition-transform active:scale-90 cursor-pointer pointer-events-auto ring-1 ring-amber-400/40"
               title="Quick Edit Product (Selling Price, MRP, Stock, Unit, Image)"
             >
               <Pencil className="w-3 h-3" />

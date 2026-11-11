@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { Product, ProductVariant, CustomCategory } from '../types';
 import { ProductCard } from './ProductCard';
 import { ArrowLeft, Search, X, Sparkles, ShoppingBasket } from 'lucide-react';
+import { isMasterAdminPin } from '../config/adminConfig';
 
 interface CategoryDetailViewProps {
   categoryName: string;
@@ -14,6 +15,7 @@ interface CategoryDetailViewProps {
   onSelectCategory: (categoryName: string) => void;
   isAdmin?: boolean;
   onQuickEdit?: (product: Product) => void;
+  onSecretAdminTrigger?: () => void;
 }
 
 export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
@@ -27,8 +29,10 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   onSelectCategory,
   isAdmin = false,
   onQuickEdit,
+  onSecretAdminTrigger,
 }) => {
   const [internalSearch, setInternalSearch] = useState<string>('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Selectable categories excluding 'All'
   const selectableCategories = useMemo(() => {
@@ -142,9 +146,30 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
           <input
             id="cat-search-input"
+            ref={inputRef}
             type="text"
             value={internalSearch}
-            onChange={(e) => setInternalSearch(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (isMasterAdminPin(val)) {
+                setInternalSearch('');
+                inputRef.current?.blur();
+                onSecretAdminTrigger?.();
+                return;
+              }
+              setInternalSearch(val);
+            }}
+            onKeyDown={(e) => {
+              if (isMasterAdminPin(internalSearch)) {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setInternalSearch('');
+                  inputRef.current?.blur();
+                  onSecretAdminTrigger?.();
+                  return;
+                }
+              }
+            }}
             placeholder={`Search in ${categoryName}...`}
             className="w-full pl-8 pr-8 py-2 bg-stone-50 focus:bg-white text-xs text-stone-900 placeholder:text-stone-400 rounded-xl border border-stone-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 font-medium transition-all"
           />

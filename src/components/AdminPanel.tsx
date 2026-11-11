@@ -46,6 +46,7 @@ import {
   Upload,
   FileSpreadsheet,
   Pencil,
+  Lock,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -1162,12 +1163,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
 
             <button
+              type="button"
+              id="admin-header-lock-exit-btn"
               onClick={onLogoutAdmin || onExitAdmin}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 text-rose-200 text-xs font-bold border border-rose-800 transition-colors cursor-pointer active:scale-95"
-              title="Lock Admin Panel & Sign Out"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-200 hover:text-white text-xs font-bold border border-rose-800 transition-all cursor-pointer active:scale-95 shadow-xs"
+              title="Lock Admin Panel and Return to Customer View"
             >
-              <LogOut className="w-4 h-4 text-rose-400" />
-              <span>Log Out</span>
+              <Lock className="w-3.5 h-3.5 text-rose-400" />
+              <span>🔒 Lock & Exit Admin</span>
             </button>
           </div>
         </div>

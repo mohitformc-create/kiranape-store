@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Search, Mic, Pencil, ChevronRight, MapPin, Check, X } from 'lucide-react';
 import { Product, ProductCategory } from '../types';
 import { getCustomerSelectedLocation, setCustomerSelectedLocation, getDeliveryLocations } from '../services/storageService';
 import { useCategories, CATEGORIES_DATA, UnifiedCategoryTile } from '../data/categoriesData';
+import { isMasterAdminPin } from '../config/adminConfig';
 
 export type MasterCategoryTile = UnifiedCategoryTile;
 export const MASTER_CATEGORIES = CATEGORIES_DATA;
@@ -11,6 +12,7 @@ interface CategoriesScreenProps {
   onSelectCategory: (categoryTarget: ProductCategory) => void;
   onOpenVoiceModal?: () => void;
   onGlobalSearch?: (query: string) => void;
+  onSecretAdminTrigger?: () => void;
   products?: Product[];
 }
 
@@ -18,9 +20,11 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
   onSelectCategory,
   onOpenVoiceModal,
   onGlobalSearch,
+  onSecretAdminTrigger,
   products = [],
 }) => {
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const categorySearchInputRef = useRef<HTMLInputElement>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>(() => {
     return getCustomerSelectedLocation() || 'Waidhan Store';
   });
@@ -114,9 +118,30 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
               <input
                 type="text"
                 id="categories-search-input"
+                ref={categorySearchInputRef}
                 value={categorySearchQuery}
-                onChange={(e) => setCategorySearchQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (isMasterAdminPin(val)) {
+                    setCategorySearchQuery('');
+                    categorySearchInputRef.current?.blur();
+                    onSecretAdminTrigger?.();
+                    return;
+                  }
+                  setCategorySearchQuery(val);
+                }}
+                onKeyDown={(e) => {
+                  if (isMasterAdminPin(categorySearchQuery)) {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      setCategorySearchQuery('');
+                      categorySearchInputRef.current?.blur();
+                      onSecretAdminTrigger?.();
+                      return;
+                    }
+                  }
+                  handleSearchKeyDown(e);
+                }}
                 placeholder="Search in Categories..."
                 className="w-full bg-transparent text-xs sm:text-sm font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none"
               />

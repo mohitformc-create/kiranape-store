@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Mic, Camera, PenLine } from 'lucide-react';
+import { isMasterAdminPin } from '../config/adminConfig';
 
 interface SearchBarProps {
   searchQuery: string;
@@ -33,6 +34,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [voiceToast, setVoiceToast] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Rotating search hint text
   useEffect(() => {
@@ -175,10 +177,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const clean = searchQuery.trim();
-          if (clean === '@2508' || clean === '2508' || clean === '9779') {
+          if (isMasterAdminPin(searchQuery)) {
             onSearchChange('');
+            searchInputRef.current?.blur();
             onSecretAdminTrigger?.();
+            return;
           }
         }}
         className="relative flex items-center"
@@ -191,13 +194,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Input Box with live streaming speech text */}
         <input
           id="search-input"
+          ref={searchInputRef}
           type="search"
           value={searchQuery}
           onChange={(e) => {
             const val = e.target.value;
-            const clean = val.trim();
-            if (clean === '@2508' || clean === '2508' || clean === '9779') {
+            if (isMasterAdminPin(val)) {
               onSearchChange('');
+              searchInputRef.current?.blur();
               onSecretAdminTrigger?.();
               return;
             }
@@ -205,11 +209,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              const trimmed = searchQuery?.trim();
-              if (trimmed === '@2508' || trimmed === '2508' || trimmed === '9779') {
+              if (isMasterAdminPin(searchQuery)) {
                 e.preventDefault();
                 onSearchChange('');
+                searchInputRef.current?.blur();
                 onSecretAdminTrigger?.();
+                return;
               }
             }
           }}

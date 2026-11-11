@@ -21,6 +21,7 @@ import {
   PenLine,
   X,
   ShoppingBasket,
+  Lock,
 } from 'lucide-react';
 import { Product, ProductVariant, CartItem, ProductCategory, Order, OrderItemSummary, OrderStatus, AppUser, DeliverySlot, StoreSettings, PromoBanner, CustomCategory } from './types';
 import {
@@ -121,19 +122,11 @@ import { insertSupabaseOrder } from './services/supabaseOrderService';
 import { UPSELL_PRODUCTS } from './data/upsellCatalog';
 import { LaunchOfferModal } from './components/LaunchOfferModal';
 import { calculateCartFinancials } from './utils/rewardsEngine';
+import { ADMIN_SECRET_PIN, isMasterAdminPin } from './config/adminConfig';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
-  const [currentView, setCurrentView] = useState<'customer' | 'admin'>(() => {
-    if (typeof window === 'undefined') return 'customer';
-    const isAuthed =
-      sessionStorage.getItem('kiranape_admin_auth') === 'true' ||
-      sessionStorage.getItem('kiranape_admin_authenticated') === 'true';
-    if (isAuthed && (window.location.hash === '#admin' || window.location.search.includes('view=admin'))) {
-      return 'admin';
-    }
-    return 'customer';
-  });
+  const [currentView, setCurrentView] = useState<'customer' | 'admin'>('customer');
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => getStoredUser());
@@ -178,19 +171,11 @@ export default function App() {
 
   // Admin PIN verification and Direct Link (#admin) state
   const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
-  const [isAdminPinVerified, setIsAdminPinVerified] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return (
-        sessionStorage.getItem('kiranape_admin_auth') === 'true' ||
-        sessionStorage.getItem('kiranape_admin_authenticated') === 'true'
-      );
-    } catch {
-      return false;
-    }
-  });
+  // Strict Admin Authentication State: defaults strictly to false (locks automatically on page refresh)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
+  const [adminAuthSource, setAdminAuthSource] = useState<'search' | 'footer' | 'hash'>('search');
 
-  // Dedicated lightweight toast for Stayfree reward interactions (auto-clears in 2.5s)
+  // Dedicated lightweight toast for Stayfree & Admin notifications (auto-clears in 2.8s)
   const [rewardToast, setRewardToast] = useState<string | null>(null);
   const showRewardToast = useCallback((msg: string) => {
     setRewardToast(msg);
@@ -199,15 +184,15 @@ export default function App() {
     }, 2800);
   }, []);
 
-  // Admin Mode & Direct In-App Inline Quick-Edit State
-  const isAdminMode = Boolean(isAdminPinVerified || currentUser?.role === 'admin');
+  // Admin Mode & Direct In-App Inline Quick-Edit State (strictly locked behind isAdminAuthenticated)
   const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
 
   const handleOpenQuickEdit = useCallback((p: Product) => {
+    if (!isAdminAuthenticated) return;
     setQuickEditProduct(p);
     setIsQuickEditOpen(true);
-  }, []);
+  }, [isAdminAuthenticated]);
 
   const handleOpenPrivacy = useCallback(() => {
     setIsPrivacyOpen(true);
@@ -222,14 +207,11 @@ export default function App() {
   }, []);
 
   const handleAdminPinSuccess = useCallback(async () => {
-    setIsAdminPinVerified(true);
+    setIsAdminAuthenticated(true);
     setIsAdminPinModalOpen(false);
-    try {
-      sessionStorage.setItem('kiranape_admin_auth', 'true');
-      sessionStorage.setItem('kiranape_admin_authenticated', 'true');
-    } catch {
-      // ignore
-    }
+    showRewardToast('एडमिन पोर्टल अनलॉक हो गया!');
+    setCurrentView('admin');
+    window.location.hash = '#admin';
     try {
       const adminUser = await signInAdminDirectly();
       setCurrentUser(adminUser);
@@ -243,12 +225,10 @@ export default function App() {
       };
       setCurrentUser(fallbackAdmin);
     }
-    setCurrentView('admin');
-    window.location.hash = '#admin';
-  }, []);
+  }, [showRewardToast]);
 
-  const handleLogoutAdmin = useCallback(() => {
-    setIsAdminPinVerified(false);
+  const handleExitAdminMode = useCallback(() => {
+    setIsAdminAuthenticated(false);
     try {
       sessionStorage.removeItem('kiranape_admin_auth');
       sessionStorage.removeItem('kiranape_admin_authenticated');
@@ -256,27 +236,53 @@ export default function App() {
     } catch {
       // ignore
     }
+    showRewardToast('एडमिन मोड बंद हो गया');
     setCurrentView('customer');
     if (window.location.hash === '#admin') {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      window.history.replaceState(null, '', window.location.pathname);
     }
-  }, []);
+  }, [showRewardToast]);
 
   const handleCloseAdminPin = useCallback(() => {
     setIsAdminPinModalOpen(false);
-    if (!isAdminPinVerified) {
+    if (!isAdminAuthenticated && currentView === 'admin') {
       setCurrentView('customer');
       if (window.location.hash === '#admin') {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        window.history.replaceState(null, '', window.location.pathname);
       }
     }
-  }, [isAdminPinVerified]);
+  }, [isAdminAuthenticated, currentView]);
 
-  // Secret direct access via search bar keyword "9779"
+  // Secret direct access exclusively via search bar keyword "2508"
   const handleSecretAdminAccess = useCallback(async () => {
     setSearchQuery('');
-    setIsAdminPinModalOpen(true);
-  }, []);
+    setIsAdminAuthenticated(true);
+    setCurrentView('admin');
+    window.location.hash = '#admin';
+    showRewardToast('एडमिन पोर्टल अनलॉक हो गया!');
+    try {
+      const adminUser = await signInAdminDirectly();
+      setCurrentUser(adminUser);
+    } catch {
+      const fallbackAdmin: AppUser = {
+        uid: 'admin-store-owner',
+        displayName: 'Store Owner (Admin)',
+        email: 'admin@chaurasiakirana.local',
+        phone: '+91 98765 43210',
+        role: 'admin',
+      };
+      setCurrentUser(fallbackAdmin);
+    }
+  }, [showRewardToast]);
+
+  // Handle customer search input with instant intercept for master PIN "2508"
+  const handleSearchChange = useCallback((query: string) => {
+    if (isMasterAdminPin(query)) {
+      handleSecretAdminAccess();
+      return;
+    }
+    setSearchQuery(query);
+  }, [handleSecretAdminAccess]);
 
   // URL route listener for #admin or ?view=admin, #tracker, #privacy
   useEffect(() => {
@@ -285,12 +291,14 @@ export default function App() {
       const search = window.location.search;
 
       if (hash === '#admin' || search.includes('view=admin')) {
-        // Direct Admin URL (https://kiranape-store.onrender.com/#admin):
-        // Keep 4-digit Store Owner PIN modal intact before revealing admin controls
-        if (isAdminPinVerified) {
+        if (isAdminAuthenticated) {
           setCurrentView('admin');
         } else {
-          setIsAdminPinModalOpen(true);
+          // Completely conceal admin access from unauthorized URL visits
+          setCurrentView('customer');
+          if (hash === '#admin') {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
         }
       } else if (hash === '#tracker') {
         setIsTrackerOpen(true);
@@ -305,7 +313,7 @@ export default function App() {
     handleRoute();
     window.addEventListener('hashchange', handleRoute);
     return () => window.removeEventListener('hashchange', handleRoute);
-  }, [isAdminPinVerified]);
+  }, [isAdminAuthenticated]);
 
   // Android Back Button Interceptor (Prevents WebIntoApp Exit Interstitial Ad)
   useEffect(() => {
@@ -975,7 +983,7 @@ export default function App() {
   }, [products, searchQuery, selectedCategory]);
 
   // If currently in Admin View, render Store Owner Panel ONLY if authenticated
-  if (currentView === 'admin' && isAdminPinVerified) {
+  if (currentView === 'admin' && isAdminAuthenticated) {
     return (
       <AdminPanel
         products={products}
@@ -994,7 +1002,7 @@ export default function App() {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
         }}
-        onLogoutAdmin={handleLogoutAdmin}
+        onLogoutAdmin={handleExitAdminMode}
         isFirebaseConnected={isFirebaseConfigured()}
         onSyncToFirestore={handleSyncToFirestore}
         storeSettings={storeSettings}
@@ -1038,10 +1046,15 @@ export default function App() {
           }}
           onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
           onGlobalSearch={(q) => {
+            if (isMasterAdminPin(q)) {
+              handleSecretAdminAccess();
+              return;
+            }
             setSearchQuery(q);
             setIsCategoriesScreenOpen(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
+          onSecretAdminTrigger={handleSecretAdminAccess}
           products={products}
         />
       ) : (
@@ -1049,7 +1062,7 @@ export default function App() {
           {/* Customer Header with brand, search, category pills */}
           <CustomerHeader
             searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={handleSearchChange}
             selectedCategory={selectedCategory}
             onSelectCategory={(cat) => {
               setSelectedCategory(cat);
@@ -1162,7 +1175,8 @@ export default function App() {
                     cartQuantities={cartQuantities}
                     onAddToCart={handleAddToCart}
                     onUpdateQuantity={handleUpdateQuantity}
-                    isAdmin={isAdminMode}
+                    isAdmin={isAdminAuthenticated}
+                    isAdminAuthenticated={isAdminAuthenticated}
                     onQuickEdit={handleOpenQuickEdit}
                   />
                 ))}
@@ -1184,8 +1198,9 @@ export default function App() {
             onAddToCart={handleAddToCart}
             onUpdateQuantity={handleUpdateQuantity}
             onSelectCategory={(cat) => setSelectedCategory(cat as ProductCategory)}
-            isAdmin={isAdminMode}
+            isAdmin={isAdminAuthenticated}
             onQuickEdit={handleOpenQuickEdit}
+            onSecretAdminTrigger={handleSecretAdminAccess}
           />
         ) : (
           /* 3. CLEAN AMAZON FRESH STYLE HOME EXPERIENCE: CATEGORIES + DIRECT PRODUCTS GRID */
@@ -1271,7 +1286,7 @@ export default function App() {
                 cartQuantities={cartQuantities}
                 onAddToCart={handleAddToCart}
                 onUpdateQuantity={handleUpdateQuantity}
-                isAdmin={isAdminMode}
+                isAdmin={isAdminAuthenticated}
                 onQuickEdit={handleOpenQuickEdit}
               />
             </div>
@@ -1314,7 +1329,8 @@ export default function App() {
                       cartQuantities={cartQuantities}
                       onAddToCart={handleAddToCart}
                       onUpdateQuantity={handleUpdateQuantity}
-                      isAdmin={isAdminMode}
+                      isAdmin={isAdminAuthenticated}
+                      isAdminAuthenticated={isAdminAuthenticated}
                       onQuickEdit={handleOpenQuickEdit}
                     />
                   ))}
@@ -1415,17 +1431,6 @@ export default function App() {
             >
               Support: {storeSettings.phone || '9424316081'}
             </a>
-            <span>•</span>
-            <button
-              id="footer-store-admin-btn"
-              type="button"
-              onClick={() => setIsAdminPinModalOpen(true)}
-              className="inline-flex items-center gap-1 text-stone-600 hover:text-emerald-700 font-bold transition-colors cursor-pointer"
-              title="Store Owner Admin PIN Login"
-            >
-              <Key className="w-3 h-3 text-amber-600" />
-              <span>🔐 स्टोर एडमिन पोर्टल (Store Admin)</span>
-            </button>
           </div>
         </div>
 
@@ -1434,6 +1439,34 @@ export default function App() {
           <CreatorCredits />
         </div>
       </footer>
+      )}
+
+      {/* Floating Exit Admin Mode Controller (Strictly Visible Only When isAdminAuthenticated === true) */}
+      {isAdminAuthenticated && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[95] flex items-center gap-2 max-w-sm w-auto px-2 pointer-events-auto animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <button
+            type="button"
+            id="floating-exit-admin-btn"
+            onClick={handleExitAdminMode}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-stone-900/95 hover:bg-stone-950 text-amber-300 font-heading font-extrabold text-xs shadow-2xl border-2 border-amber-400/80 backdrop-blur-md transition-all active:scale-95 cursor-pointer ring-4 ring-black/10"
+            title="Lock and hide product quick-edit pencil icons"
+          >
+            <Lock className="w-3.5 h-3.5 text-amber-400" />
+            <span>Exit Admin Mode (एडमिन मोड बंद करें)</span>
+          </button>
+          <button
+            type="button"
+            id="floating-open-portal-btn"
+            onClick={() => {
+              setCurrentView('admin');
+              window.location.hash = '#admin';
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-full bg-emerald-700/95 hover:bg-emerald-800 text-white font-heading font-extrabold text-xs shadow-2xl border border-emerald-500/80 backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+            title="Open full store dashboard"
+          >
+            <span>एडमिन डैशबोर्ड ➔</span>
+          </button>
+        </div>
       )}
 
       {/* MODALS */}
