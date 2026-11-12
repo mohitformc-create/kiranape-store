@@ -122,6 +122,9 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
         imageUrl: imageUrl.trim(),
         isCartRecommended,
         featuredInCart: isCartRecommended,
+        isManualOverride: true,
+        protectedFromAiSync: true,
+        lastManuallyEditedAt: Date.now(),
         updatedAt: Date.now(),
       });
 

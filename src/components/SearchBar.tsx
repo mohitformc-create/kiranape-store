@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Mic, Camera, PenLine, Barcode } from 'lucide-react';
+import { Search, X, Mic } from 'lucide-react';
 import { isMasterAdminPin } from '../config/adminConfig';
 
 interface SearchBarProps {
@@ -7,9 +7,9 @@ interface SearchBarProps {
   onSearchChange: (query: string) => void;
   placeholder?: string;
   onSecretAdminTrigger?: () => void;
+  onOpenVoiceModal?: () => void;
   onOpenBarcodeScanner?: () => void;
   onOpenParchiModal?: () => void;
-  onOpenVoiceModal?: () => void;
   onOpenDigitalParchiModal?: () => void;
   className?: string;
 }
@@ -26,17 +26,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSearchChange,
   placeholder,
   onSecretAdminTrigger,
-  onOpenBarcodeScanner,
-  onOpenParchiModal,
-  onOpenVoiceModal,
-  onOpenDigitalParchiModal,
   className = '',
 }) => {
   const [isListening, setIsListening] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [voiceToast, setVoiceToast] = useState<string | null>(null);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const noticeTimerRef = useRef<any>(null);
 
   // Rotating search hint text
   useEffect(() => {
@@ -46,8 +43,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Direct user click handler for SpeechRecognition (Supports Android Mobile Browsers)
-  const handleMicrophoneClick = async () => {
+  const showVoiceNotice = (msg: string) => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setVoiceNotice(msg);
+    noticeTimerRef.current = setTimeout(() => {
+      setVoiceNotice(null);
+    }, 4000);
+    // Gracefully focus search input so user can seamlessly type
+    searchInputRef.current?.focus();
+  };
+
+  // Safe Speech Recognition handler without alerts or mediaDevices conflicts
+  const handleMicrophoneClick = () => {
     // If currently listening, gracefully stop
     if (isListening) {
       if (recognitionRef.current) {
@@ -61,37 +68,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       return;
     }
 
-    // 1. Explicit Permission Request via getUserMedia
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Immediately release tracks so mic hardware line is free for SpeechRecognition
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    } catch (err) {
-      console.warn('Microphone permission denied:', err);
-      alert('Microphone permission denied. Kripya browser settings me mic allow karein.');
-      setIsListening(false);
-      return;
-    }
-
-    // 2. Browser Speech API Detection with Automatic Fallback to Voice Note Modal
+    // Browser Speech API Detection
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      if (onOpenVoiceModal) {
-        // Automatically switch to Voice Note Modal mode so customer never gets stuck
-        onOpenVoiceModal();
-        return;
-      }
-      const msg =
-        'Voice input is not supported in this browser. Please type your items or use Parchi upload.';
-      alert(msg);
+      showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
       return;
     }
 
-    // 3. Configure Recognition Instance
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'hi-IN'; // Supports Hindi & Hinglish
@@ -100,6 +85,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
       recognition.onstart = () => {
         setIsListening(true);
+        setVoiceNotice(null);
       };
 
       recognition.onresult = (event: any) => {
@@ -118,7 +104,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
         const currentActive = (finalTrans || interimTrans).trim();
         if (currentActive) {
-          if (currentActive === '9779') {
+          if (isMasterAdminPin(currentActive)) {
             onSearchChange('');
             onSecretAdminTrigger?.();
             setIsListening(false);
@@ -135,23 +121,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       };
 
       recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error in SearchBar:', event.error);
-        if (event.error === 'language-not-supported' && recognition.lang !== 'en-IN') {
-          try {
-            recognition.lang = 'en-IN';
-            recognition.start();
-            return;
-          } catch {
-            // ignore
-          }
-        }
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          alert('Microphone permission denied. Kripya browser settings me mic allow karein.');
-        } else if (onOpenVoiceModal && event.error !== 'no-speech') {
-          // If browser speech blocks, automatically switch to voice note modal
-          onOpenVoiceModal();
-        }
+        console.info('Speech recognition status:', event?.error);
         setIsListening(false);
+        if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+          showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
+        } else if (event?.error !== 'no-speech') {
+          showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
+        }
       };
 
       recognition.onend = () => {
@@ -160,13 +136,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
       recognitionRef.current = recognition;
       recognition.start();
-      setIsListening(true);
     } catch (err) {
-      console.warn('Speech recognition failed to start:', err);
+      console.info('Speech recognition start failed:', err);
       setIsListening(false);
-      if (onOpenVoiceModal) {
-        onOpenVoiceModal();
-      }
+      showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
     }
   };
 
@@ -189,11 +162,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         className="relative flex items-center"
       >
         {/* Left Search Icon */}
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
           <Search className="w-4 h-4 text-stone-400" />
         </div>
 
-        {/* Input Box with live streaming speech text */}
+        {/* Clean Input Box with live streaming speech text */}
         <input
           id="search-input"
           ref={searchInputRef}
@@ -221,19 +194,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             }
           }}
           placeholder={activePlaceholder}
-          className={`w-full pl-10 pr-20 py-2.5 bg-stone-50/80 hover:bg-white focus:bg-white text-stone-900 placeholder:text-stone-400 text-xs sm:text-sm rounded-2xl border transition-all shadow-2xs font-medium focus:outline-hidden ${
+          className={`w-full pl-10 pr-12 py-2.5 bg-stone-50/90 hover:bg-white focus:bg-white text-stone-900 placeholder:text-stone-400 text-xs sm:text-sm rounded-2xl border transition-all shadow-2xs font-medium focus:outline-hidden ${
             isListening
               ? 'border-red-500 ring-2 ring-red-400/30'
               : 'border-stone-200 focus:ring-2 focus:ring-[#0c831f]/20 focus:border-[#0c831f]'
           }`}
         />
 
-        {/* Right Action Icons: Clear / Mic / Camera */}
-        <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-0.5">
+        {/* Right Action Icons: Only Clear (X) and Voice (Mic) */}
+        <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
           {searchQuery ? (
             <button
               type="button"
-              onClick={() => onSearchChange('')}
+              onClick={() => {
+                onSearchChange('');
+                searchInputRef.current?.focus();
+              }}
               className="p-1 text-stone-400 hover:text-stone-600 cursor-pointer"
               title="Clear search"
             >
@@ -241,55 +217,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </button>
           ) : null}
 
-          {/* Microphone with pulsating Red/Green glowing ring */}
+          {/* Gracefully Handled Microphone Icon */}
           <button
             type="button"
+            id="search-voice-mic-btn"
             onClick={handleMicrophoneClick}
             className={`p-1.5 rounded-full transition-all cursor-pointer relative ${
               isListening
-                ? 'text-white bg-red-600 ring-4 ring-red-400/60 animate-pulse shadow-lg shadow-red-500/40'
+                ? 'text-white bg-red-600 ring-4 ring-red-400/60 animate-pulse shadow-md shadow-red-500/40'
                 : 'text-stone-600 hover:text-emerald-700 hover:bg-stone-100'
             }`}
-            title={isListening ? '🔴 Sun rahe hain... Bolie samaan ka naam - Tap to Stop' : 'Bol Kar Search Karein (Voice Search)'}
+            title={isListening ? '🔴 सुन रहे हैं... बोलिए सामान का नाम (टैप करके रोकें)' : 'बोल कर खोजें (Voice Search)'}
+            aria-label="Voice Search"
           >
             <Mic className={`w-4 h-4 ${isListening ? 'text-white animate-pulse' : 'text-stone-700'}`} />
           </button>
-
-          {/* Barcode Scanner Icon for Instant Package Scanning */}
-          {onOpenBarcodeScanner && (
-            <button
-              type="button"
-              onClick={onOpenBarcodeScanner}
-              className="p-1.5 rounded-full text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
-              title="📷 Barcode / SKU Scan Karein (Scan Empty Packet to Re-Order)"
-            >
-              <Barcode className="w-4 h-4 text-stone-700 hover:text-emerald-700" />
-            </button>
-          )}
-
-          {/* Digital Parchi (Type List) Notepad Icon */}
-          {onOpenDigitalParchiModal && (
-            <button
-              type="button"
-              onClick={onOpenDigitalParchiModal}
-              className="p-1.5 rounded-full text-stone-600 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
-              title="📝 अपनी किराना पर्ची टाइप करें (Type Grocery List)"
-            >
-              <PenLine className="w-4 h-4 text-amber-600" />
-            </button>
-          )}
-
-          {/* Camera / Lens Icon for Parchi */}
-          {onOpenParchiModal && (
-            <button
-              type="button"
-              onClick={onOpenParchiModal}
-              className="p-1.5 rounded-full text-stone-600 hover:text-emerald-700 hover:bg-stone-100 transition-colors cursor-pointer"
-              title="Scan handwritten list (Parchi)"
-            >
-              <Camera className="w-4 h-4 text-emerald-700" />
-            </button>
-          )}
         </div>
       </form>
 
@@ -297,7 +239,28 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {isListening && (
         <div className="mt-1.5 flex items-center justify-center gap-2 py-1 px-3.5 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white text-[11px] font-bold rounded-full shadow-md animate-pulse mx-auto w-fit border border-red-400/40">
           <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-          <span>🔴 Sun rahe hain... Bolie samaan ka naam</span>
+          <span>🔴 सुन रहे हैं... बोलिए सामान का नाम</span>
+        </div>
+      )}
+
+      {/* Elegant, Non-Blocking In-App Voice Fallback Toast */}
+      {voiceNotice && (
+        <div className="absolute top-full left-0 right-0 mt-1.5 z-40 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold shadow-lg flex items-center justify-between gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm">🎙️</span>
+            <span className="truncate">{voiceNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setVoiceNotice(null);
+              searchInputRef.current?.focus();
+            }}
+            className="p-1 text-amber-800 hover:text-amber-950 cursor-pointer flex-shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

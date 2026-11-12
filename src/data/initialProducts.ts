@@ -1,10 +1,8 @@
 import { Product, StoreSettings, PromoBanner } from '../types';
-import INITIAL_PRODUCTS_JSON from './initialProducts.json';
-import DEFAULT_CATALOG_JSON from './defaultCatalog.json';
 
-export const INITIAL_PRODUCTS: Product[] = INITIAL_PRODUCTS_JSON as Product[];
-export const DEFAULT_CATALOG: Product[] = DEFAULT_CATALOG_JSON as Product[];
-export const initialProducts: Product[] = INITIAL_PRODUCTS_JSON as Product[];
+export const INITIAL_PRODUCTS: Product[] = [];
+export const DEFAULT_CATALOG: Product[] = [];
+export const initialProducts: Product[] = [];
 
 export const STORE_DEFAULTS: StoreSettings = {
   name: 'Chaurasia Kirana Store',

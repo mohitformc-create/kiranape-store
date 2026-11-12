@@ -58,6 +58,7 @@ import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminCsvRestoreModal } from './AdminCsvRestoreModal';
 import { AdminHypermarketManager } from './AdminHypermarketManager';
+import { AdminAiStoreManager } from './AdminAiStoreManager';
 import { ProductQuickEditModal } from './ProductQuickEditModal';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
@@ -159,7 +160,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshProducts,
   onOpenBarcodeScanner,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'parchi_orders' | 'hypermarket' | 'offers_settings' | 'categories' | 'settings'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'ai_store_manager' | 'orders' | 'parchi_orders' | 'hypermarket' | 'offers_settings' | 'categories' | 'settings'>('ai_store_manager');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -667,10 +668,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleSaveProduct = (formData: any) => {
+    const enriched = {
+      ...formData,
+      isManualOverride: true,
+      protectedFromAiSync: true,
+      lastManuallyEditedAt: Date.now(),
+    };
     if (editingProduct) {
-      onUpdateProduct(editingProduct.id, formData);
+      onUpdateProduct(editingProduct.id, enriched);
     } else {
-      onAddProduct(formData);
+      onAddProduct(enriched);
     }
   };
 
@@ -1181,6 +1188,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* Admin Navigation Tabs */}
         <div className="max-w-6xl mx-auto px-4 flex items-center gap-2 border-t border-stone-800 pt-2 pb-1 overflow-x-auto">
           <button
+            id="admin-ai-store-manager-tab-btn"
+            onClick={() => setActiveTab('ai_store_manager')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
+              activeTab === 'ai_store_manager'
+                ? 'bg-stone-100 text-stone-900 shadow-xs'
+                : 'text-purple-300 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>🤖 AI Store Manager</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('inventory')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
               activeTab === 'inventory'
@@ -1325,6 +1345,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
+        {/* ================= TAB 0: AUTONOMOUS AI STORE MANAGER ================= */}
+        {activeTab === 'ai_store_manager' && (
+          <AdminAiStoreManager
+            products={products}
+            onRefreshProducts={onRefreshProducts}
+            onOpenQuickEdit={(p) => {
+              setQuickEditProduct(p);
+              setIsQuickEditOpen(true);
+            }}
+            onOpenAddModal={handleOpenAdd}
+            onDeleteProduct={onDeleteProduct}
+            isFirebaseConnected={isFirebaseConnected}
+          />
+        )}
+
         {/* ================= TAB 1: PRODUCT INVENTORY ================= */}
         {activeTab === 'inventory' && (
           <div className="space-y-4">
@@ -1408,6 +1443,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <span>📷 Scan Barcode / SKU</span>
                     </button>
                   )}
+
+                  {/* AI Store Manager Quick Launch Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('ai_store_manager')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 active:scale-95 text-white text-xs font-heading font-black shadow-xs hover:shadow-md transition-all cursor-pointer"
+                    title="Open AI Store Manager for Auto-Catalog & Smart Pricing"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>🤖 AI Store Manager</span>
+                  </button>
 
                   {/* Dedicated CSV Restore & Ingestion Dropzone (196 Core Products) */}
                   <button

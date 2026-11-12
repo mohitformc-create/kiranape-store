@@ -142,8 +142,8 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
 
     setIsCompressing(true);
     try {
-      // HTML5 Canvas compression: max 1200x1200px, JPEG format, quality 0.75 (clean Base64 dataURL)
-      const base64 = await compressImageFile(file, 1200, 1200, 0.75);
+      // HTML5 Canvas compression: max 1024x1024px, JPEG format, quality 0.8 (under 1 second upload)
+      const base64 = await compressImageFile(file, 1024, 1024, 0.8);
       setImagePreview(base64);
       if (errors.image) {
         setErrors((prev) => ({ ...prev, image: '' }));
@@ -161,6 +161,10 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       reader.readAsDataURL(file);
     } finally {
       setIsCompressing(false);
+      // Reset input value so selecting again always fires onChange
+      if (e.target) {
+        e.target.value = '';
+      }
     }
   };
 

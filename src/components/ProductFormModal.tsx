@@ -383,6 +383,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       variants: validVariants.length > 0 ? validVariants : undefined,
       isCartRecommended,
       featuredInCart: isCartRecommended,
+      isManualOverride: true,
+      protectedFromAiSync: true,
+      lastManuallyEditedAt: Date.now(),
     });
     onClose();
   };
