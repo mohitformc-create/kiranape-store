@@ -1004,7 +1004,7 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
                       type="file"
                       accept="image/*"
                       onChange={handleFileUpload}
-                      className="hidden"
+                      className="sr-only"
                     />
                   </label>
                 </div>

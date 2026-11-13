@@ -830,38 +830,35 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               )}
             </div>
 
-            {/* Hidden File Inputs for Gallery and Camera */}
+            {/* Hidden File Inputs for Gallery and Camera (sr-only so mobile WebView <label> triggers cleanly) */}
             <input
+              id="product-form-gallery-input"
               ref={fileInputRef}
               type="file"
               accept=".jpg,.jpeg,.png,.webp,image/*"
               onChange={(e) => e.target.files?.[0] && handleDeviceImageUpload(e.target.files[0])}
-              className="hidden"
+              className="sr-only"
             />
             <input
+              id="product-form-camera-input"
               ref={cameraInputRef}
               type="file"
               accept=".jpg,.jpeg,.png,.webp,image/*"
               capture="environment"
               onChange={(e) => e.target.files?.[0] && handleDeviceImageUpload(e.target.files[0])}
-              className="hidden"
+              className="sr-only"
             />
 
             {/* Visual 1:1 Preview and Multi-Action Controls */}
             <div className="flex flex-col sm:flex-row items-center gap-4">
               {/* 1:1 Preview Box */}
               <div
-                onClick={() => {
-                  if (!imageUrl || imageUrl.includes('data:image/svg')) {
-                    fileInputRef.current?.click();
-                  }
-                }}
                 className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl border-2 overflow-hidden flex items-center justify-center flex-shrink-0 transition-all ${
                   imageUrl
                     ? 'border-emerald-500 bg-white shadow-xs'
                     : 'border-dashed border-stone-300 hover:border-emerald-500 hover:bg-emerald-50/30 cursor-pointer bg-white'
                 }`}
-                title="Click to select image file"
+                title="Tap to select image file"
               >
                 {isProcessingImage ? (
                   <div className="flex flex-col items-center justify-center p-2 text-center">
@@ -899,7 +896,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </button>
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-2 text-center group-hover:scale-105 transition-transform">
+                  <label
+                    htmlFor="product-form-gallery-input"
+                    className="w-full h-full flex flex-col items-center justify-center p-2 text-center group-hover:scale-105 transition-transform cursor-pointer"
+                  >
                     <span className="text-2xl mb-1">🖼️</span>
                     <span className="text-[11px] font-heading font-black text-stone-800 leading-tight">
                       फ़ोटो जोड़ें
@@ -907,32 +907,32 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <span className="text-[9px] text-stone-500 font-medium">
                       (गैलरी/कैमरा)
                     </span>
-                  </div>
+                  </label>
                 )}
               </div>
 
               {/* Upload Action Triggers */}
               <div className="flex-1 w-full space-y-2">
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessingImage}
-                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-heading font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  <label
+                    htmlFor={isProcessingImage ? undefined : 'product-form-gallery-input'}
+                    className={`flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-heading font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isProcessingImage ? 'opacity-50 pointer-events-none' : ''
+                    }`}
                   >
                     <span>🖼️</span>
                     <span>गैलरी से फ़ोटो चुनें (Gallery File)</span>
-                  </button>
+                  </label>
 
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    disabled={isProcessingImage}
-                    className="py-2 px-3 rounded-xl bg-white hover:bg-stone-100 active:scale-95 text-stone-800 border border-stone-300 font-heading font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  <label
+                    htmlFor={isProcessingImage ? undefined : 'product-form-camera-input'}
+                    className={`py-2 px-3 rounded-xl bg-white hover:bg-stone-100 active:scale-95 text-stone-800 border border-stone-300 font-heading font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isProcessingImage ? 'opacity-50 pointer-events-none' : ''
+                    }`}
                   >
                     <Camera className="w-4 h-4 text-emerald-600" />
                     <span>कैमरा (Camera)</span>
-                  </button>
+                  </label>
                 </div>
 
                 {/* Direct Image URL input */}

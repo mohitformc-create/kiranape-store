@@ -31,6 +31,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const [fallbackPlaceholder, setFallbackPlaceholder] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const noticeTimerRef = useRef<any>(null);
@@ -43,19 +44,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const showVoiceNotice = (msg: string) => {
+  const showVoiceFallback = () => {
+    const friendlyMsg = 'यहाँ बोलकर या टाइप करके सामान खोजें...';
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    setVoiceNotice(msg);
+    setFallbackPlaceholder(friendlyMsg);
+    setVoiceNotice(friendlyMsg);
     noticeTimerRef.current = setTimeout(() => {
       setVoiceNotice(null);
-    }, 4000);
-    // Gracefully focus search input so user can seamlessly type
+      setFallbackPlaceholder(null);
+    }, 4500);
+    // Silently focus search input so user can type or use keyboard mic immediately
     searchInputRef.current?.focus();
   };
 
   // Safe Speech Recognition handler without alerts or mediaDevices conflicts
   const handleMicrophoneClick = () => {
-    // If currently listening, gracefully stop
     if (isListening) {
       if (recognitionRef.current) {
         try {
@@ -68,24 +71,24 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       return;
     }
 
-    // Browser Speech API Detection
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
+      showVoiceFallback();
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'hi-IN'; // Supports Hindi & Hinglish
+      recognition.lang = 'hi-IN';
       recognition.interimResults = true;
       recognition.continuous = false;
 
       recognition.onstart = () => {
         setIsListening(true);
         setVoiceNotice(null);
+        setFallbackPlaceholder(null);
       };
 
       recognition.onresult = (event: any) => {
@@ -115,7 +118,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             }
             return;
           }
-          // Live stream words directly into the input box
           onSearchChange(currentActive);
         }
       };
@@ -123,10 +125,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       recognition.onerror = (event: any) => {
         console.info('Speech recognition status:', event?.error);
         setIsListening(false);
-        if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
-          showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
-        } else if (event?.error !== 'no-speech') {
-          showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
+        if (event?.error !== 'aborted') {
+          showVoiceFallback();
         }
       };
 
@@ -139,13 +139,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     } catch (err) {
       console.info('Speech recognition start failed:', err);
       setIsListening(false);
-      showVoiceNotice('माइक की अनुमति चालू करें या सीधे टाइप करके खोजें');
+      showVoiceFallback();
     }
   };
 
   const activePlaceholder = isListening
-    ? '🔴 Sun rahe hain... Bolie samaan ka naam'
-    : (placeholder || ROTATING_SEARCH_PLACEHOLDERS[placeholderIndex]);
+    ? '🔴 सुन रहे हैं... बोलिए सामान का नाम'
+    : fallbackPlaceholder || placeholder || ROTATING_SEARCH_PLACEHOLDERS[placeholderIndex];
 
   return (
     <div className={`w-full relative ${className}`}>

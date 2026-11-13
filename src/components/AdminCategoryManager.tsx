@@ -814,16 +814,17 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
                 {photoInputMode === 'upload' && (
                   <div className="space-y-3 animate-fadeIn">
                     <input
+                      id="category-photo-file-input"
                       ref={fileInputRef}
                       type="file"
-                      accept="image/png, image/jpeg, image/webp"
+                      accept="image/png, image/jpeg, image/webp, image/*"
                       onChange={handleFileChange}
-                      className="hidden"
+                      className="sr-only"
                     />
 
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/70 rounded-2xl p-6 text-center cursor-pointer transition-all group"
+                    <label
+                      htmlFor="category-photo-file-input"
+                      className="block border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/70 rounded-2xl p-6 text-center cursor-pointer transition-all group"
                     >
                       <div className="w-12 h-12 rounded-2xl bg-white text-emerald-700 flex items-center justify-center mx-auto mb-2 shadow-xs group-hover:scale-110 transition-transform">
                         <UploadCloud className="w-6 h-6" />
@@ -840,7 +841,7 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
                           <span>{selectedFile.name} (Ready to Save)</span>
                         </div>
                       )}
-                    </div>
+                    </label>
                   </div>
                 )}
 

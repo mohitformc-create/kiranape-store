@@ -183,9 +183,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
         }
 
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          const deniedMsg =
-            'कृपया सेटिंग्स में जाकर माइक्रोफ़ोन की अनुमति (Microphone Permission) ऑन करें।';
-          showToast(deniedMsg);
+          showToast('यहाँ बोलकर या टाइप करके सामान खोजें...');
           stopListening();
         }
 

@@ -197,13 +197,14 @@ export const AdminBackupRestore: React.FC<AdminBackupRestoreProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-2xl p-5 sm:p-6 border border-stone-200 shadow-xs space-y-6">
-      {/* Hidden File Input for Native Picker */}
+      {/* sr-only File Input for Native Picker */}
       <input
+        id="backup-restore-json-input"
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept=".json,application/json"
-        className="hidden"
+        accept=".json,application/json,*/*"
+        className="sr-only"
       />
 
       {/* Header */}
@@ -343,16 +344,16 @@ export const AdminBackupRestore: React.FC<AdminBackupRestoreProps> = ({
           </div>
 
           <div className="space-y-2.5 pt-2">
-            {/* Secure Restore Button */}
-            <button
-              type="button"
+            {/* Secure Restore Label */}
+            <label
               id="restore-backup-file-btn"
-              onClick={handleOpenFilePicker}
+              htmlFor="backup-restore-json-input"
+              onClick={() => setRestoreError(null)}
               className="w-full py-3 px-4 bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white rounded-xl text-xs sm:text-sm font-heading font-bold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Upload className="w-4 h-4 text-amber-400" />
               <span>📤 Restore Backup File</span>
-            </button>
+            </label>
 
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-stone-500 py-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

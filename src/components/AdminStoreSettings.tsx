@@ -1154,7 +1154,7 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
                     <input
                       type="file"
                       accept="image/*"
-                      className="hidden"
+                      className="sr-only"
                       disabled={isCompressingBannerImage}
                       onChange={handleImageFileUpload}
                     />

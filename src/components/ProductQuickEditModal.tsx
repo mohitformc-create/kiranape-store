@@ -425,17 +425,18 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
 
               <div className="flex items-center gap-2">
                 <input
+                  id="quick-edit-gallery-input"
                   type="file"
                   ref={fileInputRef}
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
+                  accept="image/png,image/jpeg,image/webp,image/*"
+                  className="sr-only"
                   onChange={handleImageFileChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isCompressing}
-                  className="flex-1 py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-stone-300 transition-colors cursor-pointer disabled:opacity-50"
+                <label
+                  htmlFor="quick-edit-gallery-input"
+                  className={`flex-1 min-h-[40px] py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-stone-300 transition-colors cursor-pointer select-none ${
+                    isCompressing ? 'opacity-50 pointer-events-none' : ''
+                  }`}
                 >
                   {isCompressing ? (
                     <>
@@ -448,7 +449,7 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
                       <span>Choose from Phone Gallery</span>
                     </>
                   )}
-                </button>
+                </label>
 
                 {imageUrl && (
                   <button

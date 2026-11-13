@@ -641,32 +641,25 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
           </span>
         </div>
 
-        {/* Hidden Native Mobile/Desktop File Input */}
+        {/* Direct HTML Label-Bound Native Mobile/Desktop File Input */}
         <input
+          id="excel-file-picker"
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
-          className="hidden"
+          accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,*/*"
+          className="sr-only"
           onChange={handleFileChange}
         />
 
-        {/* Tap-Friendly Mobile Upload Dropzone */}
-        <div
-          role="button"
-          tabIndex={0}
+        {/* Tap-Friendly Mobile Upload Dropzone using direct <label htmlFor="excel-file-picker"> */}
+        <label
+          htmlFor="excel-file-picker"
           id="excel-uploader-dropzone"
-          onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
           onDragEnter={handleDrag}
           onDragOver={handleDrag}
           onDragLeave={handleDrag}
           onDrop={handleDrop}
-          className={`w-full rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all cursor-pointer select-none ${
+          className={`block w-full rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all cursor-pointer select-none ${
             dragActive
               ? 'border-emerald-600 bg-emerald-50/80 scale-[0.995]'
               : 'border-emerald-400 bg-emerald-50/40 hover:bg-emerald-50/70'
@@ -691,7 +684,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
               <span>{fileName ? 'दूसरी फाइल चुनें' : 'फाइल चुनें (Browse Files)'}</span>
             </span>
           </div>
-        </div>
+        </label>
 
         {/* Parse Error Banner */}
         {parseError && (

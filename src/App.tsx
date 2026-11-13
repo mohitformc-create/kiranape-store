@@ -1691,15 +1691,15 @@ export default function App() {
         onOpenBarcodeScanner={(p) => handleOpenAdminBarcodeScanner(p)}
       />
 
-      {/* 11. Camera-Based FMCG SKU Barcode Scanner */}
+      {/* 11. Zero-Permission Native Camera FMCG SKU Barcode Scanner */}
       <BarcodeScannerModal
         isOpen={isBarcodeScannerOpen}
         onClose={() => {
           setIsBarcodeScannerOpen(false);
           setProductToBind(null);
         }}
-        onDetected={handleBarcodeDetected}
-        products={products}
+        onBarcodeDetected={handleBarcodeDetected}
+        catalogProducts={products}
         mode={barcodeScannerMode}
         productToBind={productToBind}
       />

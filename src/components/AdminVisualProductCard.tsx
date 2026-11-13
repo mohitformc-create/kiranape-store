@@ -208,58 +208,62 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
           : 'border-rose-300 bg-rose-50/10'
       }`}
     >
-      {/* Hidden File Input for Direct Gallery/Camera Image Upload */}
+      {/* sr-only File Input for Direct Gallery/Camera Image Upload */}
       <input
+        id={`visual-card-file-${product.id}`}
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        className="hidden"
+        className="sr-only"
         onChange={handleFileChange}
       />
 
       {/* Top Section: Product Image with 1-Tap Camera Replacement & Badges */}
       <div
-        onClick={handleTriggerImageUpload}
-        className="relative w-full aspect-square bg-stone-50 overflow-hidden flex items-center justify-center p-2.5 sm:p-3 cursor-pointer group/img select-none"
+        className="relative w-full aspect-square bg-stone-50 overflow-hidden flex items-center justify-center p-2.5 sm:p-3 group/img select-none"
         title="Tap to change photo from Camera/Gallery"
       >
-        {isUploadingImage ? (
-          <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center gap-1.5 text-emerald-700">
-            <RefreshCw className="w-6 h-6 animate-spin" />
-            <span className="text-[11px] font-bold">Uploading photo...</span>
-          </div>
-        ) : (
-          <img
-            src={
-              imageError
-                ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice)
-                : getValidImageUrl(product.imageUrl, product.category, product.name, product.unit, product.finalPrice)
-            }
-            alt={product.name}
-            onError={(e) => {
-              setImageError(true);
-              const fallback = getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice);
-              if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                (e.currentTarget as HTMLImageElement).src = fallback;
+        <label
+          htmlFor={`visual-card-file-${product.id}`}
+          className="w-full h-full flex items-center justify-center cursor-pointer"
+        >
+          {isUploadingImage ? (
+            <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center gap-1.5 text-emerald-700">
+              <RefreshCw className="w-6 h-6 animate-spin" />
+              <span className="text-[11px] font-bold">Uploading photo...</span>
+            </div>
+          ) : (
+            <img
+              src={
+                imageError
+                  ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice)
+                  : getValidImageUrl(product.imageUrl, product.category, product.name, product.unit, product.finalPrice)
               }
-            }}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-contain mix-blend-multiply group-hover/img:scale-105 transition-transform duration-300"
-          />
-        )}
+              alt={product.name}
+              onError={(e) => {
+                setImageError(true);
+                const fallback = getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice);
+                if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                  (e.currentTarget as HTMLImageElement).src = fallback;
+                }
+              }}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-contain mix-blend-multiply group-hover/img:scale-105 transition-transform duration-300"
+            />
+          )}
+        </label>
 
         {/* 1-Tap Camera Change Badge Overlay */}
         <div className="absolute top-2 right-2 z-10">
-          <button
-            type="button"
-            onClick={handleTriggerImageUpload}
+          <label
+            htmlFor={`visual-card-file-${product.id}`}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-900/85 hover:bg-stone-950 text-white text-[10px] font-bold shadow-md backdrop-blur-xs transition-transform active:scale-95 cursor-pointer"
             title="Tap to upload new photo"
           >
             <Camera className="w-3 h-3 text-amber-300" />
             <span className="hidden sm:inline">Change Photo</span>
-          </button>
+          </label>
         </div>
 
         {/* Discount Badge */}

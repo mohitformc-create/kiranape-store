@@ -213,10 +213,10 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
       }
     },
     onError: (err) => {
-      console.warn('Speech recognition warning:', err);
+      console.info('Speech recognition status:', err);
       if (err === 'not-allowed' || err === 'service-not-allowed') {
         setMicBlocked(true);
-        showToast("माइक्रोफ़ोन की अनुमति नहीं मिली! कृपया ब्राउज़र में Mic परमिशन Allow करें।");
+        showToast('यहाँ बोलकर या नीचे लिखकर सामान जोड़ें...');
       }
     },
   });
@@ -231,17 +231,16 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
 
     setMicBlocked(false);
 
-    // Request real microphone permission
     let stream: MediaStream;
     try {
       if (!navigator?.mediaDevices?.getUserMedia) {
-        throw new Error('getUserMedia not supported on this device/browser');
+        throw new Error('getUserMedia unavailable');
       }
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err: any) {
-      console.warn('Microphone permission request error:', err);
+      console.info('Microphone unavailable in WebView, falling back to inline input:', err);
       setMicBlocked(true);
-      showToast("माइक्रोफ़ोन की अनुमति दें / Please allow microphone in browser settings");
+      showToast('यहाँ बोलकर या नीचे लिखकर सामान जोड़ें...');
       return;
     }
 
@@ -255,7 +254,7 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
         startListening();
       }
     } catch (e) {
-      console.warn('SpeechRecognition start notice:', e);
+      console.info('SpeechRecognition start notice:', e);
     }
   };
 
@@ -665,17 +664,17 @@ export const VoiceGroceryModal: React.FC<VoiceGroceryModalProps> = ({
                 </div>
               )}
 
-              {/* Microphone Blocked Fallback Guidance */}
+              {/* Friendly Inline Fallback Guidance if WebView Mic is Unavailable */}
               {micBlocked && (
-                <div className="mt-3 p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl text-left space-y-1.5">
+                <div className="mt-3 p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-left space-y-1">
                   <div className="flex items-start gap-2">
-                    <MicOff className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                    <MicOff className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-heading font-black text-rose-950 text-xs">
-                        माइक्रोफ़ोन अनुमति बंद है
+                      <p className="font-heading font-black text-amber-950 text-xs">
+                        सीधे नीचे टाइप करके या कीबोर्ड के माइक से सामान लिखें
                       </p>
-                      <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
-                        कृपया ब्राउज़र सेटिंग्स में जाकर माइक्रोफ़ोन की अनुमति (Allow Microphone) दें ताकि आपकी आवाज़ रिकॉर्ड हो सके।
+                      <p className="text-[11px] text-amber-900 font-medium leading-relaxed">
+                        आप नीचे दिए गए बॉक्स में सामान का नाम लिखकर भी तुरंत ऑर्डर भेज सकते हैं।
                       </p>
                     </div>
                   </div>
