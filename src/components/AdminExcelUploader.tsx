@@ -463,9 +463,9 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     handleParseFile(file);
-    e.target.value = '';
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -641,31 +641,29 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
           </span>
         </div>
 
-        {/* Direct HTML Label-Bound Native Mobile/Desktop File Input */}
-        <input
-          id="excel-file-picker"
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,*/*"
-          className="sr-only"
-          onChange={handleFileChange}
-        />
-
-        {/* Tap-Friendly Mobile Upload Dropzone using direct <label htmlFor="excel-file-picker"> */}
-        <label
-          htmlFor="excel-file-picker"
+        {/* Tap-Friendly Mobile Upload Dropzone with Direct Overlay File Input */}
+        <div
           id="excel-uploader-dropzone"
           onDragEnter={handleDrag}
           onDragOver={handleDrag}
           onDragLeave={handleDrag}
           onDrop={handleDrop}
-          className={`block w-full rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all cursor-pointer select-none ${
+          className={`relative overflow-hidden cursor-pointer select-none block w-full rounded-2xl border-2 border-dashed p-6 sm:p-8 text-center transition-all ${
             dragActive
               ? 'border-emerald-600 bg-emerald-50/80 scale-[0.995]'
               : 'border-emerald-400 bg-emerald-50/40 hover:bg-emerald-50/70'
           }`}
         >
-          <div className="flex flex-col items-center justify-center gap-3">
+          <input
+            id="excel-file-picker"
+            ref={fileInputRef}
+            type="file"
+            accept="*/*"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+            onChange={handleFileChange}
+          />
+
+          <div className="flex flex-col items-center justify-center gap-3 pointer-events-none">
             <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
               <Upload className="w-7 h-7" />
             </div>
@@ -679,12 +677,12 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
               </p>
             </div>
 
-            <span className="min-h-[44px] inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-heading font-extrabold shadow-xs whitespace-nowrap">
+            <span className="min-h-[44px] inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-heading font-extrabold shadow-xs whitespace-nowrap">
               <FileSpreadsheet className="w-4 h-4 shrink-0" />
               <span>{fileName ? 'दूसरी फाइल चुनें' : 'फाइल चुनें (Browse Files)'}</span>
             </span>
           </div>
-        </label>
+        </div>
 
         {/* Parse Error Banner */}
         {parseError && (

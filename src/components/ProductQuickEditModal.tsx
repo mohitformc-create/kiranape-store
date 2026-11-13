@@ -78,6 +78,7 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
 
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     setIsCompressing(true);
@@ -90,7 +91,6 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
       setErrorNotice('Could not compress photo. Please paste an image URL instead.');
     } finally {
       setIsCompressing(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -424,32 +424,36 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
               />
 
               <div className="flex items-center gap-2">
-                <input
-                  id="quick-edit-gallery-input"
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/png,image/jpeg,image/webp,image/*"
-                  className="sr-only"
-                  onChange={handleImageFileChange}
-                />
-                <label
-                  htmlFor="quick-edit-gallery-input"
-                  className={`flex-1 min-h-[40px] py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-stone-300 transition-colors cursor-pointer select-none ${
-                    isCompressing ? 'opacity-50 pointer-events-none' : ''
-                  }`}
-                >
-                  {isCompressing ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-700" />
-                      <span>Optimizing Photo...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-3.5 h-3.5 text-stone-600" />
-                      <span>Choose from Phone Gallery</span>
-                    </>
-                  )}
-                </label>
+                <div className="relative flex-1 overflow-hidden cursor-pointer rounded-xl">
+                  <button
+                    type="button"
+                    disabled={isCompressing}
+                    className={`w-full min-h-[40px] py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-stone-300 transition-colors cursor-pointer select-none ${
+                      isCompressing ? 'opacity-50' : ''
+                    }`}
+                  >
+                    {isCompressing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+                        <span>Optimizing Photo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5 text-stone-600" />
+                        <span>Choose from Phone Gallery</span>
+                      </>
+                    )}
+                  </button>
+                  <input
+                    id="quick-edit-gallery-input"
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    disabled={isCompressing}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                    onChange={handleImageFileChange}
+                  />
+                </div>
 
                 {imageUrl && (
                   <button

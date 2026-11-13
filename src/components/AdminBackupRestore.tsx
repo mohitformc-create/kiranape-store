@@ -110,6 +110,7 @@ export const AdminBackupRestore: React.FC<AdminBackupRestoreProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     if (!file.name.endsWith('.json') && file.type !== 'application/json') {
@@ -197,16 +198,6 @@ export const AdminBackupRestore: React.FC<AdminBackupRestoreProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-2xl p-5 sm:p-6 border border-stone-200 shadow-xs space-y-6">
-      {/* sr-only File Input for Native Picker */}
-      <input
-        id="backup-restore-json-input"
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept=".json,application/json,*/*"
-        className="sr-only"
-      />
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
         <div className="flex items-center gap-3">
@@ -344,16 +335,25 @@ export const AdminBackupRestore: React.FC<AdminBackupRestoreProps> = ({
           </div>
 
           <div className="space-y-2.5 pt-2">
-            {/* Secure Restore Label */}
-            <label
-              id="restore-backup-file-btn"
-              htmlFor="backup-restore-json-input"
-              onClick={() => setRestoreError(null)}
-              className="w-full py-3 px-4 bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white rounded-xl text-xs sm:text-sm font-heading font-bold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Upload className="w-4 h-4 text-amber-400" />
-              <span>📤 Restore Backup File</span>
-            </label>
+            {/* Secure Restore Overlay Button */}
+            <div className="relative overflow-hidden cursor-pointer rounded-xl">
+              <button
+                type="button"
+                className="w-full py-3 px-4 bg-stone-900 hover:bg-stone-800 active:scale-[0.99] text-white rounded-xl text-xs sm:text-sm font-heading font-bold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Upload className="w-4 h-4 text-amber-400" />
+                <span>📤 Restore Backup File</span>
+              </button>
+              <input
+                id="backup-restore-json-input"
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                onClick={() => setRestoreError(null)}
+                accept="*/*"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+              />
+            </div>
 
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-stone-500 py-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

@@ -269,6 +269,7 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
   // Handle Photo Upload with Compression
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     setIsUploading(true);
@@ -997,16 +998,18 @@ export const AdminOffersAndSettings: React.FC<AdminOffersAndSettingsProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-stone-700">Banner Packshot / Graphic Image *</label>
-                  <label className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer">
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Upload from Phone</span>
+                  <div className="relative overflow-hidden cursor-pointer rounded-lg px-2 py-1 hover:bg-emerald-50">
+                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1 pointer-events-none">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Upload from Phone</span>
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleFileUpload}
-                      className="sr-only"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                     />
-                  </label>
+                  </div>
                 </div>
 
                 <input

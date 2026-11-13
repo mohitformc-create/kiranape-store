@@ -291,6 +291,7 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
   // Handle Image File Upload (Convert to Compressed Data URL)
   const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -1144,21 +1145,27 @@ export const AdminStoreSettings: React.FC<AdminStoreSettingsProps> = ({
 
                 {/* Device Upload Button */}
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold transition-all shadow-2xs">
-                    {isCompressingBannerImage ? (
-                      <RefreshCw className="w-4 h-4 animate-spin text-emerald-700" />
-                    ) : (
-                      <Upload className="w-4 h-4 text-emerald-700" />
-                    )}
-                    <span>{isCompressingBannerImage ? 'Compressing device photo...' : 'Choose Banner Photo from Device'}</span>
+                  <div className="relative overflow-hidden cursor-pointer flex-1 rounded-xl">
+                    <button
+                      type="button"
+                      disabled={isCompressingBannerImage}
+                      className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold transition-all shadow-2xs"
+                    >
+                      {isCompressingBannerImage ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-emerald-700" />
+                      ) : (
+                        <Upload className="w-4 h-4 text-emerald-700" />
+                      )}
+                      <span>{isCompressingBannerImage ? 'Compressing device photo...' : 'Choose Banner Photo from Device'}</span>
+                    </button>
                     <input
                       type="file"
                       accept="image/*"
-                      className="sr-only"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                       disabled={isCompressingBannerImage}
                       onChange={handleImageFileUpload}
                     />
-                  </label>
+                  </div>
                 </div>
 
                 {/* Image Preview */}

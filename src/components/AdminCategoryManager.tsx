@@ -260,6 +260,7 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
   // Handle local file selection (Gallery / Camera / Local)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     setPhotoModalError(null);
@@ -813,35 +814,31 @@ export const AdminCategoryManager: React.FC<AdminCategoryManagerProps> = ({
                 {/* TAB 1: FILE UPLOAD */}
                 {photoInputMode === 'upload' && (
                   <div className="space-y-3 animate-fadeIn">
-                    <input
-                      id="category-photo-file-input"
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp, image/*"
-                      onChange={handleFileChange}
-                      className="sr-only"
-                    />
-
-                    <label
-                      htmlFor="category-photo-file-input"
-                      className="block border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/70 rounded-2xl p-6 text-center cursor-pointer transition-all group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-white text-emerald-700 flex items-center justify-center mx-auto mb-2 shadow-xs group-hover:scale-110 transition-transform">
+                    <div className="relative overflow-hidden cursor-pointer block border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/70 rounded-2xl p-6 text-center transition-all group">
+                      <input
+                        id="category-photo-file-input"
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      />
+                      <div className="w-12 h-12 rounded-2xl bg-white text-emerald-700 flex items-center justify-center mx-auto mb-2 shadow-xs group-hover:scale-110 transition-transform pointer-events-none">
                         <UploadCloud className="w-6 h-6" />
                       </div>
-                      <h5 className="font-heading font-extrabold text-stone-900 text-sm">
+                      <h5 className="font-heading font-extrabold text-stone-900 text-sm pointer-events-none">
                         Tap to Choose Photo (फ़ोन गैलरी से चुनें)
                       </h5>
-                      <p className="text-xs text-stone-500 mt-1">
+                      <p className="text-xs text-stone-500 mt-1 pointer-events-none">
                         PNG, JPG, WebP supported. File automatically optimized to ultra-fast &lt;150KB (400x400).
                       </p>
                       {selectedFile && (
-                        <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-emerald-300 text-xs font-bold text-emerald-800 shadow-2xs">
+                        <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-emerald-300 text-xs font-bold text-emerald-800 shadow-2xs pointer-events-none">
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
                           <span>{selectedFile.name} (Ready to Save)</span>
                         </div>
                       )}
-                    </label>
+                    </div>
                   </div>
                 )}
 

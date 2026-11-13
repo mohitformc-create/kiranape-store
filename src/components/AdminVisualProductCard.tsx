@@ -171,6 +171,7 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     try {
       setIsUploadingImage(true);
@@ -190,7 +191,6 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
       console.error('Failed to compress/upload image:', err);
     } finally {
       setIsUploadingImage(false);
-      if (e.target) e.target.value = '';
     }
   };
 
@@ -208,27 +208,24 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
           : 'border-rose-300 bg-rose-50/10'
       }`}
     >
-      {/* sr-only File Input for Direct Gallery/Camera Image Upload */}
-      <input
-        id={`visual-card-file-${product.id}`}
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={handleFileChange}
-      />
-
       {/* Top Section: Product Image with 1-Tap Camera Replacement & Badges */}
       <div
-        className="relative w-full aspect-square bg-stone-50 overflow-hidden flex items-center justify-center p-2.5 sm:p-3 group/img select-none"
+        className="relative w-full aspect-square bg-stone-50 overflow-hidden flex items-center justify-center p-2.5 sm:p-3 group/img select-none cursor-pointer"
         title="Tap to change photo from Camera/Gallery"
       >
-        <label
-          htmlFor={`visual-card-file-${product.id}`}
-          className="w-full h-full flex items-center justify-center cursor-pointer"
-        >
+        {/* Direct Overlay File Input over Card Photo */}
+        <input
+          id={`visual-card-file-${product.id}`}
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+          onChange={handleFileChange}
+        />
+
+        <div className="w-full h-full flex items-center justify-center pointer-events-none">
           {isUploadingImage ? (
-            <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center gap-1.5 text-emerald-700">
+            <div className="absolute inset-0 bg-white/90 z-30 flex flex-col items-center justify-center gap-1.5 text-emerald-700">
               <RefreshCw className="w-6 h-6 animate-spin" />
               <span className="text-[11px] font-bold">Uploading photo...</span>
             </div>
@@ -252,18 +249,17 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
               className="w-full h-full object-contain mix-blend-multiply group-hover/img:scale-105 transition-transform duration-300"
             />
           )}
-        </label>
+        </div>
 
         {/* 1-Tap Camera Change Badge Overlay */}
-        <div className="absolute top-2 right-2 z-10">
-          <label
-            htmlFor={`visual-card-file-${product.id}`}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-900/85 hover:bg-stone-950 text-white text-[10px] font-bold shadow-md backdrop-blur-xs transition-transform active:scale-95 cursor-pointer"
+        <div className="absolute top-2 right-2 z-10 pointer-events-none">
+          <span
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-900/85 text-white text-[10px] font-bold shadow-md backdrop-blur-xs"
             title="Tap to upload new photo"
           >
             <Camera className="w-3 h-3 text-amber-300" />
             <span className="hidden sm:inline">Change Photo</span>
-          </label>
+          </span>
         </div>
 
         {/* Discount Badge */}
@@ -283,7 +279,7 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
         )}
 
         {/* Weight / Pack size tag - tap to inline edit unit if desired */}
-        <div className="absolute bottom-2 left-2 z-10">
+        <div className="absolute bottom-2 left-2 z-30">
           {isEditingUnit ? (
             <div
               onClick={(e) => e.stopPropagation()}

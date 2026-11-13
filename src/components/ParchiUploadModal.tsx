@@ -136,6 +136,7 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     setIsCompressing(true);
@@ -159,10 +160,6 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
       reader.readAsDataURL(file);
     } finally {
       setIsCompressing(false);
-      // Reset input value so selecting again always fires onChange
-      if (e.target) {
-        e.target.value = '';
-      }
     }
   };
 
@@ -451,23 +448,6 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
                 <span>1. राशन पर्ची की फोटो (Parchi Photo) <span className="text-rose-600">*</span></span>
               </label>
 
-              {/* Zero-Permission Native Camera & Gallery Inputs */}
-              <input
-                id="cust-parchi-cam"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileChange}
-                className="sr-only"
-              />
-              <input
-                id="cust-parchi-gal"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="sr-only"
-              />
-
               {imagePreview ? (
                 <div className="space-y-2">
                   <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500 bg-stone-900 max-h-56 flex items-center justify-center shadow-sm">
@@ -483,20 +463,37 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
                   </div>
 
                   <div className="flex gap-2">
-                    <label
-                      htmlFor="cust-parchi-cam"
-                      className="flex-1 min-h-[40px] py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl font-bold text-[11px] transition-colors flex items-center justify-center gap-1 cursor-pointer select-none"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>फोटो बदलें</span>
-                    </label>
-                    <label
-                      htmlFor="cust-parchi-gal"
-                      className="min-h-[40px] py-1.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-[11px] transition-colors flex items-center justify-center gap-1 cursor-pointer select-none"
-                    >
-                      <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
-                      <span>गैलरी</span>
-                    </label>
+                    <div className="relative flex-1 overflow-hidden cursor-pointer rounded-xl">
+                      <button
+                        type="button"
+                        className="w-full min-h-[40px] py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl font-bold text-[11px] transition-colors flex items-center justify-center gap-1 cursor-pointer select-none"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>फोटो बदलें</span>
+                      </button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      />
+                    </div>
+                    <div className="relative overflow-hidden cursor-pointer rounded-xl">
+                      <button
+                        type="button"
+                        className="min-h-[40px] py-1.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-[11px] transition-colors flex items-center justify-center gap-1 cursor-pointer select-none"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                        <span>गैलरी</span>
+                      </button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -694,41 +691,60 @@ export const ParchiUploadModal: React.FC<ParchiUploadModalProps> = ({
               ) : (
                 <div className="space-y-2.5">
                   <div className="grid grid-cols-2 gap-2.5">
-                    {/* 1. Native Camera Capture Label */}
-                    <label
-                      htmlFor="cust-parchi-cam"
-                      className="min-h-[116px] p-4 rounded-2xl border-2 border-emerald-600 bg-emerald-50/60 hover:bg-emerald-100/60 text-emerald-950 flex flex-col items-center justify-center text-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer select-none"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-emerald-700 text-white flex items-center justify-center shadow-xs">
-                        {isCompressing ? (
-                          <RefreshCw className="w-6 h-6 animate-spin text-white" />
-                        ) : (
-                          <Camera className="w-6 h-6" />
-                        )}
-                      </div>
-                      <span className="font-heading font-extrabold text-xs">
-                        पर्ची की फोटो लें
-                      </span>
-                      <span className="text-[10px] text-emerald-700 font-medium">
-                        सीधे कैमरा खोलें
-                      </span>
-                    </label>
+                    {/* 1. Native Camera Capture Overlay */}
+                    <div className="relative overflow-hidden cursor-pointer rounded-2xl">
+                      <button
+                        type="button"
+                        className="w-full min-h-[116px] p-4 rounded-2xl border-2 border-emerald-600 bg-emerald-50/60 hover:bg-emerald-100/60 text-emerald-950 flex flex-col items-center justify-center text-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer select-none"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-emerald-700 text-white flex items-center justify-center shadow-xs">
+                          {isCompressing ? (
+                            <RefreshCw className="w-6 h-6 animate-spin text-white" />
+                          ) : (
+                            <Camera className="w-6 h-6" />
+                          )}
+                        </div>
+                        <span className="font-heading font-extrabold text-xs">
+                          पर्ची की फोटो लें
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-medium">
+                          सीधे कैमरा खोलें
+                        </span>
+                      </button>
+                      <input
+                        id="cust-parchi-cam"
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      />
+                    </div>
 
-                    {/* 2. Native Gallery Picker Label */}
-                    <label
-                      htmlFor="cust-parchi-gal"
-                      className="min-h-[116px] p-4 rounded-2xl border-2 border-stone-300 hover:border-amber-500 bg-stone-50 hover:bg-amber-50/50 text-stone-900 flex flex-col items-center justify-center text-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer select-none"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center shadow-xs">
-                        <ImageIcon className="w-6 h-6" />
-                      </div>
-                      <span className="font-heading font-extrabold text-xs">
-                        गैलरी से चुनें
-                      </span>
-                      <span className="text-[10px] text-stone-500 font-medium">
-                        पुराना फोटो अपलोड
-                      </span>
-                    </label>
+                    {/* 2. Native Gallery Picker Overlay */}
+                    <div className="relative overflow-hidden cursor-pointer rounded-2xl">
+                      <button
+                        type="button"
+                        className="w-full min-h-[116px] p-4 rounded-2xl border-2 border-stone-300 hover:border-amber-500 bg-stone-50 hover:bg-amber-50/50 text-stone-900 flex flex-col items-center justify-center text-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer select-none"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center shadow-xs">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                        <span className="font-heading font-extrabold text-xs">
+                          गैलरी से चुनें
+                        </span>
+                        <span className="text-[10px] text-stone-500 font-medium">
+                          पुराना फोटो अपलोड
+                        </span>
+                      </button>
+                      <input
+                        id="cust-parchi-gal"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      />
+                    </div>
                   </div>
 
                   {errors.image && (

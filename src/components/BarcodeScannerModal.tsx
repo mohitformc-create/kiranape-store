@@ -281,22 +281,6 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
         {/* Native Camera Capture & Preview Zone (Zero Browser Permissions Needed) */}
         <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
-          <input
-            id="native-barcode-cam"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="sr-only"
-            onChange={handleBarcodeImageCapture}
-          />
-          <input
-            id="native-barcode-gal"
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={handleBarcodeImageCapture}
-          />
-
           {/* Preview or Scan Launch Box */}
           <div className="relative rounded-2xl bg-stone-950 border border-stone-800 overflow-hidden min-h-[210px] flex flex-col items-center justify-center p-4 text-center">
             {capturedPreviewUrl ? (
@@ -359,23 +343,42 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             )}
           </div>
 
-          {/* Primary Zero-Permission Native Camera Label + Secondary Gallery Label */}
+          {/* Primary Zero-Permission Native Camera Button + Secondary Gallery Button (Direct Overlay Inputs) */}
           <div className="space-y-2.5">
-            <label
-              htmlFor="native-barcode-cam"
-              className="w-full min-h-[48px] px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-heading font-black text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
-            >
-              <Camera className="w-5 h-5 shrink-0" />
-              <span>📷 पैकेट का बारकोड स्कैन करें</span>
-            </label>
+            <div className="relative overflow-hidden cursor-pointer rounded-2xl">
+              <button
+                type="button"
+                className="w-full min-h-[48px] px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-heading font-black text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
+              >
+                <Camera className="w-5 h-5 shrink-0" />
+                <span>📷 पैकेट का बारकोड स्कैन करें</span>
+              </button>
+              <input
+                id="native-barcode-cam"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                onChange={handleBarcodeImageCapture}
+              />
+            </div>
 
-            <label
-              htmlFor="native-barcode-gal"
-              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 active:scale-[0.98] text-stone-200 font-heading font-bold text-xs border border-stone-700 transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
-            >
-              <ImageIcon className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>गैलरी से बारकोड फोटो चुनें</span>
-            </label>
+            <div className="relative overflow-hidden cursor-pointer rounded-xl">
+              <button
+                type="button"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 active:scale-[0.98] text-stone-200 font-heading font-bold text-xs border border-stone-700 transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
+              >
+                <ImageIcon className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>🖼️ गैलरी से बारकोड चुनें</span>
+              </button>
+              <input
+                id="native-barcode-gal"
+                type="file"
+                accept="image/*"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                onChange={handleBarcodeImageCapture}
+              />
+            </div>
           </div>
 
           {/* Manual Barcode / SKU Entry Fallback */}
