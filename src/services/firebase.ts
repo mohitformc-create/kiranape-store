@@ -813,7 +813,7 @@ export async function batchUpsertProductsToFirestore(
   products: Product[],
   chunkSize: number = 100,
   onProgress?: (processed: number, total: number) => void
-): Promise<{ count: number; success: boolean }> {
+): Promise<{ count: number; success: boolean; mergedProducts: Product[] }> {
   const db = getDb();
   if (db && products.length > 0) {
     try {
@@ -848,12 +848,7 @@ export async function batchUpsertProductsToFirestore(
               stock: Number(p.stockCount ?? p.stock ?? 50),
               imageUrl: p.imageUrl || '',
               description: p.description || '',
-              martBasePrice: p.martBasePrice !== undefined ? Number(p.martBasePrice) : undefined,
-              isMartItem: Boolean(p.isMartItem),
-              isManualOverride: Boolean(p.isManualOverride),
-              protectedFromAiSync: Boolean(p.protectedFromAiSync),
-              aiGenerated: Boolean(p.aiGenerated),
-              aiPricingRationale: p.aiPricingRationale || undefined,
+              barcode: p.barcode || undefined,
               priority: 0,
               updatedAt: Date.now(),
               createdAt: p.updatedAt || Date.now(),
@@ -869,13 +864,27 @@ export async function batchUpsertProductsToFirestore(
       }
     } catch (err) {
       console.error('Firestore batchUpsertProducts error:', err);
-      throw err;
+      handleFirestoreError(err, OperationType.WRITE, PRODUCTS_COLLECTION);
     }
   }
 
-  // Persist directly to local cache and notify listeners
-  saveProducts(products);
-  return { count: products.length, success: true };
+  // Merge upserted products into existing local cache so partial batches never wipe other items
+  const existing = getProducts();
+  const upsertedById = new Map<string, Product>();
+  products.forEach((p) => upsertedById.set(p.id, p));
+
+  const mergedProducts: Product[] = existing.map((item) =>
+    upsertedById.has(item.id) ? { ...item, ...upsertedById.get(item.id)! } : item
+  );
+  const existingIds = new Set(existing.map((item) => item.id));
+  products.forEach((p) => {
+    if (!existingIds.has(p.id)) {
+      mergedProducts.push(p);
+    }
+  });
+
+  saveProducts(mergedProducts);
+  return { count: products.length, success: true, mergedProducts };
 }
 
 /**
@@ -951,49 +960,7 @@ export async function updateProductDirectlyInFirestore(
   return updatedProduct;
 }
 
-/**
- * ADMIN: Global Toggle to Mark All Mart Items Available or Out of Stock
- */
-export async function batchToggleMartProductsStock(inStock: boolean): Promise<number> {
-  const current = getProducts();
-  const martItems = current.filter((p) => p.isMartItem || p.id.startsWith('vmart-'));
-  if (martItems.length === 0) return 0;
 
-  const db = getDb();
-  if (db) {
-    try {
-      const chunkSize = 100;
-      for (let i = 0; i < martItems.length; i += chunkSize) {
-        const chunk = martItems.slice(i, i + chunkSize);
-        const batch = writeBatch(db);
-        chunk.forEach((p) => {
-          const docRef = doc(db, PRODUCTS_COLLECTION, p.id);
-          batch.set(
-            docRef,
-            cleanFirestoreData({
-              isAvailable: inStock,
-              inStock: inStock,
-              updatedAt: Date.now(),
-            }),
-            { merge: true }
-          );
-        });
-        await batch.commit();
-      }
-    } catch (err) {
-      console.warn('batchToggleMartProductsStock error:', err);
-      throw err;
-    }
-  }
-
-  const updatedList = current.map((p) =>
-    p.isMartItem || p.id.startsWith('vmart-')
-      ? { ...p, isAvailable: inStock, updatedAt: Date.now() }
-      : p
-  );
-  saveProducts(updatedList);
-  return martItems.length;
-}
 
 // ============================================================================
 // 3. REAL-TIME CATALOG & CATEGORY LISTENERS (onSnapshot)

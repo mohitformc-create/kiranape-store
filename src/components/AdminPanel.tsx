@@ -57,8 +57,7 @@ import { AdminOffersAndSettings } from './AdminOffersAndSettings';
 import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminCsvRestoreModal } from './AdminCsvRestoreModal';
-import { AdminHypermarketManager } from './AdminHypermarketManager';
-import { AdminAiStoreManager } from './AdminAiStoreManager';
+import { AdminExcelUploader } from './AdminExcelUploader';
 import { ProductQuickEditModal } from './ProductQuickEditModal';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
@@ -160,7 +159,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshProducts,
   onOpenBarcodeScanner,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'ai_store_manager' | 'orders' | 'parchi_orders' | 'hypermarket' | 'offers_settings' | 'categories' | 'settings'>('ai_store_manager');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'excel_uploader' | 'orders' | 'parchi_orders' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -668,16 +667,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleSaveProduct = (formData: any) => {
-    const enriched = {
-      ...formData,
-      isManualOverride: true,
-      protectedFromAiSync: true,
-      lastManuallyEditedAt: Date.now(),
-    };
     if (editingProduct) {
-      onUpdateProduct(editingProduct.id, enriched);
+      onUpdateProduct(editingProduct.id, formData);
     } else {
-      onAddProduct(enriched);
+      onAddProduct(formData);
     }
   };
 
@@ -1188,21 +1181,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* Admin Navigation Tabs */}
         <div className="max-w-6xl mx-auto px-4 flex items-center gap-2 border-t border-stone-800 pt-2 pb-1 overflow-x-auto">
           <button
-            id="admin-ai-store-manager-tab-btn"
-            onClick={() => setActiveTab('ai_store_manager')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
-              activeTab === 'ai_store_manager'
-                ? 'bg-stone-100 text-stone-900 shadow-xs'
-                : 'text-purple-300 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>🤖 AI Store Manager</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('inventory')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'inventory'
                 ? 'bg-stone-100 text-stone-900 shadow-xs'
                 : 'text-stone-400 hover:text-white'
@@ -1210,6 +1190,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           >
             <Package className="w-4 h-4 text-amber-600" />
             <span>Product Inventory ({products.length})</span>
+          </button>
+
+          <button
+            id="admin-excel-uploader-tab-btn"
+            onClick={() => setActiveTab('excel_uploader')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === 'excel_uploader'
+                ? 'bg-stone-100 text-stone-900 shadow-xs'
+                : 'text-emerald-300 hover:text-white'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>📊 Excel / CSV अपलोड और अपडेट (Bulk Excel Manager)</span>
           </button>
 
           <button
@@ -1254,18 +1247,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <span>🎨 Banners, Offers & Store Settings</span>
           </button>
 
-          <button
-            id="admin-hypermarket-tab-btn"
-            onClick={() => setActiveTab('hypermarket')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
-              activeTab === 'hypermarket'
-                ? 'bg-stone-100 text-stone-900 shadow-xs'
-                : 'text-purple-300 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>🤖 AI Hypermarket (Vishal Mart)</span>
-          </button>
 
           <button
             onClick={() => setActiveTab('categories')}
@@ -1345,18 +1326,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
-        {/* ================= TAB 0: AUTONOMOUS AI STORE MANAGER ================= */}
-        {activeTab === 'ai_store_manager' && (
-          <AdminAiStoreManager
+        {/* ================= TAB 0: EXCEL / CSV BULK MANAGER ================= */}
+        {activeTab === 'excel_uploader' && (
+          <AdminExcelUploader
             products={products}
-            onRefreshProducts={onRefreshProducts}
-            onOpenQuickEdit={(p) => {
-              setQuickEditProduct(p);
-              setIsQuickEditOpen(true);
+            onCatalogUpdated={(updated) => {
+              if (onRefreshProducts) {
+                onRefreshProducts(updated);
+              }
             }}
-            onOpenAddModal={handleOpenAdd}
-            onDeleteProduct={onDeleteProduct}
-            isFirebaseConnected={isFirebaseConnected}
           />
         )}
 
@@ -1444,15 +1422,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </button>
                   )}
 
-                  {/* AI Store Manager Quick Launch Button */}
+                  {/* Bulk Excel / CSV Manager Quick Launch Button */}
                   <button
                     type="button"
-                    onClick={() => setActiveTab('ai_store_manager')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 active:scale-95 text-white text-xs font-heading font-black shadow-xs hover:shadow-md transition-all cursor-pointer"
-                    title="Open AI Store Manager for Auto-Catalog & Smart Pricing"
+                    onClick={() => setActiveTab('excel_uploader')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-heading font-black shadow-xs hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+                    title="Open Bulk Excel (.xlsx/.xls) & CSV Smart Uploader"
                   >
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>🤖 AI Store Manager</span>
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+                    <span>📊 Excel / CSV अपलोड</span>
                   </button>
 
                   {/* Dedicated CSV Restore & Ingestion Dropzone (196 Core Products) */}
@@ -3247,15 +3225,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           />
         )}
 
-        {/* ================= TAB: AI HYPERMARKET (VISHAL MEGA MART) ================= */}
-        {activeTab === 'hypermarket' && (
-          <AdminHypermarketManager
-            products={products}
-            onRefreshProducts={(next) => {
-              if (onRefreshProducts) onRefreshProducts(next);
-            }}
-          />
-        )}
 
         {/* ================= TAB 4: DYNAMIC CATEGORY MANAGER ================= */}
         {activeTab === 'categories' && (
