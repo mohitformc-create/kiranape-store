@@ -47,7 +47,6 @@ import {
   FileSpreadsheet,
   Pencil,
   Lock,
-  Barcode,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -121,7 +120,6 @@ interface AdminPanelProps {
   onSaveSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   onSaveBanners: (banners: PromoBanner[]) => Promise<void>;
   onRefreshProducts?: (products: Product[]) => void;
-  onOpenBarcodeScanner?: (productToBind?: Product) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -144,7 +142,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveSettings,
   onSaveBanners,
   onRefreshProducts,
-  onOpenBarcodeScanner,
 }) => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'excel_uploader' | 'orders' | 'parchi_orders' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
@@ -949,19 +946,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
                     <span>📊 Excel / CSV अपलोड और अपडेट</span>
                   </button>
-
-                  {onOpenBarcodeScanner && (
-                    <button
-                      type="button"
-                      id="admin-scan-barcode-btn"
-                      onClick={() => onOpenBarcodeScanner()}
-                      className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-white text-xs font-heading font-black shadow-xs transition-all cursor-pointer whitespace-nowrap"
-                      title="Open Zero-Permission Barcode / SKU Scanner"
-                    >
-                      <Barcode className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>📷 Scan Barcode / SKU</span>
-                    </button>
-                  )}
 
                   <button
                     id="admin-add-product-btn"

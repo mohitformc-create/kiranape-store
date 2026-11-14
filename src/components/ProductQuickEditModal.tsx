@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Upload, Check, RefreshCw, AlertCircle, Eye, EyeOff, Sparkles, Barcode, Camera } from 'lucide-react';
+import { X, Save, Upload, Check, RefreshCw, AlertCircle, Eye, EyeOff, Sparkles, Barcode } from 'lucide-react';
 import { Product } from '../types';
 import { updateProductDirectlyInFirestore } from '../services/firebase';
 import { compressImageFile } from '../utils/imageUtils';
@@ -10,7 +10,6 @@ interface ProductQuickEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductUpdated?: (updated: Product) => void;
-  onOpenBarcodeScanner?: (product: Product) => void;
 }
 
 const UNIT_PRESETS = [
@@ -38,7 +37,6 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
   isOpen,
   onClose,
   onProductUpdated,
-  onOpenBarcodeScanner,
 }) => {
   const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [mrp, setMrp] = useState<number>(0);
@@ -383,20 +381,9 @@ export const ProductQuickEditModal: React.FC<ProductQuickEditModalProps> = ({
                 type="text"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
-                placeholder="Scan or type barcode (e.g. 8901030383120)"
+                placeholder="Type barcode or SKU (e.g. 8901030383120)"
                 className="flex-1 px-3 py-2 text-xs font-mono bg-white border border-stone-300 rounded-xl font-bold text-stone-900 focus:border-emerald-600 focus:outline-hidden"
               />
-              {onOpenBarcodeScanner && (
-                <button
-                  type="button"
-                  onClick={() => onOpenBarcodeScanner(product)}
-                  className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs font-heading font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer flex-shrink-0"
-                  title="Scan physical product package with phone camera"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Scan</span>
-                </button>
-              )}
             </div>
             {barcode && (
               <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
