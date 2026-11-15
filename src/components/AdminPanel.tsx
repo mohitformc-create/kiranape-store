@@ -47,6 +47,7 @@ import {
   FileSpreadsheet,
   Pencil,
   Lock,
+  Wand2,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -56,6 +57,7 @@ import { AdminOffersAndSettings } from './AdminOffersAndSettings';
 import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminExcelUploader } from './AdminExcelUploader';
+import { AdminAutoImageModal } from './AdminAutoImageModal';
 import { ProductQuickEditModal } from './ProductQuickEditModal';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
@@ -397,6 +399,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
+  const [isAutoImageModalOpen, setIsAutoImageModalOpen] = useState(false);
 
   const handleExportAllStoreProducts = async () => {
     if (isExportingExcel) return;
@@ -970,6 +973,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
                     <span>📊 Excel / CSV अपलोड करें</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="admin-toolbar-auto-images-btn"
+                    onClick={() => setIsAutoImageModalOpen(true)}
+                    className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-heading font-black shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                    title="🪄 ऑटो-फोटो भरें (Auto-Fill Missing Images)"
+                  >
+                    <Wand2 className="w-4 h-4 text-violet-100 shrink-0" />
+                    <span>🪄 ऑटो-फोटो भरें</span>
                   </button>
 
                   <button
@@ -3053,6 +3067,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+
+      <AdminAutoImageModal
+        isOpen={isAutoImageModalOpen}
+        onClose={() => setIsAutoImageModalOpen(false)}
+        products={products}
+        onCatalogUpdated={(updated, summaryMessage) => {
+          if (onRefreshProducts) {
+            onRefreshProducts(updated);
+          }
+          if (summaryMessage) {
+            setCatalogSyncNotice(summaryMessage);
+            setTimeout(() => setCatalogSyncNotice(null), 8000);
+          }
+        }}
+      />
     </div>
   );
 };
