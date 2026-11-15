@@ -396,6 +396,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
 
   const handleExportAllStoreProducts = async () => {
     if (isExportingExcel) return;
@@ -914,9 +915,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {activeTab === 'excel_uploader' && (
           <AdminExcelUploader
             products={products}
-            onCatalogUpdated={(updated) => {
+            onCatalogUpdated={(updated, summaryMessage) => {
               if (onRefreshProducts) {
                 onRefreshProducts(updated);
+              }
+              if (summaryMessage) {
+                setCatalogSyncNotice(summaryMessage);
+                setTimeout(() => setCatalogSyncNotice(null), 8000);
               }
             }}
           />
@@ -959,12 +964,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     type="button"
                     id="admin-toolbar-excel-btn"
-                    onClick={() => setActiveTab('excel_uploader')}
-                    className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-heading font-black shadow-xs transition-all cursor-pointer whitespace-nowrap"
+                    onClick={() => setIsExcelUploadModalOpen(true)}
+                    className="min-h-[42px] flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-heading font-black shadow-sm transition-all cursor-pointer whitespace-nowrap"
                     title="Open Excel (.xlsx/.xls) & CSV Smart Inventory Uploader"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
-                    <span>📊 Excel / CSV अपलोड और अपडेट</span>
+                    <span>📊 Excel / CSV अपलोड करें</span>
                   </button>
 
                   <button
@@ -2995,6 +3000,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }
         }}
       />
+
+      {/* Clean Bulk Excel / CSV Upload Modal */}
+      {isExcelUploadModalOpen && (
+        <div
+          className="fixed inset-0 z-[90] bg-stone-950/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="excel-upload-modal-title"
+        >
+          <div className="bg-stone-100 rounded-3xl border border-stone-300 shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-stone-900 text-white px-5 py-4 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 id="excel-upload-modal-title" className="font-heading font-black text-base sm:text-lg leading-tight">
+                    📊 Excel / CSV अपलोड करें
+                  </h3>
+                  <p className="text-[11px] text-stone-300">
+                    केवल नए प्रोडक्ट्स जोड़ें — पहले से मौजूद आइटम्स व फोटो सुरक्षित रहेंगे
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="close-excel-upload-modal-btn"
+                onClick={() => setIsExcelUploadModalOpen(false)}
+                className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                aria-label="Close Excel Upload Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1">
+              <AdminExcelUploader
+                products={products}
+                onCatalogUpdated={(updated, summaryMessage) => {
+                  if (onRefreshProducts) {
+                    onRefreshProducts(updated);
+                  }
+                  setIsExcelUploadModalOpen(false);
+                  if (summaryMessage) {
+                    setCatalogSyncNotice(summaryMessage);
+                    setTimeout(() => setCatalogSyncNotice(null), 8000);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

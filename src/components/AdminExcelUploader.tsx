@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import Papa from 'papaparse';
 import {
   FileSpreadsheet,
   Upload,
@@ -22,7 +21,7 @@ import { exportAllStoreProductsToExcel } from '../utils/excelExportUtils';
 
 interface AdminExcelUploaderProps {
   products: Product[];
-  onCatalogUpdated: (updatedProducts: Product[]) => void;
+  onCatalogUpdated: (updatedProducts: Product[], summaryMessage?: string) => void;
 }
 
 interface ParsedExcelRow {
@@ -42,7 +41,15 @@ const normalizeName = (value: string): string =>
   value.trim().toLowerCase().replace(/\s+/g, ' ');
 
 const normalizeWeight = (value: string): string =>
-  value.trim().toLowerCase().replace(/\s+/g, '');
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/(\d)(kilograms?|kgs?)$/i, '$1kg')
+    .replace(/(\d)(grams?|gms?|gm)$/i, '$1g')
+    .replace(/(\d)(litres?|liters?|ltrs?|ltr)$/i, '$1l')
+    .replace(/(\d)(millilitres?|milliliters?|mls?)$/i, '$1ml')
+    .replace(/(\d)(pieces?|pcs?)$/i, '$1pc');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -500,15 +507,18 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
 
     try {
       if (lowerName.endsWith('.csv')) {
-        const rows = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
-          Papa.parse<Record<string, unknown>>(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => resolve(results.data || []),
-            error: (err) => reject(err),
-          });
+        const rawText = (await file.text()).replace(/^\uFEFF/, '');
+        const workbook = XLSX.read(rawText, { type: 'string' });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          setParseError('CSV फाइल में कोई डेटा नहीं मिला।');
+          return;
+        }
+        const sheet = workbook.Sheets[firstSheetName];
+        const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+          defval: '',
         });
-        await processParsedRows(rows, file);
+        await processParsedRows(jsonRows, file);
       } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
@@ -598,10 +608,9 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
       }
 
       if (brandNewProducts.length === 0) {
-        showToast(
-          'success',
-          `0 नए आइटम जोड़े गए, ${skippedExistingCount} पहले से मौजूद आइटम छोड़े गए।`
-        );
+        const summary = `0 नए आइटम जोड़े गए, ${skippedExistingCount} पहले से मौजूद आइटम छोड़े गए।`;
+        showToast('success', summary);
+        onCatalogUpdated(products, summary);
         setPreviewRows(null);
         setFileName(null);
         setFileSize(null);
@@ -610,7 +619,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
 
       setSaveProgress({ current: 0, total: brandNewProducts.length });
 
-      // 1. Insert ONLY brand-new products into Supabase 'products' table
+      // 1. Insert ONLY brand-new products into Supabase 'products' table in batches
       const BATCH_SIZE = 40;
       const insertedProducts: Product[] = [];
 
@@ -624,7 +633,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
           original_price: p.originalPrice > 0 ? p.originalPrice : p.finalPrice,
           price: p.finalPrice > 0 ? p.finalPrice : p.originalPrice,
           image_url: p.imageUrl || null,
-          in_stock: p.isAvailable !== false,
+          in_stock: true,
         }));
 
         const { data: insertedRows, error: insertError } = await supabase
@@ -638,7 +647,10 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
 
         chunk.forEach((p, idx) => {
           const sbRow = insertedRows?.[idx];
-          insertedProducts.push(sbRow?.id ? { ...p, id: String(sbRow.id) } : p);
+          insertedProducts.push({
+            ...(sbRow?.id ? { ...p, id: String(sbRow.id) } : p),
+            isAvailable: true,
+          });
         });
 
         setSaveProgress({
@@ -653,11 +665,9 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
       // 3. Sync new items to central inventory quietly in background
       saveBulkProductsToCentralInventory(insertedProducts).catch(() => {});
 
-      onCatalogUpdated(result.mergedProducts);
-      showToast(
-        'success',
-        `${insertedProducts.length} नए आइटम जोड़े गए, ${skippedExistingCount} पहले से मौजूद आइटम छोड़े गए।`
-      );
+      const summary = `${insertedProducts.length} नए आइटम जोड़े गए, ${skippedExistingCount} पहले से मौजूद आइटम छोड़े गए।`;
+      showToast('success', summary);
+      onCatalogUpdated(result.mergedProducts, summary);
       setPreviewRows(null);
       setFileName(null);
       setFileSize(null);
@@ -865,7 +875,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-heading font-black text-stone-900 text-base sm:text-lg tabular-nums">
-                  {previewRows.length} आइटम मिले: {newCount} नए जुड़ेंगे, {skipCount} पहले से मौजूद (छोड़े जाएंगे)
+                  {newCount} नए आइटम जुड़ेंगे, {skipCount} पहले से मौजूद आइटम छोड़े जाएंगे
                 </span>
                 {skippedCount > 0 && (
                   <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md tabular-nums">
@@ -906,17 +916,13 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                     <span className="tabular-nums">
-                      सेव हो रहा है ({saveProgress?.current ?? 0}/{saveProgress?.total ?? newCount})...
+                      Uploading ({saveProgress?.current ?? 0}/{saveProgress?.total ?? newCount})...
                     </span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>
-                      {newCount > 0
-                        ? `✅ कन्फर्म करें (${newCount} नए आइटम जोड़ें)`
-                        : '✅ कन्फर्म करें (0 नए आइटम)'}
-                    </span>
+                    <span>Confirm &amp; Upload All</span>
                   </>
                 )}
               </button>
