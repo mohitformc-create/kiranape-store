@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Search, Mic, Pencil, ChevronRight, MapPin, Check, X } from 'lucide-react';
+import { Search, Mic, ChevronRight, X } from 'lucide-react';
 import { Product, ProductCategory } from '../types';
-import { getCustomerSelectedLocation, setCustomerSelectedLocation, getDeliveryLocations } from '../services/storageService';
 import { useCategories, CATEGORIES_DATA, UnifiedCategoryTile } from '../data/categoriesData';
 import { isMasterAdminPin } from '../config/adminConfig';
 
@@ -25,11 +24,6 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
 }) => {
   const [categorySearchQuery, setCategorySearchQuery] = useState('');
   const categorySearchInputRef = useRef<HTMLInputElement>(null);
-  const [selectedLocation, setSelectedLocation] = useState<string>(() => {
-    return getCustomerSelectedLocation() || 'Waidhan Store';
-  });
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const deliveryLocations = useMemo(() => getDeliveryLocations(), []);
 
   // Unified categories synchronized identically with Home screen
   const { categories: unifiedCategories } = useCategories(products);
@@ -72,7 +66,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
       ========================================================================= */}
       <header className="bg-[#0C5A2B] text-white pt-3 pb-4 px-3 sm:px-4 shadow-md sticky top-0 z-30 transition-all">
         <div className="max-w-4xl mx-auto space-y-3">
-          {/* Brand Row + Store Selector */}
+          {/* Brand Row */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <img
@@ -83,32 +77,10 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
                 }}
               />
-              <div className="leading-tight">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-heading font-black text-base sm:text-lg tracking-tight text-white">
-                    Kiranapė
-                  </span>
-                  <span className="bg-amber-400 text-emerald-950 text-[10px] font-black px-1.5 py-0.5 rounded-sm tracking-wider uppercase">
-                    EXPRESS
-                  </span>
-                </div>
-                <p className="text-[10px] sm:text-[11px] font-semibold text-amber-300 tracking-wide">
-                  SUPERSTORE • 10-15 MIN
-                </p>
-              </div>
+              <span className="font-heading font-black text-base sm:text-lg tracking-tight text-white">
+                Kiranapė
+              </span>
             </div>
-
-            {/* Store selector pill with edit pencil icon */}
-            <button
-              type="button"
-              id="category-store-selector-pill"
-              onClick={() => setShowLocationPicker(true)}
-              className="inline-flex items-center gap-1.5 bg-emerald-800/80 hover:bg-emerald-800 border border-emerald-600/60 rounded-full px-3 py-1 text-xs font-semibold text-emerald-50 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            >
-              <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-              <span className="truncate max-w-[110px] sm:max-w-[150px]">{selectedLocation}</span>
-              <Pencil className="w-3 h-3 text-emerald-200 stroke-[2.2] flex-shrink-0 ml-0.5" />
-            </button>
           </div>
 
           {/* Sleek, High-Contrast Search Pill */}
@@ -285,55 +257,6 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = ({
         )}
       </main>
 
-      {/* Location Selector Modal */}
-      {showLocationPicker && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-700" />
-                <h3 className="font-heading font-black text-base text-stone-900">Select Store Location</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowLocationPicker(false)}
-                className="p-1 text-stone-400 hover:text-stone-700 rounded-lg cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-stone-500">
-              Kiranapė delivers fresh grocery across Waidhan and Singrauli region:
-            </p>
-
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {deliveryLocations.map((loc) => {
-                const isSelected = selectedLocation.toLowerCase().includes(loc.toLowerCase());
-                return (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => {
-                      setSelectedLocation(loc);
-                      setCustomerSelectedLocation(loc);
-                      setShowLocationPicker(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-600 shadow-2xs'
-                        : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border border-stone-200/80'
-                    }`}
-                  >
-                    <span>{loc}</span>
-                    {isSelected && <Check className="w-4 h-4 text-emerald-700" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -9,8 +9,8 @@ export const STORE_DEFAULTS: StoreSettings = {
   tagline: 'Ghar tak taaza kirana, sabse tezi se!',
   phone: '9424316081',
   whatsapp: '9424316081',
-  address: 'Shop No. 4, Main Market, Near Shiv Mandir, Ward No. 12, Waidhan',
-  serviceArea: 'Waidhan, Singrauli',
+  address: 'थाना रोड, बैढ़न',
+  serviceArea: 'बैढ़न, सिंगरौली',
   deliveryTime: 'Bharosemand Delivery',
   deliveryTagline: 'Shuddh Samaan, Bharosemand Delivery - Waidhan Store',
   minOrderForFreeDelivery: 499,
@@ -20,7 +20,24 @@ export const STORE_DEFAULTS: StoreSettings = {
   telegramChatId: '6229341464',
 };
 
+export const CUSTOM_PARCHI_BANNER: PromoBanner = {
+  id: 'banner-custom-parchi-request',
+  title: 'कोई सामान ऐप में नहीं दिख रहा? चिंता न करें!',
+  subtitle:
+    "अपनी ज़रूरत का हर सामान 'पर्ची टाइप करें' में लिख दें — हम आपको सबसे बेहतरीन क्वालिटी और किफ़ायती दाम पर घर बैठे पहुँचा देंगे।",
+  badge: '✍️ कस्टम राशन पर्ची',
+  imageUrl: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=600&q=80',
+  linkCategory: 'All',
+  gradient: 'from-emerald-700 via-teal-700 to-emerald-900',
+  buttonText: '✍️ अभी अपनी पर्ची लिखें →',
+  actionType: 'parchi',
+  targetType: 'parchi',
+  isActive: true,
+  order: 0,
+};
+
 export const DEFAULT_BANNERS: PromoBanner[] = [
+  CUSTOM_PARCHI_BANNER,
   {
     id: 'banner-festive-dhamaka',
     title: 'किरानापे उत्सव धमाका - Get Heavy Discounts & Gift Offers!',
@@ -33,7 +50,7 @@ export const DEFAULT_BANNERS: PromoBanner[] = [
     actionType: 'shop_now',
     targetType: 'category',
     isActive: true,
-    order: 0,
+    order: 1,
   },
   {
     id: 'banner-parle-50off',

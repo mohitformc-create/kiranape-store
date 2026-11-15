@@ -10,7 +10,7 @@ import {
   Check,
 } from 'lucide-react';
 import { PromoBanner, Product } from '../types';
-import { DEFAULT_BANNERS } from '../data/initialProducts';
+import { DEFAULT_BANNERS, CUSTOM_PARCHI_BANNER } from '../data/initialProducts';
 import { SPECIAL_DEAL_PRODUCTS, STAYFREE_REWARD_PRODUCT_ID } from '../data/specialDealsCatalog';
 
 interface HomeBannerCarouselProps {
@@ -46,12 +46,16 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
 }) => {
   const activeBanners = useMemo(() => {
     const raw = banners && banners.length > 0 ? banners : DEFAULT_BANNERS;
-    return raw.filter(
+    const filtered = raw.filter(
       (b) =>
         b.isActive !== false &&
         b.id !== 'banner-stayfree-xl' &&
         !b.title?.toLowerCase().includes('stayfree')
     );
+    const hasCustomParchiSlide = filtered.some(
+      (b) => b.id === CUSTOM_PARCHI_BANNER.id || b.title === CUSTOM_PARCHI_BANNER.title
+    );
+    return hasCustomParchiSlide ? filtered : [CUSTOM_PARCHI_BANNER, ...filtered];
   }, [banners]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -170,7 +174,12 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
         onSelectCategory('All');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-    } else if (banner.targetType === 'parchi' || banner.actionType === 'parchi' || banner.id === 'banner-parchi-upload') {
+    } else if (
+      banner.targetType === 'parchi' ||
+      banner.actionType === 'parchi' ||
+      banner.id === 'banner-parchi-upload' ||
+      banner.id === 'banner-custom-parchi-request'
+    ) {
       if (onOpenDigitalParchi) {
         onOpenDigitalParchi();
       } else if (onOpenParchi) {
@@ -320,6 +329,8 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
                       const isOrderNow =
                         banner.id === 'banner-festive-dhamaka' ||
                         (banner.buttonText && banner.buttonText.toUpperCase().includes('ORDER NOW'));
+                      const labelText = banner.buttonText || (isOrderNow ? 'ORDER NOW ➔' : 'Claim Deal ➔');
+                      const hasArrow = labelText.includes('→') || labelText.includes('➔');
 
                       return (
                         <button
@@ -331,8 +342,10 @@ export const HomeBannerCarousel: React.FC<HomeBannerCarouselProps> = ({
                               : 'px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white text-stone-900 hover:bg-stone-100'
                           }`}
                         >
-                          <span>{banner.buttonText || (isOrderNow ? 'ORDER NOW ➔' : 'Claim Deal ➔')}</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform stroke-[2.5]" />
+                          <span>{labelText}</span>
+                          {!hasArrow && (
+                            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform stroke-[2.5]" />
+                          )}
                         </button>
                       );
                     })()}

@@ -1234,24 +1234,26 @@ export default function App() {
 
 
 
-            {/* Subtle Blinkit Quick Parchi Chips */}
-            <div className="flex items-center justify-center gap-2.5 px-3 py-1">
+            {/* Home Quick Parchi Actions */}
+            <div className="flex flex-wrap items-center justify-center gap-3 px-2 py-1">
               <button
                 type="button"
                 id="home-digital-parchi-pill"
                 onClick={() => setIsDigitalParchiOpen(true)}
-                className="inline-flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-white/90 hover:bg-amber-50/80 border border-stone-200/70 text-stone-700 hover:text-amber-900 text-[11px] font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer"
+                className="group inline-flex items-center justify-center gap-2.5 min-h-[52px] px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 hover:brightness-105 text-stone-950 text-sm sm:text-base font-heading font-black shadow-lg shadow-amber-500/20 border-2 border-amber-300/80 active:scale-[0.97] transition-all cursor-pointer"
               >
-                <PenLine className="w-3 h-3 text-amber-600 stroke-[2.2]" />
-                <span>📝 पर्ची टाइप करें</span>
+                <span className="w-8 h-8 rounded-xl bg-white/85 text-amber-800 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                  <PenLine className="w-4 h-4 stroke-[2.5]" />
+                </span>
+                <span>✍️ पर्ची टाइप करें</span>
               </button>
               <button
                 type="button"
                 id="home-parchi-photo-pill"
                 onClick={() => setIsParchiModalOpen(true)}
-                className="inline-flex items-center gap-1.5 py-1 px-3.5 rounded-full bg-white/90 hover:bg-emerald-50/80 border border-stone-200/70 text-stone-700 hover:text-emerald-900 text-[11px] font-semibold shadow-2xs active:scale-95 transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 min-h-[48px] px-4 py-2.5 rounded-2xl bg-white hover:bg-emerald-50/90 border border-stone-200 hover:border-emerald-300 text-stone-800 hover:text-emerald-900 text-xs sm:text-sm font-heading font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
               >
-                <span className="text-xs">📸</span>
+                <span className="text-base">📸</span>
                 <span>पर्ची की फोटो भेजें</span>
               </button>
             </div>
@@ -1382,7 +1384,7 @@ export default function App() {
               <span>{storeSettings.name || 'Chaurasia Kirana Store'}</span>
             </div>
             <p className="mt-1 text-stone-500 text-xs max-w-lg">
-              {storeSettings.address || STORE_DEFAULTS.address} • Daily Timings: 6:30 AM - 10:30 PM
+              थाना रोड, बैढ़न • Daily Timings: 10:00 AM - 9:00 PM
             </p>
           </div>
 
