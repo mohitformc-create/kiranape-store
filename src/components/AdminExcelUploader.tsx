@@ -9,16 +9,16 @@ import {
   AlertCircle,
   Search,
   RefreshCw,
-  Image as ImageIcon,
   ShieldCheck,
   X,
   PlusCircle,
-  ArrowUpDown,
 } from 'lucide-react';
 import { Product } from '../types';
 import { batchUpsertProductsToFirestore } from '../services/firebase';
 import { saveBulkProductsToCentralInventory } from '../services/orderApiService';
+import { supabase } from '../services/supabaseClient';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { exportAllStoreProductsToExcel } from '../utils/excelExportUtils';
 
 interface AdminExcelUploaderProps {
   products: Product[];
@@ -27,13 +27,13 @@ interface AdminExcelUploaderProps {
 
 interface ParsedExcelRow {
   rowIndex: number;
-  action: 'update' | 'add';
+  action: 'skip' | 'add';
   product: Product;
   matchedExistingName?: string;
-  imagePreservedFromStore: boolean;
+  matchedSource?: 'supabase' | 'store' | 'duplicate_in_file';
 }
 
-type PreviewFilter = 'all' | 'update' | 'add';
+type PreviewFilter = 'all' | 'add' | 'skip';
 
 const normalizeHeaderKey = (key: string): string =>
   key.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -43,6 +43,45 @@ const normalizeName = (value: string): string =>
 
 const normalizeWeight = (value: string): string =>
   value.trim().toLowerCase().replace(/\s+/g, '');
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const generateUuid = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+const buildMatchKeysForExisting = (name: string, unit: string): string[] => {
+  const nName = normalizeName(name || '');
+  if (!nName) return [];
+  const nWeight = normalizeWeight(unit || '');
+  if (!nWeight) {
+    return [`${nName}::`, `${nName}::1pc`, `${nName}::1piece`];
+  }
+  if (nWeight === '1pc' || nWeight === '1piece') {
+    return [`${nName}::${nWeight}`, `${nName}::`, `${nName}::1pc`, `${nName}::1piece`];
+  }
+  return [`${nName}::${nWeight}`];
+};
+
+const buildMatchKeysForRow = (name: string, rawWeight: string, resolvedUnit: string): string[] => {
+  const nName = normalizeName(name || '');
+  if (!nName) return [];
+  const nWeight = normalizeWeight(resolvedUnit || '');
+  if (!rawWeight.trim()) {
+    return [`${nName}::${nWeight}`, `${nName}::`, `${nName}::1pc`, `${nName}::1piece`];
+  }
+  if (nWeight === '1pc' || nWeight === '1piece') {
+    return [`${nName}::${nWeight}`, `${nName}::`, `${nName}::1pc`, `${nName}::1piece`];
+  }
+  return [`${nName}::${nWeight}`];
+};
 
 const parseNumericPrice = (val: unknown): number => {
   if (typeof val === 'number' && !Number.isNaN(val)) return val;
@@ -92,12 +131,14 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [isCheckingSupabase, setIsCheckingSupabase] = useState(false);
   const [previewRows, setPreviewRows] = useState<ParsedExcelRow[] | null>(null);
   const [skippedCount, setSkippedCount] = useState(0);
   const [previewFilter, setPreviewFilter] = useState<PreviewFilter>('all');
   const [previewSearch, setPreviewSearch] = useState('');
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [saveProgress, setSaveProgress] = useState<{ current: number; total: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -105,7 +146,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
     setToastMessage({ type, text });
     setTimeout(() => {
       setToastMessage((curr) => (curr?.text === text ? null : curr));
-    }, 6000);
+    }, 8000);
   };
 
   // Download a ready-to-use .xlsx template with exact supported columns
@@ -160,211 +201,170 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
     showToast('success', 'Sample Excel Template (kiranape_sample_template.xlsx) डाउनलोड हो गया!');
   };
 
-  // Export live store inventory to Excel (.xlsx) for easy bulk editing
-  const handleExportCurrentStoreExcel = () => {
-    const exportRows = products.map((p) => ({
-      id: p.id,
-      'Item Name': p.name,
-      Weight: p.unit || '1 Pc',
-      MRP: p.originalPrice || p.finalPrice || 0,
-      'Selling Price': p.finalPrice || p.originalPrice || 0,
-      Category: p.category || 'General Kirana',
-      'Image URL': p.imageUrl || '',
-      inStock: p.isAvailable !== false ? 'true' : 'false',
-      stockCount: p.stockCount ?? p.stock ?? 50,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportRows);
-    worksheet['!cols'] = [
-      { wch: 22 },
-      { wch: 36 },
-      { wch: 14 },
-      { wch: 10 },
-      { wch: 14 },
-      { wch: 22 },
-      { wch: 42 },
-      { wch: 10 },
-      { wch: 12 },
-    ];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Store Catalog');
-    XLSX.writeFile(workbook, `kiranape_store_catalog_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast('success', `${products.length} आइटम्स की Excel शीट डाउनलोड हो गई!`);
+  // Export all live store & Supabase products to Excel (.xlsx)
+  const handleExportCurrentStoreExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const { count, format } = await exportAllStoreProductsToExcel(products);
+      showToast(
+        'success',
+        `${count} स्टोर प्रोडक्ट्स की ${format === 'csv' ? 'CSV (.csv)' : 'Excel (.xlsx)'} फाइल डाउनलोड हो गई!`
+      );
+    } catch (err: any) {
+      console.error('Excel export error:', err);
+      showToast('error', err?.message || 'Excel डाउनलोड करने में समस्या आई।');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  // Smart matching & row normalization
-  const processParsedRows = (rawRows: Record<string, unknown>[], file: File) => {
+  // Fetch live existing products from Supabase + store catalog for deduplication
+  const fetchExistingProducts = async (): Promise<{
+    byNameWeight: Map<string, { name: string; unit: string; source: 'supabase' | 'store' }>;
+    existingIds: Set<string>;
+  }> => {
+    const byNameWeight = new Map<
+      string,
+      { name: string; unit: string; source: 'supabase' | 'store' }
+    >();
+    const existingIds = new Set<string>();
+
+    // 1. Index existing products currently loaded in store catalog
+    for (const prod of products) {
+      if (prod.id) existingIds.add(prod.id.trim());
+      const keys = buildMatchKeysForExisting(prod.name || '', prod.unit || '');
+      for (const k of keys) {
+        if (!byNameWeight.has(k)) {
+          byNameWeight.set(k, {
+            name: prod.name || '',
+            unit: prod.unit || '',
+            source: 'store',
+          });
+        }
+      }
+    }
+
+    // 2. Fetch live products from Supabase 'products' table (paginated to cover full catalog)
+    const pageSize = 1000;
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, unit')
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        throw new Error(`Supabase से मौजूदा आइटम्स जांचने में त्रुटि: ${error.message}`);
+      }
+      if (!data || data.length === 0) break;
+
+      for (const row of data) {
+        if (row.id) existingIds.add(String(row.id).trim());
+        const keys = buildMatchKeysForExisting(String(row.name || ''), String(row.unit || ''));
+        for (const k of keys) {
+          byNameWeight.set(k, {
+            name: String(row.name || ''),
+            unit: String(row.unit || ''),
+            source: 'supabase',
+          });
+        }
+      }
+
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return { byNameWeight, existingIds };
+  };
+
+  // Smart matching & row normalization (Never overwrite or duplicate existing items)
+  const processParsedRows = async (rawRows: Record<string, unknown>[], file: File) => {
     if (!rawRows || rawRows.length === 0) {
       setParseError('अपलोड की गई फाइल में कोई डेटा पंक्ति (row) नहीं मिली।');
       setPreviewRows(null);
       return;
     }
 
-    // Build fast lookup maps from existing store products
-    const byId = new Map<string, Product>();
-    const byNameWeight = new Map<string, Product>();
-    const byNameOnly = new Map<string, Product | 'ambiguous'>();
+    setIsCheckingSupabase(true);
+    try {
+      const { byNameWeight, existingIds } = await fetchExistingProducts();
+      const seenInFile = new Map<string, string>();
 
-    for (const prod of products) {
-      if (prod.id) byId.set(prod.id.trim(), prod);
-      const nName = normalizeName(prod.name || '');
-      const nWeight = normalizeWeight(prod.unit || '');
-      if (nName) {
-        byNameWeight.set(`${nName}::${nWeight}`, prod);
-        if (!byNameOnly.has(nName)) {
-          byNameOnly.set(nName, prod);
-        } else {
-          byNameOnly.set(nName, 'ambiguous');
+      const mappedRows: ParsedExcelRow[] = [];
+      let skipped = 0;
+      const now = Date.now();
+
+      rawRows.forEach((rawRow, index) => {
+        const normRow: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(rawRow)) {
+          normRow[normalizeHeaderKey(k)] = v;
         }
-      }
-    }
 
-    const mappedRows: ParsedExcelRow[] = [];
-    let skipped = 0;
-    const now = Date.now();
+        const itemName = extractField(normRow, [
+          'itemname',
+          'name',
+          'productname',
+          'product',
+          'item',
+          'title',
+        ]);
 
-    rawRows.forEach((rawRow, index) => {
-      const normRow: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(rawRow)) {
-        normRow[normalizeHeaderKey(k)] = v;
-      }
-
-      const itemName = extractField(normRow, [
-        'itemname',
-        'name',
-        'productname',
-        'product',
-        'item',
-        'title',
-      ]);
-
-      if (!itemName) {
-        skipped += 1;
-        return;
-      }
-
-      const rowId = extractField(normRow, ['id', 'productid', 'sku']);
-      const rowWeight = extractField(normRow, [
-        'weight',
-        'unit',
-        'size',
-        'qty',
-        'packsize',
-        'wt',
-        'pack',
-      ]);
-      const rawMrp = parseNumericPrice(
-        extractRawField(normRow, [
-          'mrp',
-          'maxretailprice',
-          'originalprice',
-          'listprice',
-          'price',
-        ])
-      );
-      const rawSellingPrice = parseNumericPrice(
-        extractRawField(normRow, [
-          'sellingprice',
-          'rate',
-          'saleprice',
-          'finalprice',
-          'sp',
-          'offerprice',
-        ])
-      );
-      const rowImageUrl = extractField(normRow, [
-        'imageurl',
-        'image',
-        'photo',
-        'img',
-        'photourl',
-        'pic',
-        'picture',
-      ]);
-      const rowCategory = extractField(normRow, [
-        'category',
-        'department',
-        'cat',
-        'group',
-      ]);
-      const rowHindiName = extractField(normRow, ['hindiname', 'hindi']);
-      const rawInStock = extractField(normRow, ['instock', 'isavailable', 'available']);
-      const rawStockCount = parseNumericPrice(
-        extractRawField(normRow, ['stockcount', 'stock'])
-      );
-
-      // Match against existing store product
-      const nName = normalizeName(itemName);
-      const nWeight = normalizeWeight(rowWeight);
-
-      let existingMatch: Product | undefined;
-      if (rowId && byId.has(rowId)) {
-        existingMatch = byId.get(rowId);
-      } else if (nWeight && byNameWeight.has(`${nName}::${nWeight}`)) {
-        existingMatch = byNameWeight.get(`${nName}::${nWeight}`);
-      } else if (!nWeight) {
-        const candidate = byNameOnly.get(nName);
-        if (candidate && candidate !== 'ambiguous') {
-          existingMatch = candidate;
+        if (!itemName) {
+          skipped += 1;
+          return;
         }
-      }
 
-      // Compute MRP and Selling Price cleanly
-      const baseExistingMrp = existingMatch?.originalPrice || existingMatch?.finalPrice || 0;
-      const baseExistingSp = existingMatch?.finalPrice || baseExistingMrp;
+        const rowId = extractField(normRow, ['id', 'productid', 'sku']);
+        const rowWeight = extractField(normRow, [
+          'weight',
+          'unit',
+          'size',
+          'qty',
+          'packsize',
+          'wt',
+          'pack',
+        ]);
+        const rawMrp = parseNumericPrice(
+          extractRawField(normRow, [
+            'mrp',
+            'maxretailprice',
+            'originalprice',
+            'listprice',
+            'price',
+          ])
+        );
+        const rawSellingPrice = parseNumericPrice(
+          extractRawField(normRow, [
+            'sellingprice',
+            'rate',
+            'saleprice',
+            'finalprice',
+            'sp',
+            'offerprice',
+          ])
+        );
+        const rowImageUrl = extractField(normRow, [
+          'imageurl',
+          'image',
+          'photo',
+          'img',
+          'photourl',
+          'pic',
+          'picture',
+        ]);
+        const rowCategory = extractField(normRow, [
+          'category',
+          'department',
+          'cat',
+          'group',
+        ]);
+        const rowHindiName = extractField(normRow, ['hindiname', 'hindi']);
+        const rawInStock = extractField(normRow, ['instock', 'isavailable', 'available']);
+        const rawStockCount = parseNumericPrice(
+          extractRawField(normRow, ['stockcount', 'stock'])
+        );
 
-      let mrp = rawMrp > 0 ? rawMrp : rawSellingPrice > 0 ? rawSellingPrice : baseExistingMrp;
-      let sellingPrice = rawSellingPrice > 0 ? rawSellingPrice : rawMrp > 0 ? rawMrp : baseExistingSp;
-
-      if (mrp < sellingPrice) {
-        mrp = sellingPrice;
-      }
-
-      const discountPercent =
-        mrp > sellingPrice && mrp > 0
-          ? Math.round(((mrp - sellingPrice) / mrp) * 100)
-          : 0;
-
-      if (existingMatch) {
-        // UPDATE EXISTING: Only overwrite imageUrl if Excel cell is non-empty!
-        const hasNewImageUrl = rowImageUrl.length > 0;
-        const resolvedImageUrl = hasNewImageUrl ? rowImageUrl : existingMatch.imageUrl || '';
-        const resolvedUnit = rowWeight || existingMatch.unit || '1 Pc';
-        const resolvedCategory = rowCategory || existingMatch.category || 'General Kirana';
-        const resolvedInStock =
-          rawInStock !== ''
-            ? rawInStock.toLowerCase() !== 'false' && rawInStock !== '0'
-            : existingMatch.isAvailable !== false;
-        const resolvedStockCount =
-          rawStockCount > 0
-            ? Math.round(rawStockCount)
-            : existingMatch.stockCount ?? existingMatch.stock ?? 50;
-
-        const updatedProduct: Product = {
-          ...existingMatch,
-          name: itemName,
-          hindiName: rowHindiName || existingMatch.hindiName || '',
-          category: resolvedCategory,
-          unit: resolvedUnit,
-          originalPrice: mrp,
-          finalPrice: sellingPrice,
-          discountPercent,
-          imageUrl: resolvedImageUrl,
-          isAvailable: resolvedInStock,
-          stockCount: resolvedStockCount,
-          stock: resolvedStockCount,
-          updatedAt: now,
-        };
-
-        mappedRows.push({
-          rowIndex: index + 1,
-          action: 'update',
-          product: updatedProduct,
-          matchedExistingName: existingMatch.name,
-          imagePreservedFromStore: !hasNewImageUrl && Boolean(existingMatch.imageUrl),
-        });
-      } else {
-        // ADD NEW PRODUCT
         const resolvedUnit = rowWeight || '1 Pc';
         const resolvedCategory = rowCategory || 'General Kirana';
         const resolvedInStock =
@@ -373,52 +373,125 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
             : true;
         const resolvedStockCount = rawStockCount > 0 ? Math.round(rawStockCount) : 50;
 
-        const newProduct: Product = {
-          id: rowId || `excel_${now}_${index}`,
-          name: itemName,
-          hindiName: rowHindiName || '',
-          category: resolvedCategory,
-          department: 'grocery',
-          unit: resolvedUnit,
-          originalPrice: mrp,
-          finalPrice: sellingPrice,
-          discountPercent,
-          imageUrl: rowImageUrl,
-          isAvailable: resolvedInStock,
-          stockCount: resolvedStockCount,
-          stock: resolvedStockCount,
-          description: `${itemName} - ${resolvedUnit}`,
-          updatedAt: now,
-        };
+        let mrp = rawMrp > 0 ? rawMrp : rawSellingPrice > 0 ? rawSellingPrice : 0;
+        let sellingPrice = rawSellingPrice > 0 ? rawSellingPrice : rawMrp > 0 ? rawMrp : 0;
+        if (mrp < sellingPrice) {
+          mrp = sellingPrice;
+        }
+        const discountPercent =
+          mrp > sellingPrice && mrp > 0
+            ? Math.round(((mrp - sellingPrice) / mrp) * 100)
+            : 0;
 
-        mappedRows.push({
-          rowIndex: index + 1,
-          action: 'add',
-          product: newProduct,
-          imagePreservedFromStore: false,
-        });
+        // Check case-insensitive item name + weight against Supabase & store DB
+        const rowCheckKeys = buildMatchKeysForRow(itemName, rowWeight, resolvedUnit);
+        let existingEntry: { name: string; unit: string; source: 'supabase' | 'store' } | undefined;
+        for (const key of rowCheckKeys) {
+          const found = byNameWeight.get(key);
+          if (found) {
+            existingEntry = found;
+            break;
+          }
+        }
+
+        let duplicateInFileName: string | undefined;
+        if (!existingEntry) {
+          for (const key of rowCheckKeys) {
+            const found = seenInFile.get(key);
+            if (found) {
+              duplicateInFileName = found;
+              break;
+            }
+          }
+        }
+
+        if (existingEntry || duplicateInFileName) {
+          // EXISTING OR DUPLICATE ITEM: Skip completely (never overwrite or duplicate)
+          mappedRows.push({
+            rowIndex: index + 1,
+            action: 'skip',
+            product: {
+              id: `skip_${now}_${index}`,
+              name: itemName,
+              hindiName: rowHindiName || '',
+              category: resolvedCategory,
+              department: 'grocery',
+              unit: resolvedUnit,
+              originalPrice: mrp,
+              finalPrice: sellingPrice,
+              discountPercent,
+              imageUrl: rowImageUrl,
+              isAvailable: resolvedInStock,
+              stockCount: resolvedStockCount,
+              stock: resolvedStockCount,
+              updatedAt: now,
+            },
+            matchedExistingName: existingEntry?.name || duplicateInFileName,
+            matchedSource: existingEntry ? existingEntry.source : 'duplicate_in_file',
+          });
+        } else {
+          // BRAND-NEW PRODUCT: Assign non-colliding UUID & mark for insert
+          const newId =
+            rowId && UUID_REGEX.test(rowId) && !existingIds.has(rowId)
+              ? rowId
+              : generateUuid();
+          existingIds.add(newId);
+          for (const key of rowCheckKeys) {
+            seenInFile.set(key, itemName);
+          }
+
+          const newProduct: Product = {
+            id: newId,
+            name: itemName,
+            hindiName: rowHindiName || '',
+            category: resolvedCategory,
+            department: 'grocery',
+            unit: resolvedUnit,
+            originalPrice: mrp,
+            finalPrice: sellingPrice,
+            discountPercent,
+            imageUrl: rowImageUrl,
+            isAvailable: resolvedInStock,
+            stockCount: resolvedStockCount,
+            stock: resolvedStockCount,
+            description: `${itemName} - ${resolvedUnit}`,
+            updatedAt: now,
+          };
+
+          mappedRows.push({
+            rowIndex: index + 1,
+            action: 'add',
+            product: newProduct,
+          });
+        }
+      });
+
+      if (mappedRows.length === 0) {
+        setParseError(
+          'फाइल में "Item Name" या "Name" कॉलम वाले मान्य उत्पाद नहीं मिले। कृपया Sample Excel Template देखें।'
+        );
+        setPreviewRows(null);
+        return;
       }
-    });
 
-    if (mappedRows.length === 0) {
-      setParseError(
-        'फाइल में "Item Name" या "Name" कॉलम वाले मान्य उत्पाद नहीं मिले। कृपया Sample Excel Template देखें।'
+      setParseError(null);
+      setPreviewRows(mappedRows);
+      setSkippedCount(skipped);
+      setFileName(file.name);
+      setFileSize(
+        file.size >= 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+          : `${Math.max(1, Math.round(file.size / 1024))} KB`
       );
+      setPreviewFilter('all');
+      setPreviewSearch('');
+    } catch (err: any) {
+      console.error('Supabase duplicate check error:', err);
+      setParseError(err?.message || 'Supabase में मौजूदा आइटम्स जांचने में समस्या आई।');
       setPreviewRows(null);
-      return;
+    } finally {
+      setIsCheckingSupabase(false);
     }
-
-    setParseError(null);
-    setPreviewRows(mappedRows);
-    setSkippedCount(skipped);
-    setFileName(file.name);
-    setFileSize(
-      file.size >= 1024 * 1024
-        ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
-        : `${Math.max(1, Math.round(file.size / 1024))} KB`
-    );
-    setPreviewFilter('all');
-    setPreviewSearch('');
   };
 
   const handleParseFile = async (file: File) => {
@@ -427,17 +500,15 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
 
     try {
       if (lowerName.endsWith('.csv')) {
-        Papa.parse<Record<string, unknown>>(file, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            processParsedRows(results.data || [], file);
-          },
-          error: (err) => {
-            setParseError(err?.message || 'CSV फाइल पढ़ने में त्रुटि हुई।');
-            setPreviewRows(null);
-          },
+        const rows = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
+          Papa.parse<Record<string, unknown>>(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => resolve(results.data || []),
+            error: (err) => reject(err),
+          });
         });
+        await processParsedRows(rows, file);
       } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
@@ -450,7 +521,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
         const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
           defval: '',
         });
-        processParsedRows(jsonRows, file);
+        await processParsedRows(jsonRows, file);
       } else {
         setParseError('कृपया केवल .xlsx, .xls या .csv फाइल ही चुनें।');
       }
@@ -490,23 +561,102 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
     if (!previewRows || previewRows.length === 0 || isSaving) return;
 
     setIsSaving(true);
-    setSaveProgress({ current: 0, total: previewRows.length });
 
     try {
-      const productsToUpsert = previewRows.map((r) => r.product);
-      const result = await batchUpsertProductsToFirestore(
-        productsToUpsert,
-        100,
-        (current, total) => setSaveProgress({ current, total })
-      );
+      // Re-verify against live Supabase products before inserting
+      const { byNameWeight: liveExistingMap, existingIds } = await fetchExistingProducts();
+      const seenBatchKeys = new Set<string>();
 
-      // Sync central inventory quietly in background
-      saveBulkProductsToCentralInventory(productsToUpsert).catch(() => {});
+      const brandNewProducts: Product[] = [];
+      let skippedExistingCount = 0;
+
+      for (const row of previewRows) {
+        if (row.action === 'skip') {
+          skippedExistingCount += 1;
+          continue;
+        }
+
+        const p = row.product;
+        const checkKeys = buildMatchKeysForRow(p.name, p.unit, p.unit);
+        const alreadyExists = checkKeys.some(
+          (k) => liveExistingMap.has(k) || seenBatchKeys.has(k)
+        );
+
+        if (alreadyExists) {
+          skippedExistingCount += 1;
+          continue;
+        }
+
+        const safeId =
+          p.id && UUID_REGEX.test(p.id) && !existingIds.has(p.id) ? p.id : generateUuid();
+        existingIds.add(safeId);
+        for (const k of checkKeys) {
+          seenBatchKeys.add(k);
+        }
+
+        brandNewProducts.push({ ...p, id: safeId });
+      }
+
+      if (brandNewProducts.length === 0) {
+        showToast(
+          'success',
+          `0 नए आइटम जोड़े गए, ${skippedExistingCount} पहले से मौजूद आइटम छोड़े गए।`
+        );
+        setPreviewRows(null);
+        setFileName(null);
+        setFileSize(null);
+        return;
+      }
+
+      setSaveProgress({ current: 0, total: brandNewProducts.length });
+
+      // 1. Insert ONLY brand-new products into Supabase 'products' table
+      const BATCH_SIZE = 40;
+      const insertedProducts: Product[] = [];
+
+      for (let i = 0; i < brandNewProducts.length; i += BATCH_SIZE) {
+        const chunk = brandNewProducts.slice(i, i + BATCH_SIZE);
+        const supabasePayload = chunk.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category || 'General Grocery',
+          unit: p.unit || '1 Pc',
+          original_price: p.originalPrice > 0 ? p.originalPrice : p.finalPrice,
+          price: p.finalPrice > 0 ? p.finalPrice : p.originalPrice,
+          image_url: p.imageUrl || null,
+          in_stock: p.isAvailable !== false,
+        }));
+
+        const { data: insertedRows, error: insertError } = await supabase
+          .from('products')
+          .insert(supabasePayload)
+          .select();
+
+        if (insertError) {
+          throw new Error(`Supabase insert error: ${insertError.message}`);
+        }
+
+        chunk.forEach((p, idx) => {
+          const sbRow = insertedRows?.[idx];
+          insertedProducts.push(sbRow?.id ? { ...p, id: String(sbRow.id) } : p);
+        });
+
+        setSaveProgress({
+          current: Math.min(i + chunk.length, brandNewProducts.length),
+          total: brandNewProducts.length,
+        });
+      }
+
+      // 2. Persist ONLY brand-new products to Firestore & local cache (never overwrites existing)
+      const result = await batchUpsertProductsToFirestore(insertedProducts, 100);
+
+      // 3. Sync new items to central inventory quietly in background
+      saveBulkProductsToCentralInventory(insertedProducts).catch(() => {});
 
       onCatalogUpdated(result.mergedProducts);
       showToast(
         'success',
-        `सफलतापूर्वक अपडेट हुआ! ${updateCount} आइटम अपडेट किए गए और ${newCount} नए आइटम स्टोर में जोड़े गए।`
+        `${insertedProducts.length} नए आइटम जोड़े गए, ${skippedExistingCount} पहले से मौजूद आइटम छोड़े गए।`
       );
       setPreviewRows(null);
       setFileName(null);
@@ -515,7 +665,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
       console.error('Batch save error:', err);
       showToast(
         'error',
-        err?.message || 'Firestore में सेव करने में समस्या आई। कृपया पुनः प्रयास करें।'
+        err?.message || 'डेटाबेस में नए आइटम सेव करने में समस्या आई। कृपया पुनः प्रयास करें।'
       );
     } finally {
       setIsSaving(false);
@@ -523,8 +673,8 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
     }
   };
 
-  const updateCount = useMemo(
-    () => (previewRows ? previewRows.filter((r) => r.action === 'update').length : 0),
+  const skipCount = useMemo(
+    () => (previewRows ? previewRows.filter((r) => r.action === 'skip').length : 0),
     [previewRows]
   );
 
@@ -586,7 +736,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
               <span>Excel / CSV Smart Inventory Uploader</span>
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 mt-1">
-              अपनी `.xlsx`, `.xls` या `.csv` फाइल अपलोड करें — पुराने आइटम्स का रेट/MRP अपडेट होगा (मौजूदा Supabase फोटो सुरक्षित रहेगी) और नए आइटम अपने-आप जुड़ जाएंगे।
+              अपनी `.xlsx`, `.xls` या `.csv` फाइल अपलोड करें — सिस्टम Supabase में पहले से मौजूद आइटम्स (नाम + वजन) को सुरक्षित रखेगा (कोई ओवरराइट या डुप्लीकेट नहीं होगा) और केवल बिल्कुल नए आइटम जोड़ेगा।
             </p>
           </div>
 
@@ -605,10 +755,19 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
               type="button"
               id="excel-export-current-store-btn"
               onClick={handleExportCurrentStoreExcel}
-              className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-[0.98] text-stone-800 border border-stone-300 text-xs sm:text-sm font-heading font-bold transition-all cursor-pointer whitespace-nowrap"
+              disabled={isExporting}
+              className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] text-emerald-900 border border-emerald-300 text-xs sm:text-sm font-heading font-extrabold transition-all cursor-pointer disabled:opacity-60 whitespace-nowrap"
             >
-              <ArrowUpDown className="w-4 h-4 text-stone-600 shrink-0" />
-              <span>वर्तमान स्टोर डेटा (.xlsx)</span>
+              {isExporting ? (
+                <RefreshCw className="w-4 h-4 text-emerald-700 animate-spin shrink-0" />
+              ) : (
+                <Download className="w-4 h-4 text-emerald-700 shrink-0" />
+              )}
+              <span>
+                {isExporting
+                  ? 'डाउनलोड हो रहा है...'
+                  : '📥 सभी स्टोर प्रोडक्ट्स डाउनलोड करें (.xlsx)'}
+              </span>
             </button>
           </div>
         </div>
@@ -637,7 +796,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
           </span>
           <span>•</span>
           <span>
-            <strong className="text-stone-900">Image URL</strong> (खाली होने पर पुरानी फोटो सुरक्षित रहेगी)
+            <strong className="text-stone-900">Image URL</strong> (नए आइटम के लिए)
           </span>
         </div>
 
@@ -656,12 +815,20 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
         >
           <div className="flex flex-col items-center justify-center gap-3.5">
             <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-              <Upload className="w-7 h-7" />
+              {isCheckingSupabase ? (
+                <RefreshCw className="w-7 h-7 animate-spin" />
+              ) : (
+                <Upload className="w-7 h-7" />
+              )}
             </div>
 
             <div className="space-y-1">
               <p className="font-heading font-black text-stone-900 text-base sm:text-lg">
-                {fileName ? `चयनित फाइल: ${fileName} (${fileSize})` : 'Excel (.xlsx / .xls) या CSV फाइल चुनें'}
+                {isCheckingSupabase
+                  ? 'Supabase में मौजूदा आइटम्स की जांच हो रही है...'
+                  : fileName
+                    ? `चयनित फाइल: ${fileName} (${fileSize})`
+                    : 'Excel (.xlsx / .xls) या CSV फाइल चुनें'}
               </p>
               <p className="text-xs sm:text-sm text-stone-600">
                 मोबाइल से सीधे फाइल चुनने के लिए नीचे हरे बटन पर टैप करें या फाइल यहाँ ड्रैग करें
@@ -698,7 +865,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-heading font-black text-stone-900 text-base sm:text-lg tabular-nums">
-                  {previewRows.length} आइटम मिले: {updateCount} अपडेट होंगे, {newCount} नए जुड़ेंगे
+                  {previewRows.length} आइटम मिले: {newCount} नए जुड़ेंगे, {skipCount} पहले से मौजूद (छोड़े जाएंगे)
                 </span>
                 {skippedCount > 0 && (
                   <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md tabular-nums">
@@ -708,7 +875,9 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
               </div>
               <p className="text-xs text-stone-600 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>मौजूदा उत्पादों की Supabase फोटो सुरक्षित रहेगी जब तक Excel में नया Image URL न दिया गया हो।</span>
+                <span>
+                  पहले से मौजूद किसी भी उत्पाद का नाम, दाम या फोटो ओवरराइट नहीं होगा — केवल बिल्कुल नए आइटम ही जोड़े जाएंगे।
+                </span>
               </p>
             </div>
 
@@ -737,13 +906,17 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                     <span className="tabular-nums">
-                      सेव हो रहा है ({saveProgress?.current ?? 0}/{saveProgress?.total ?? previewRows.length})...
+                      सेव हो रहा है ({saveProgress?.current ?? 0}/{saveProgress?.total ?? newCount})...
                     </span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>✅ कन्फर्म और स्टोर में अपडेट करें</span>
+                    <span>
+                      {newCount > 0
+                        ? `✅ कन्फर्म करें (${newCount} नए आइटम जोड़ें)`
+                        : '✅ कन्फर्म करें (0 नए आइटम)'}
+                    </span>
                   </>
                 )}
               </button>
@@ -754,7 +927,7 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
           {isSaving && saveProgress && (
             <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-200">
               <div className="flex items-center justify-between text-xs font-bold text-emerald-900 mb-1.5 tabular-nums">
-                <span>Firebase Firestore में बैच अपलोड जारी है...</span>
+                <span>Supabase व स्टोर डेटाबेस में नए आइटम जोड़े जा रहे हैं...</span>
                 <span>
                   {saveProgress.current} / {saveProgress.total}
                 </span>
@@ -786,17 +959,6 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setPreviewFilter('update')}
-                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap tabular-nums ${
-                  previewFilter === 'update'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-blue-50 text-blue-800 hover:bg-blue-100'
-                }`}
-              >
-                अपडेट होंगे ({updateCount})
-              </button>
-              <button
-                type="button"
                 onClick={() => setPreviewFilter('add')}
                 className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap tabular-nums ${
                   previewFilter === 'add'
@@ -805,6 +967,17 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
                 }`}
               >
                 नए जुड़ेंगे ({newCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewFilter('skip')}
+                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap tabular-nums ${
+                  previewFilter === 'skip'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                पहले से मौजूद / छोड़े गए ({skipCount})
               </button>
             </div>
 
@@ -839,7 +1012,10 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
                   const p = row.product;
                   const fallbackSvg = getCategoryFallbackSvg(p.category, p.name, p.unit, p.finalPrice);
                   return (
-                    <tr key={`${p.id}_${row.rowIndex}`} className="hover:bg-stone-50/80">
+                    <tr
+                      key={`${p.id}_${row.rowIndex}`}
+                      className={row.action === 'skip' ? 'bg-stone-50/70 opacity-75' : 'hover:bg-stone-50/80'}
+                    >
                       <td className="py-2.5 px-3 text-stone-400 font-mono text-xs tabular-nums">
                         {row.rowIndex}
                       </td>
@@ -860,10 +1036,12 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
                         <div className="font-bold text-stone-900 leading-snug">{p.name}</div>
                         <div className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
                           <span>{p.category}</span>
-                          {row.imagePreservedFromStore && (
-                            <span className="inline-flex items-center gap-0.5 text-emerald-700 font-semibold">
-                              <ImageIcon className="w-3 h-3" />
-                              पुरानी फोटो सुरक्षित
+                          {row.action === 'skip' && row.matchedExistingName && (
+                            <span className="text-amber-700 font-semibold">
+                              •{' '}
+                              {row.matchedSource === 'duplicate_in_file'
+                                ? 'फाइल में दोहराया गया'
+                                : 'Supabase/स्टोर में पहले से मौजूद'}
                             </span>
                           )}
                         </div>
@@ -885,10 +1063,10 @@ export const AdminExcelUploader: React.FC<AdminExcelUploaderProps> = ({
                         )}
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        {row.action === 'update' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-[11px] font-bold">
-                            <RefreshCw className="w-3 h-3" />
-                            <span>अपडेट</span>
+                        {row.action === 'skip' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>पहले से मौजूद (छोड़ा गया)</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold">

@@ -63,6 +63,7 @@ import { CreatorCredits } from './CreatorCredits';
 import { getWhatsAppBillUrl, generateWhatsAppBillMessage } from '../utils/orderUtils';
 import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import { exportAllStoreProductsToExcel } from '../utils/excelExportUtils';
 import { API_BASE_URL } from '../config/api';
 import { matchesUniversalSearch } from '../utils/universalSearch';
 import { supabase } from '../config/supabase';
@@ -394,6 +395,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [pinChangeSuccess, setPinChangeSuccess] = useState(false);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+  const handleExportAllStoreProducts = async () => {
+    if (isExportingExcel) return;
+    setIsExportingExcel(true);
+    try {
+      const { count, format } = await exportAllStoreProductsToExcel(products);
+      setCatalogSyncNotice(
+        `${count} सभी स्टोर प्रोडक्ट्स (${format === 'csv' ? '.csv' : '.xlsx'}) सफलतापूर्वक डाउनलोड हो गए!`
+      );
+      setTimeout(() => setCatalogSyncNotice(null), 4000);
+    } catch (err: any) {
+      console.error('Store Excel export error:', err);
+      setCatalogSyncNotice(err?.message || 'Excel डाउनलोड करने में समस्या आई।');
+      setTimeout(() => setCatalogSyncNotice(null), 4000);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
 
   const handleCreateCategory = (catData: Omit<CustomCategory, 'id'>) => {
     const created = addCustomCategory(catData);
@@ -934,7 +954,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </p>
                 </div>
 
-                {/* Essential Controls: Excel Uploader, Barcode Scanner, + Add New Item */}
+                {/* Essential Controls: Excel Uploader, Excel Export, + Add New Item */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
@@ -945,6 +965,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   >
                     <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
                     <span>📊 Excel / CSV अपलोड और अपडेट</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="admin-toolbar-export-all-excel-btn"
+                    onClick={handleExportAllStoreProducts}
+                    disabled={isExportingExcel}
+                    className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 border border-amber-300 text-xs font-heading font-extrabold shadow-xs transition-all cursor-pointer disabled:opacity-60 whitespace-nowrap"
+                    title="Download all current store & Supabase products as .xlsx"
+                  >
+                    {isExportingExcel ? (
+                      <RefreshCw className="w-4 h-4 text-amber-700 animate-spin shrink-0" />
+                    ) : (
+                      <Download className="w-4 h-4 text-amber-700 shrink-0" />
+                    )}
+                    <span>
+                      {isExportingExcel
+                        ? 'डाउनलोड हो रहा है...'
+                        : '📥 सभी स्टोर प्रोडक्ट्स डाउनलोड करें (.xlsx)'}
+                    </span>
                   </button>
 
                   <button
