@@ -39,10 +39,28 @@ export function mapSupabaseRowToOrder(row: any): Order {
   const total = Number(row.total ?? row.finalPayableAmount ?? row.subtotalFinal ?? 0);
   const customerName = row.customer_name || row.customerName || 'Customer';
   const phone = row.phone || row.customerPhone || '';
-  const address = row.address || row.deliveryAddress || 'Store Pickup';
+  const rawAddress = String(row.address || row.deliveryAddress || 'Store Pickup');
   const status = (row.status || 'received') as OrderStatus;
   const deliverySlot = row.delivery_slot || row.deliverySlot || 'Bharosemand Doorstep Delivery';
-  const deliveryLocation = row.delivery_location || row.deliveryLocation || 'Waidhan, Singrauli';
+
+  // Extract Area and Delivery Fee if stored either in dedicated columns or in formatted address metadata
+  const areaMatch = rawAddress.match(/\[Area:\s*([^\]]+)\]/i);
+  const feeMatch = rawAddress.match(/\[Delivery:\s*(?:FREE|₹?(\d+(?:\.\d+)?))\]/i);
+  const parsedDeliveryFee =
+    row.delivery_fee !== undefined && row.delivery_fee !== null
+      ? Number(row.delivery_fee)
+      : row.deliveryFee !== undefined && row.deliveryFee !== null
+      ? Number(row.deliveryFee)
+      : feeMatch
+      ? feeMatch[1]
+        ? Number(feeMatch[1])
+        : 0
+      : 0;
+  const deliveryLocation =
+    row.delivery_location ||
+    row.deliveryLocation ||
+    (areaMatch ? areaMatch[1].trim() : 'बैढ़न (Waidhan)');
+  const address = rawAddress;
 
   return {
     ...row,
@@ -59,7 +77,8 @@ export function mapSupabaseRowToOrder(row: any): Order {
     itemsCount: rawItems.length || Number(row.itemsCount) || 1,
     subtotalOriginal: Number(row.subtotalOriginal) || total,
     totalSavings: Number(row.totalSavings) || 0,
-    deliveryFee: Number(row.deliveryFee) || 0,
+    deliveryFee: Number.isFinite(parsedDeliveryFee) ? parsedDeliveryFee : 0,
+    deliveryCharge: Number.isFinite(parsedDeliveryFee) ? parsedDeliveryFee : 0,
     total: total,
     finalPayableAmount: total,
     paymentMethod: row.paymentMethod || 'Cash on Delivery (COD)',
@@ -90,6 +109,9 @@ export async function insertSupabaseOrder(payload: {
   customerName?: string;
   phone?: string;
   address?: string;
+  deliveryLocation?: string;
+  deliveryFee?: number;
+  deliveryMode?: 'delivery' | 'pickup';
   items?: any[];
   total?: number;
   orderType: 'cart' | 'voice' | 'parchi';
@@ -98,11 +120,28 @@ export async function insertSupabaseOrder(payload: {
   status?: string;
 }) {
   try {
+    const baseAddr = (payload.address || 'Store Pickup').trim();
+    const metaTags: string[] = [];
+    if (payload.deliveryLocation && !baseAddr.includes('[Area:')) {
+      metaTags.push(`[Area: ${payload.deliveryLocation}]`);
+    }
+    if (payload.deliveryFee !== undefined && !baseAddr.includes('[Delivery:')) {
+      const feeNum = Math.max(0, Number(payload.deliveryFee) || 0);
+      metaTags.push(
+        feeNum === 0
+          ? payload.deliveryMode === 'pickup'
+            ? '[Delivery: FREE - Store Pickup]'
+            : '[Delivery: FREE]'
+          : `[Delivery: ₹${feeNum}]`
+      );
+    }
+    const enrichedAddress = metaTags.length > 0 ? `${baseAddr} ${metaTags.join(' ')}` : baseAddr;
+
     const rowToInsert: SupabaseOrderRow = {
       id: payload.id,
       customer_name: payload.customerName || 'Customer',
       phone: payload.phone || 'Not provided',
-      address: payload.address || 'Store Pickup',
+      address: enrichedAddress,
       items: payload.items || [],
       total: Number(payload.total) || 0,
       order_type: payload.orderType,

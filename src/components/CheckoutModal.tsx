@@ -12,6 +12,7 @@ import {
   Store,
   Truck,
   Tag,
+  ChevronDown,
 } from 'lucide-react';
 import { CartItem, DeliverySlot, StoreSettings, Product } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
@@ -21,10 +22,17 @@ import { CartBumperProgressBar } from './CartBumperProgressBar';
 import {
   calculateCartFinancials,
   STANDARD_DELIVERY_FEE,
-  FREE_DELIVERY_THRESHOLD,
 } from '../utils/rewardsEngine';
 import { ConfirmedDeliverySlot, DeliveryMode, DeliverySlotModal } from './DeliverySlotModal';
 import { saveCartAddress, getSavedCartAddress } from './CartDrawer';
+import {
+  DeliveryZone,
+  getDeliveryZones,
+  getActiveDeliveryZones,
+  resolveSelectedDeliveryZone,
+  formatDeliveryZoneOption,
+  subscribeToDeliveryZones,
+} from '../services/deliveryZonesService';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -44,11 +52,14 @@ interface CheckoutModalProps {
     fullName: string;
     phoneNumber: string;
     fullAddress: string;
+    deliveryLocation: string;
     deliverySlot: DeliverySlot;
     deliveryMode?: DeliveryMode;
     couponCode?: string | null;
   }) => Promise<void> | void;
   storeSettings?: StoreSettings;
+  deliveryZones?: DeliveryZone[];
+  onSelectedAreaChange?: (areaName: string) => void;
   onAddStayfreeReward?: () => void;
   onAddToCart?: (product: Product) => void;
   onUpdateQuantity?: (itemKey: string, quantity: number) => void;
@@ -66,10 +77,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onUpdateDeliverySlot,
   onSubmitOrder,
   storeSettings = STORE_DEFAULTS,
+  deliveryZones: externalDeliveryZones,
+  onSelectedAreaChange,
 }) => {
+  const [internalZones, setInternalZones] = useState<DeliveryZone[]>(() => getDeliveryZones());
+
+  useEffect(() => {
+    const unsub = subscribeToDeliveryZones((updated) => {
+      setInternalZones(updated);
+    });
+    return () => unsub();
+  }, []);
+
+  const activeDeliveryZones = getActiveDeliveryZones(
+    externalDeliveryZones && externalDeliveryZones.length > 0
+      ? externalDeliveryZones
+      : internalZones
+  );
+
   const [fullName, setFullName] = useState(initialCustomer?.fullName || '');
   const [phoneNumber, setPhoneNumber] = useState(initialCustomer?.phoneNumber || '');
   const [fullAddress, setFullAddress] = useState(initialCustomer?.fullAddress || '');
+  const [selectedAreaName, setSelectedAreaName] = useState<string>(() =>
+    resolveSelectedDeliveryZone(
+      activeDeliveryZones,
+      initialCustomer?.locality || getSavedCartAddress().locality || getCustomerSelectedLocation()
+    ).name
+  );
   const [activeSlot, setActiveSlot] = useState<ConfirmedDeliverySlot | null>(
     selectedDeliverySlot || null
   );
@@ -87,6 +121,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setFullName((prev) => initialCustomer?.fullName || saved.fullName || prev);
       setPhoneNumber((prev) => initialCustomer?.phoneNumber || saved.phoneNumber || prev);
       setFullAddress((prev) => initialCustomer?.fullAddress || saved.fullAddress || prev);
+      const resolvedArea = resolveSelectedDeliveryZone(
+        activeDeliveryZones,
+        initialCustomer?.locality || saved.locality || getCustomerSelectedLocation()
+      ).name;
+      setSelectedAreaName(resolvedArea);
       if (selectedDeliverySlot) {
         setActiveSlot(selectedDeliverySlot);
         setActiveMode(selectedDeliverySlot.mode);
@@ -98,17 +137,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, initialCustomer, selectedDeliverySlot, deliveryMode]);
 
-  const selectedLocation =
-    initialCustomer?.locality ||
-    getCustomerSelectedLocation() ||
-    storeSettings.serviceArea ||
-    'बैढ़न, सिंगरौली';
-
   if (!isOpen) return null;
+
+  const selectedZone = resolveSelectedDeliveryZone(activeDeliveryZones, selectedAreaName);
+
+  const handleCheckoutAreaChange = (newArea: string) => {
+    const resolved = resolveSelectedDeliveryZone(activeDeliveryZones, newArea);
+    setSelectedAreaName(resolved.name);
+    const saved = getSavedCartAddress();
+    saveCartAddress({ ...saved, locality: resolved.name });
+    onSelectedAreaChange?.(resolved.name);
+  };
 
   const financials = calculateCartFinancials(cartItems, {
     deliveryMode: activeMode,
     couponCode: appliedCouponCode,
+    deliveryZone: selectedZone,
   });
 
   const {
@@ -117,6 +161,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     couponDiscount,
     isFreeDelivery,
     deliveryCharge,
+    baseDeliveryFee,
+    freeDeliveryThreshold,
     subTotalWithDelivery,
     totalPayable: finalPayable,
   } = financials;
@@ -163,14 +209,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const finalAddress =
       activeMode === 'pickup'
         ? fullAddress.trim() || 'Chaurasia Kirana Store: बस स्टैंड, बैढ़न'
-        : fullAddress.trim() || selectedLocation;
+        : fullAddress.trim() || selectedZone.name;
 
     // Persist customer details for future carts
     saveCartAddress({
       fullName: fullName.trim(),
       phoneNumber: phoneNumber.trim(),
       fullAddress: activeMode === 'pickup' ? fullAddress.trim() : finalAddress,
-      locality: selectedLocation,
+      locality: selectedZone.name,
     });
 
     setIsSubmitting(true);
@@ -179,6 +225,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         fullName: fullName.trim() || 'Customer',
         phoneNumber: phoneNumber.trim() || '9424316081',
         fullAddress: finalAddress,
+        deliveryLocation: selectedZone.name,
         deliverySlot: effectiveSlotLabel,
         deliveryMode: activeMode,
         couponCode: validCoupon,
@@ -258,7 +305,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </button>
           </div>
 
-          <CartBumperProgressBar currentSubtotal={subtotal} />
+          <CartBumperProgressBar
+            currentSubtotal={subtotal}
+            deliveryZone={selectedZone}
+            deliveryMode={activeMode}
+          />
 
           {/* Field 1: Full Name */}
           <div>
@@ -347,41 +398,70 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </p>
             </div>
           ) : (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
+            <div className="space-y-3">
+              {/* Interactive Area / Locality Dropdown */}
+              <div>
                 <label
-                  htmlFor="customer-full-address"
-                  className="text-xs font-bold text-stone-800 uppercase tracking-wider"
+                  htmlFor="checkout-delivery-area-select"
+                  className="block text-xs font-bold text-stone-800 uppercase tracking-wider mb-1.5"
                 >
-                  3. Full Delivery Address <span className="text-rose-600">*</span>
+                  3. अपना एरिया चुनें / Select Area <span className="text-rose-600">*</span>
                 </label>
-                <span className="text-[11px] font-semibold text-stone-500 truncate max-w-[160px]">
-                  {selectedLocation}
-                </span>
-              </div>
-              <div className="relative">
-                <div className="absolute top-3 left-3.5 pointer-events-none text-stone-400">
-                  <MapPin className="w-4 h-4" />
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-[#0c831f] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    id="checkout-delivery-area-select"
+                    value={selectedZone.name}
+                    onChange={(e) => handleCheckoutAreaChange(e.target.value)}
+                    className="w-full min-h-[44px] pl-10 pr-9 py-2.5 bg-stone-50 text-stone-900 text-xs sm:text-sm font-bold rounded-xl border border-stone-200 focus:bg-white focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 appearance-none cursor-pointer transition-all"
+                  >
+                    {activeDeliveryZones.map((zone) => (
+                      <option key={zone.id} value={zone.name}>
+                        {formatDeliveryZoneOption(zone)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-                <textarea
-                  id="customer-full-address"
-                  rows={3}
-                  value={fullAddress}
-                  onChange={(e) => {
-                    setFullAddress(e.target.value);
-                    if (errors.fullAddress) setErrors({ ...errors, fullAddress: '' });
-                  }}
-                  placeholder="Flat / House No., Floor, Street, Landmark, Colony / Area..."
-                  className={`w-full pl-10 pr-3.5 py-2.5 bg-stone-50 text-stone-900 placeholder:text-stone-400 text-sm rounded-xl border transition-all resize-none ${
-                    errors.fullAddress
-                      ? 'border-rose-400 bg-rose-50/30 focus:ring-2 focus:ring-rose-200'
-                      : 'border-stone-200 focus:bg-white focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600'
-                  }`}
-                />
               </div>
-              {errors.fullAddress && (
-                <p className="mt-1 text-xs text-rose-600 font-medium">{errors.fullAddress}</p>
-              )}
+
+              {/* Full Street / House Address */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="customer-full-address"
+                    className="text-xs font-bold text-stone-800 uppercase tracking-wider"
+                  >
+                    4. Full Delivery Address <span className="text-rose-600">*</span>
+                  </label>
+                  <span className="text-[11px] font-semibold text-stone-500 truncate max-w-[160px]">
+                    {selectedZone.name}
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="absolute top-3 left-3.5 pointer-events-none text-stone-400">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <textarea
+                    id="customer-full-address"
+                    rows={3}
+                    value={fullAddress}
+                    onChange={(e) => {
+                      setFullAddress(e.target.value);
+                      if (errors.fullAddress) setErrors({ ...errors, fullAddress: '' });
+                    }}
+                    placeholder="Flat / House No., Floor, Street, Landmark, Colony..."
+                    className={`w-full pl-10 pr-3.5 py-2.5 bg-stone-50 text-stone-900 placeholder:text-stone-400 text-sm rounded-xl border transition-all resize-none ${
+                      errors.fullAddress
+                        ? 'border-rose-400 bg-rose-50/30 focus:ring-2 focus:ring-rose-200'
+                        : 'border-stone-200 focus:bg-white focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600'
+                    }`}
+                  />
+                </div>
+                {errors.fullAddress && (
+                  <p className="mt-1 text-xs text-rose-600 font-medium">{errors.fullAddress}</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -403,27 +483,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <span className="font-bold text-stone-900">₹{subtotal.toFixed(2)}</span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
                   <span className="text-stone-700 font-medium">
-                    Delivery Charge{activeMode === 'pickup' ? ' (Pickup)' : ''}
+                    Delivery Charge ({activeMode === 'pickup' ? 'Store Pickup' : selectedZone.name})
                   </span>
-                  {!isFreeDelivery && activeMode !== 'pickup' && (
-                    <span className="block text-[10px] text-amber-700 font-medium">
-                      Add ₹{Math.ceil(FREE_DELIVERY_THRESHOLD - subtotal)} more for FREE Delivery
-                    </span>
-                  )}
+                  {!isFreeDelivery &&
+                    activeMode !== 'pickup' &&
+                    freeDeliveryThreshold !== null &&
+                    freeDeliveryThreshold > subtotal && (
+                      <span className="block text-[10px] text-amber-700 font-medium">
+                        Add ₹{Math.ceil(freeDeliveryThreshold - subtotal)} more for FREE Delivery
+                      </span>
+                    )}
                 </div>
                 {isFreeDelivery ? (
-                  <span className="text-[#0c831f] font-black flex items-center gap-1">
+                  <span className="text-[#0c831f] font-black flex items-center gap-1 shrink-0">
                     <span className="text-[11px] text-stone-400 line-through">
-                      ₹{STANDARD_DELIVERY_FEE.toFixed(2)}
+                      ₹{(baseDeliveryFee || STANDARD_DELIVERY_FEE).toFixed(2)}
                     </span>
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     ₹0.00 (FREE)
                   </span>
                 ) : (
-                  <span className="font-bold text-stone-900">
+                  <span className="font-bold text-stone-900 shrink-0">
                     ₹{deliveryCharge.toFixed(2)}
                   </span>
                 )}
@@ -496,6 +579,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         initialMode={activeMode}
         initialSlotId={activeSlot?.slotId || null}
         storeAddress={storeSettings.address || 'थाना रोड, बैढ़न (10:00 AM - 9:00 PM)'}
+        deliveryZone={selectedZone}
         onConfirmSlot={(slot) => {
           setActiveSlot(slot);
           setActiveMode(slot.mode);

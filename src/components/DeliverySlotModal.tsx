@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { X, Truck, Store, Calendar, Clock, Check, ChevronRight, MapPin } from 'lucide-react';
 import { STANDARD_DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '../utils/rewardsEngine';
+import { DeliveryZone } from '../services/deliveryZonesService';
 
 export type DeliveryMode = 'delivery' | 'pickup';
 
@@ -20,6 +21,7 @@ interface DeliverySlotModalProps {
   initialMode?: DeliveryMode;
   initialSlotId?: string | null;
   storeAddress?: string;
+  deliveryZone?: DeliveryZone | null;
   onConfirmSlot: (slot: ConfirmedDeliverySlot) => void;
 }
 
@@ -53,6 +55,7 @@ export const DeliverySlotModal: React.FC<DeliverySlotModalProps> = ({
   subtotal,
   initialMode = 'delivery',
   initialSlotId = null,
+  deliveryZone,
   onConfirmSlot,
 }) => {
   const [mode, setMode] = useState<DeliveryMode>(initialMode);
@@ -107,7 +110,19 @@ export const DeliverySlotModal: React.FC<DeliverySlotModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isFreeEligible = mode === 'pickup' || subtotal >= FREE_DELIVERY_THRESHOLD;
+  const baseFee =
+    deliveryZone !== undefined && deliveryZone !== null
+      ? Math.max(0, Number(deliveryZone.baseCharge) || 0)
+      : STANDARD_DELIVERY_FEE;
+  const freeThreshold =
+    deliveryZone !== undefined && deliveryZone !== null
+      ? deliveryZone.freeDeliveryAbove && deliveryZone.freeDeliveryAbove > 0
+        ? Number(deliveryZone.freeDeliveryAbove)
+        : null
+      : FREE_DELIVERY_THRESHOLD;
+  const areaLabel = deliveryZone?.name || 'बैढ़न (Waidhan)';
+  const qualifiesFreeByThreshold = freeThreshold !== null && subtotal >= freeThreshold;
+  const isFreeEligible = mode === 'pickup' || qualifiesFreeByThreshold;
 
   const buildSelectedPayload = (): ConfirmedDeliverySlot | null => {
     if (!selectedSlotId) return null;
@@ -219,18 +234,20 @@ export const DeliverySlotModal: React.FC<DeliverySlotModalProps> = ({
               Select a slot
             </h3>
 
-            <div className="text-xs font-bold tabular-nums flex items-center gap-1.5">
-              <span className="text-stone-500 font-medium">Delivery:</span>
+            <div className="text-xs font-bold tabular-nums flex items-center gap-1.5 min-w-0">
+              <span className="text-stone-500 font-medium truncate max-w-[140px]">
+                {mode === 'pickup' ? 'Pickup:' : `${areaLabel}:`}
+              </span>
               {isFreeEligible ? (
                 <>
-                  <span className="text-stone-400 line-through">
-                    ₹{STANDARD_DELIVERY_FEE.toFixed(2)}
+                  <span className="text-stone-400 line-through shrink-0">
+                    ₹{baseFee.toFixed(2)}
                   </span>
-                  <span className="text-[#0c831f] font-black">FREE</span>
+                  <span className="text-[#0c831f] font-black shrink-0">FREE</span>
                 </>
               ) : (
-                <span className="text-stone-900 font-black">
-                  ₹{STANDARD_DELIVERY_FEE.toFixed(2)}
+                <span className="text-stone-900 font-black shrink-0">
+                  ₹{baseFee.toFixed(2)}
                 </span>
               )}
             </div>

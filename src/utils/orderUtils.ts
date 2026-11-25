@@ -22,17 +22,30 @@ export function generateWhatsAppBillMessage(order: Order, storeSettings?: StoreS
     ? Number(order.subtotal)
     : items.reduce((sum, it) => sum + (Number(it.price) * Number(it.quantity)), 0);
   const subtotal = Math.round(Number(rawSubtotal) * 100) / 100;
-  const isFreeDelivery = subtotal >= 499;
-  const deliveryCharge = isFreeDelivery
-    ? 0
-    : (order.deliveryFee !== undefined && Number(order.deliveryFee) > 0
-        ? Number(order.deliveryFee)
-        : (order.deliveryCharge !== undefined && Number(order.deliveryCharge) > 0
-            ? Number(order.deliveryCharge)
-            : 30));
-  const finalPayable = subtotal + deliveryCharge;
-  const deliveryFeeDisplay = deliveryCharge === 0 ? 'FREE (Order above ₹499)' : `₹${deliveryCharge}`;
+  const recordedDelivery =
+    order.deliveryMode === 'pickup'
+      ? 0
+      : order.deliveryFee !== undefined
+      ? Math.max(0, Number(order.deliveryFee) || 0)
+      : order.deliveryCharge !== undefined
+      ? Math.max(0, Number(order.deliveryCharge) || 0)
+      : subtotal >= 499
+      ? 0
+      : 29;
+  const deliveryCharge = Math.round(recordedDelivery * 100) / 100;
+  const couponDisc = Math.max(0, Number(order.couponDiscount) || 0);
+  const finalPayable =
+    order.finalPayableAmount !== undefined && Number(order.finalPayableAmount) >= 0
+      ? Number(order.finalPayableAmount)
+      : Math.max(0, Math.round((subtotal + deliveryCharge - couponDisc) * 100) / 100);
+  const deliveryFeeDisplay =
+    deliveryCharge === 0
+      ? order.deliveryMode === 'pickup'
+        ? 'FREE (₹0 - Store Pickup)'
+        : 'FREE (₹0)'
+      : `₹${deliveryCharge}`;
   const savingsDisplay = order.totalSavings > 0 ? `Total Discount / Savings: -₹${order.totalSavings}\n` : '';
+  const areaDisplay = order.deliveryLocation ? `\n• *Area / Locality:* ${order.deliveryLocation}` : '';
 
   return (
 `🏪 *${storeName}*
@@ -44,7 +57,7 @@ export function generateWhatsAppBillMessage(order: Order, storeSettings?: StoreS
 
 👤 *CUSTOMER DETAILS:*
 • *Customer Name:* ${order.customerName}
-• *Phone:* ${order.phone}
+• *Phone:* ${order.phone}${areaDisplay}
 • *Delivery Address:* ${order.address}
 • *Delivery Slot:* ${order.deliverySlot || 'Bharosemand Doorstep Delivery'}
 
@@ -54,7 +67,7 @@ ${itemsList}
 ----------------------------------------
 💵 *BILL SUMMARY:*
 Items Subtotal: ₹${subtotal}
-${savingsDisplay}Delivery Fee: ${deliveryFeeDisplay}
+${savingsDisplay}Delivery Charge${order.deliveryLocation ? ` (${order.deliveryLocation})` : ''}: ${deliveryFeeDisplay}
 *TOTAL PAYABLE (COD): ₹${finalPayable}*
 *Payment Method:* 💵 Cash on Delivery (COD) / UPI on Delivery
 
@@ -81,6 +94,8 @@ export interface StoreNotificationParams {
   customerPhone: string;
   deliveryAddress: string;
   deliveryLocation?: string;
+  deliveryCharge?: number;
+  deliveryMode?: 'delivery' | 'pickup';
   deliverySlot?: string;
   orderType: 'voice' | 'parchi' | 'cart';
   textDetails?: string;
@@ -103,6 +118,17 @@ export function generateStoreOwnerOrderNotificationMessage(
       ? '📸 पर्ची फोटो आर्डर (Ration Slip Photo)'
       : '🛒 सामान्य कार्ट आर्डर (Cart Order)';
 
+  const deliveryFeeLine =
+    data.deliveryCharge !== undefined
+      ? `🚚 *डिलीवरी चार्ज:* ${
+          Number(data.deliveryCharge) === 0
+            ? data.deliveryMode === 'pickup'
+              ? '₹0 (FREE - Store Pickup)'
+              : '₹0 (FREE)'
+            : `₹${data.deliveryCharge}`
+        }\n`
+      : '';
+
   let detailsBlock = '';
   if (data.orderType === 'voice') {
     detailsBlock = `🎙️ *ऑडियो स्थिति:* ग्राहक का वॉइस नोट एडमिन पैनल में सुरक्षित अपलोड है।\n${
@@ -113,7 +139,7 @@ export function generateStoreOwnerOrderNotificationMessage(
       data.textDetails ? `📝 *नोट / निर्देश:*\n${data.textDetails}\n` : ''
     }`;
   } else {
-    detailsBlock = `📦 *सामान:* ${data.itemsCount || 1} आइटम्स\n💵 *कुल बिल राशि:* ₹${data.finalAmount || 0} (COD)\n${
+    detailsBlock = `📦 *सामान:* ${data.itemsCount || 1} आइटम्स\n${deliveryFeeLine}💵 *कुल बिल राशि:* ₹${data.finalAmount || 0} (COD)\n${
       data.textDetails ? `📝 *सामान विवरण:*\n${data.textDetails}\n` : ''
     }`;
   }
@@ -127,8 +153,8 @@ export function generateStoreOwnerOrderNotificationMessage(
 ━━━━━━━━━━━━━━━━━━━━
 👤 *ग्राहक:* ${data.customerName}
 📱 *फ़ोन:* ${data.customerPhone}
-📍 *डिलीवरी पता:* ${data.deliveryAddress}
-${data.deliveryLocation ? `🏘️ *इलाका:* ${data.deliveryLocation}\n` : ''}${data.deliverySlot ? `⏰ *डिलीवरी समय:* ${data.deliverySlot}\n` : ''}━━━━━━━━━━━━━━━━━━━━
+${data.deliveryLocation ? `🏘️ *एरिया / इलाका:* ${data.deliveryLocation}\n` : ''}📍 *डिलीवरी पता:* ${data.deliveryAddress}
+${data.deliverySlot ? `⏰ *डिलीवरी समय:* ${data.deliverySlot}\n` : ''}━━━━━━━━━━━━━━━━━━━━
 ${detailsBlock}━━━━━━━━━━━━━━━━━━━━
 ℹ️ _ऑर्डर की पूरी जानकारी, ऑडियो क्लिप और पर्ची फोटो एडमिन डैशबोर्ड में 1-क्लिक में उपलब्ध है।_`
   );

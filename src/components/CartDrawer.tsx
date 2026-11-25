@@ -32,10 +32,17 @@ import { hasRealDisplayImage } from '../utils/studioImageUpload';
 import {
   calculateCartFinancials,
   STANDARD_DELIVERY_FEE,
-  FREE_DELIVERY_THRESHOLD,
 } from '../utils/rewardsEngine';
 import { STORE_COUPONS, evaluateCoupon } from '../utils/coupons';
 import { DeliverySlotModal, ConfirmedDeliverySlot, DeliveryMode } from './DeliverySlotModal';
+import {
+  DeliveryZone,
+  getDeliveryZones,
+  getActiveDeliveryZones,
+  resolveSelectedDeliveryZone,
+  formatDeliveryZoneOption,
+  subscribeToDeliveryZones,
+} from '../services/deliveryZonesService';
 
 const CART_ADDRESS_STORAGE_KEY = 'kiranape_saved_delivery_address_v1';
 
@@ -47,7 +54,8 @@ export interface SavedCartAddress {
 }
 
 export function getSavedCartAddress(): SavedCartAddress {
-  const defaultLoc = getCustomerSelectedLocation() || 'थाना रोड, बैढ़न, सिंगरौली';
+  const zones = getDeliveryZones();
+  const defaultLoc = resolveSelectedDeliveryZone(zones, getCustomerSelectedLocation()).name;
   if (typeof window === 'undefined') {
     return { fullName: '', phoneNumber: '', fullAddress: '', locality: defaultLoc };
   }
@@ -55,11 +63,12 @@ export function getSavedCartAddress(): SavedCartAddress {
     const raw = localStorage.getItem(CART_ADDRESS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const resolvedLocality = resolveSelectedDeliveryZone(zones, parsed.locality || defaultLoc).name;
       return {
         fullName: parsed.fullName || '',
         phoneNumber: parsed.phoneNumber || '',
         fullAddress: parsed.fullAddress || '',
-        locality: parsed.locality || defaultLoc,
+        locality: resolvedLocality,
       };
     }
   } catch {}
@@ -97,6 +106,8 @@ interface CartDrawerProps {
   onCouponChange?: (code: string | null) => void;
   deliveryMode?: DeliveryMode;
   onDeliveryModeChange?: (mode: DeliveryMode) => void;
+  deliveryZones?: DeliveryZone[];
+  onSelectedAreaChange?: (areaName: string) => void;
 }
 
 const CartItemThumb: React.FC<{ product: Product }> = ({ product }) => {
@@ -143,10 +154,26 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onCouponChange,
   deliveryMode: controlledDeliveryMode,
   onDeliveryModeChange,
+  deliveryZones: externalDeliveryZones,
+  onSelectedAreaChange,
 }) => {
   const [repeatSuccessNotice, setRepeatSuccessNotice] = useState<string | null>(null);
   const [internalCouponCode, setInternalCouponCode] = useState<string | null>(null);
   const [internalDeliveryMode, setInternalDeliveryMode] = useState<DeliveryMode>('delivery');
+  const [internalZones, setInternalZones] = useState<DeliveryZone[]>(() => getDeliveryZones());
+
+  useEffect(() => {
+    const unsub = subscribeToDeliveryZones((updated) => {
+      setInternalZones(updated);
+    });
+    return () => unsub();
+  }, []);
+
+  const allDeliveryZones =
+    externalDeliveryZones && externalDeliveryZones.length > 0
+      ? externalDeliveryZones
+      : internalZones;
+  const activeDeliveryZones = getActiveDeliveryZones(allDeliveryZones);
 
   const appliedCouponCode =
     controlledCouponCode !== undefined ? controlledCouponCode : internalCouponCode;
@@ -189,6 +216,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   if (!isOpen) return null;
 
+  const selectedZone = resolveSelectedDeliveryZone(activeDeliveryZones, savedAddress.locality);
+
+  const handleSelectAreaDirectly = (newAreaName: string) => {
+    const resolved = resolveSelectedDeliveryZone(activeDeliveryZones, newAreaName);
+    const updatedAddr: SavedCartAddress = {
+      ...savedAddress,
+      locality: resolved.name,
+    };
+    saveCartAddress(updatedAddr);
+    setSavedAddress(updatedAddr);
+    setDraftAddress((prev) => ({ ...prev, locality: resolved.name }));
+    onSelectedAreaChange?.(resolved.name);
+  };
+
   const pastOrders = orders && orders.length > 0 ? orders : getCustomerOrders();
   const lastOrder = pastOrders.length > 0 ? pastOrders[0] : null;
 
@@ -201,6 +242,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const financials = calculateCartFinancials(cartItems, {
     deliveryMode,
     couponCode: appliedCouponCode,
+    deliveryZone: selectedZone,
   });
 
   const {
@@ -212,20 +254,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     totalSavings,
     isFreeDelivery,
     deliveryCharge,
+    baseDeliveryFee,
+    freeDeliveryThreshold,
     subTotalWithDelivery,
     totalPayable: finalPayable,
   } = financials;
 
   const handleSaveAddress = (e: React.FormEvent) => {
     e.preventDefault();
+    const resolved = resolveSelectedDeliveryZone(activeDeliveryZones, draftAddress.locality);
     const cleaned: SavedCartAddress = {
       fullName: draftAddress.fullName.trim(),
       phoneNumber: draftAddress.phoneNumber.trim(),
       fullAddress: draftAddress.fullAddress.trim(),
-      locality: draftAddress.locality.trim() || 'बैढ़न, सिंगरौली',
+      locality: resolved.name,
     };
     saveCartAddress(cleaned);
     setSavedAddress(cleaned);
+    onSelectedAreaChange?.(resolved.name);
     setIsEditingAddress(false);
   };
 
@@ -251,15 +297,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     onProceedToCheckout({
       deliverySlot: slot,
       couponCode: validAppliedCoupon,
-      savedAddress,
+      savedAddress: {
+        ...savedAddress,
+        locality: selectedZone.name,
+      },
     });
   };
 
   const displayAddressLine = savedAddress.fullAddress
-    ? `${savedAddress.fullAddress}${savedAddress.locality ? `, ${savedAddress.locality}` : ''}`
-    : `${savedAddress.locality || storeSettings.serviceArea || 'बैढ़न, सिंगरौली'} (Tap Change to add house/street)`;
+    ? `${savedAddress.fullAddress}, ${selectedZone.name}`
+    : `${selectedZone.name} (Tap Change to add house/street)`;
 
-  const remainingForFree = Math.max(0, Math.ceil(FREE_DELIVERY_THRESHOLD - cartValue));
+  const remainingForFree =
+    freeDeliveryThreshold !== null && freeDeliveryThreshold > 0
+      ? Math.max(0, Math.ceil(freeDeliveryThreshold - cartValue))
+      : 0;
 
   return (
     <div
@@ -380,8 +432,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
              POPULATED CART SCROLLABLE BODY
           ================================================================ */
           <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
-            {/* 1. Delivery Address Bar */}
-            <div className="bg-white rounded-2xl border border-stone-200/90 p-3.5 shadow-2xs">
+            {/* 1. Delivery Address & Area Selector Bar */}
+            <div className="bg-white rounded-2xl border border-stone-200/90 p-3.5 shadow-2xs space-y-3">
               <div className="flex items-start justify-between gap-2.5">
                 <div className="flex items-start gap-2.5 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#0c831f] flex items-center justify-center shrink-0 mt-0.5">
@@ -414,11 +466,39 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </button>
               </div>
 
+              {/* Interactive Select Delivery Area / Locality Dropdown */}
+              {deliveryMode !== 'pickup' && !isEditingAddress && (
+                <div className="pt-2.5 border-t border-stone-100">
+                  <label
+                    htmlFor="cart-delivery-area-select"
+                    className="block text-[11px] font-bold text-stone-700 mb-1.5"
+                  >
+                    अपना एरिया चुनें / Select Area
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-[#0c831f] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <select
+                      id="cart-delivery-area-select"
+                      value={selectedZone.name}
+                      onChange={(e) => handleSelectAreaDirectly(e.target.value)}
+                      className="w-full min-h-[44px] pl-9 pr-9 py-2 text-xs sm:text-[13px] font-bold text-stone-900 bg-stone-50 hover:bg-white border border-stone-200 focus:border-[#0c831f] focus:bg-white focus:ring-2 focus:ring-emerald-600/20 rounded-xl appearance-none cursor-pointer transition-all"
+                    >
+                      {activeDeliveryZones.map((zone) => (
+                        <option key={zone.id} value={zone.name}>
+                          {formatDeliveryZoneOption(zone)}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-stone-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+
               {/* Inline Address Quick-Edit Form */}
               {isEditingAddress && (
                 <form
                   onSubmit={handleSaveAddress}
-                  className="mt-3 pt-3 border-t border-stone-100 space-y-2.5"
+                  className="mt-1 pt-3 border-t border-stone-100 space-y-2.5"
                 >
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -440,15 +520,32 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       className="px-3 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-[#0c831f] focus:outline-none"
                     />
                   </div>
-                  <input
-                    type="text"
-                    value={draftAddress.locality}
-                    onChange={(e) =>
-                      setDraftAddress((p) => ({ ...p, locality: e.target.value }))
-                    }
-                    placeholder="Area / Mohalla (e.g. Waidhan, Ambedkar Chowk)"
-                    className="w-full px-3 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-[#0c831f] focus:outline-none"
-                  />
+                  <div>
+                    <label
+                      htmlFor="cart-edit-area-select"
+                      className="block text-[11px] font-bold text-stone-700 mb-1"
+                    >
+                      अपना एरिया चुनें / Select Area
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-[#0c831f] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <select
+                        id="cart-edit-area-select"
+                        value={resolveSelectedDeliveryZone(activeDeliveryZones, draftAddress.locality).name}
+                        onChange={(e) =>
+                          setDraftAddress((p) => ({ ...p, locality: e.target.value }))
+                        }
+                        className="w-full min-h-[42px] pl-9 pr-9 py-2 text-xs font-bold text-stone-900 bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-[#0c831f] focus:outline-none appearance-none cursor-pointer"
+                      >
+                        {activeDeliveryZones.map((zone) => (
+                          <option key={zone.id} value={zone.name}>
+                            {formatDeliveryZoneOption(zone)}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-stone-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
                   <textarea
                     rows={2}
                     value={draftAddress.fullAddress}
@@ -477,8 +574,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               )}
             </div>
 
-            {/* Bumper Progress Bar */}
-            <CartBumperProgressBar currentSubtotal={cartValue} />
+            {/* Area-Aware Free Delivery Progress Bar / Area Delivery Charge Badge */}
+            <CartBumperProgressBar
+              currentSubtotal={cartValue}
+              deliveryZone={selectedZone}
+              deliveryMode={deliveryMode}
+            />
 
             {/* 2. Cart Item Cards */}
             <div className="bg-white rounded-2xl border border-stone-200/90 divide-y divide-stone-100 overflow-hidden shadow-2xs">
@@ -699,23 +800,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
 
                 {/* Delivery Charge */}
-                <div className="flex justify-between items-start text-stone-700">
-                  <div className="flex flex-col">
-                    <span>
-                      Delivery Charge
-                      {deliveryMode === 'pickup' ? ' (Store Pickup)' : ''}
-                    </span>
-                    {!isFreeDelivery && deliveryMode !== 'pickup' && (
-                      <span className="text-[10px] font-semibold text-amber-700">
-                        Add ₹{remainingForFree} more for FREE Delivery
+                <div className="flex justify-between items-start text-stone-700 gap-2">
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate">
+                      Delivery Charge{' '}
+                      <span className="text-stone-500 font-medium">
+                        ({deliveryMode === 'pickup' ? 'Store Pickup' : selectedZone.name})
                       </span>
-                    )}
+                    </span>
+                    {!isFreeDelivery &&
+                      deliveryMode !== 'pickup' &&
+                      freeDeliveryThreshold !== null &&
+                      remainingForFree > 0 && (
+                        <span className="text-[10px] font-semibold text-amber-700">
+                          Add ₹{remainingForFree} more for FREE Delivery
+                        </span>
+                      )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isFreeDelivery ? (
                       <>
                         <span className="text-[11px] text-stone-400 line-through">
-                          ₹{STANDARD_DELIVERY_FEE.toFixed(2)}
+                          ₹{(baseDeliveryFee || STANDARD_DELIVERY_FEE).toFixed(2)}
                         </span>
                         <span className="font-black text-[#0c831f]">₹0.00 (FREE)</span>
                       </>
@@ -997,6 +1103,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         initialMode={deliveryMode}
         initialSlotId={confirmedSlot?.slotId || null}
         storeAddress={storeSettings.address || 'थाना रोड, बैढ़न (10:00 AM - 9:00 PM)'}
+        deliveryZone={selectedZone}
         onConfirmSlot={handleConfirmDeliverySlot}
       />
     </div>

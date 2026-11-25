@@ -40,9 +40,15 @@ if (typeof window !== 'undefined') {
 
 export const DEFAULT_DELIVERY_LOCATIONS: string[] = [
   'बैढ़न (Waidhan)',
-  'सिंगरौली (Singrauli)',
-  'मोरवा (Morwa)',
-  'अंबेडकर चौक (Ambedkar Chowk)',
+  'कॉलेज मोड़ (College Mod)',
+  'माजन मोड़ (Majan Mod)',
+  'ढोंटी (Dhonti)',
+  'विंध्यनगर (Vindhyanagar)',
+  'नवजीवन विहार (Navjeevan Vihar)',
+  'जयंत (Jayant)',
+  'दुधीचुआ (Dudhichua)',
+  'अमलोरी (Amlohri)',
+  'नवानगर (Navanagar)',
 ];
 
 export function getDeviceUserId(): string {

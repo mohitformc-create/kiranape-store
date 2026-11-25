@@ -71,9 +71,15 @@ export const FREE_GIFT_ITEMS: FreeGiftReward[] = [
 
 export interface CartCalculationOptions {
   deliveryFee?: number;
-  freeThreshold?: number;
+  freeThreshold?: number | null;
   deliveryMode?: 'delivery' | 'pickup';
   couponCode?: string | null;
+  areaName?: string;
+  deliveryZone?: {
+    name: string;
+    baseCharge: number;
+    freeDeliveryAbove: number | null;
+  } | null;
 }
 
 export interface CartCalculationResult {
@@ -87,6 +93,9 @@ export interface CartCalculationResult {
   totalSavings: number;
   isFreeDelivery: boolean;
   deliveryCharge: number;
+  baseDeliveryFee: number;
+  freeDeliveryThreshold: number | null;
+  selectedAreaName: string;
   subTotalWithDelivery: number;
   totalPayable: number;
   unlockedGifts: FreeGiftReward[];
@@ -100,7 +109,7 @@ export interface CartCalculationResult {
 
 /**
  * Calculates cart finances strictly casting all prices and quantities using Number()
- * Supports both legacy positional arguments and modern options object.
+ * Supports both legacy positional arguments, modern options object, and area-based DeliveryZone rules.
  */
 export function calculateCartFinancials(
   cartItems: CartItem[],
@@ -115,14 +124,29 @@ export function calculateCartFinancials(
         }
       : customDeliveryFeeOrOptions;
 
-  const deliveryFeeBase =
-    options.deliveryFee !== undefined && Number(options.deliveryFee) >= 0
-      ? Number(options.deliveryFee)
-      : STANDARD_DELIVERY_FEE;
-  const freeThresholdBase =
-    options.freeThreshold !== undefined && Number(options.freeThreshold) > 0
-      ? Number(options.freeThreshold)
-      : FREE_DELIVERY_THRESHOLD;
+  const zone = options.deliveryZone;
+
+  const deliveryFeeBase = zone
+    ? Math.max(0, Number(zone.baseCharge) || 0)
+    : options.deliveryFee !== undefined && Number(options.deliveryFee) >= 0
+    ? Number(options.deliveryFee)
+    : STANDARD_DELIVERY_FEE;
+
+  let freeThresholdBase: number | null;
+  if (zone) {
+    freeThresholdBase =
+      zone.freeDeliveryAbove !== null && Number(zone.freeDeliveryAbove) > 0
+        ? Number(zone.freeDeliveryAbove)
+        : null;
+  } else if (options.freeThreshold === null || options.freeThreshold === 0) {
+    freeThresholdBase = null;
+  } else if (options.freeThreshold !== undefined && Number(options.freeThreshold) > 0) {
+    freeThresholdBase = Number(options.freeThreshold);
+  } else {
+    freeThresholdBase = FREE_DELIVERY_THRESHOLD;
+  }
+
+  const selectedAreaName = zone?.name || options.areaName || 'बैढ़न (Waidhan)';
   const deliveryMode = options.deliveryMode || 'delivery';
 
   let totalItemsCount = 0;
@@ -154,8 +178,13 @@ export function calculateCartFinancials(
 
   const productDiscount = Math.max(0, Math.round((subtotalOriginalMRP - subtotal) * 100) / 100);
 
-  // Delivery Rules: FREE above ₹499 OR when Store Pickup is chosen; otherwise ₹29
-  const isFreeDelivery = deliveryMode === 'pickup' || subtotal >= freeThresholdBase;
+  // Delivery Rules:
+  // - Store Pickup is ALWAYS ₹0 (FREE)
+  // - If area has a freeDeliveryThreshold (e.g., ₹499 for बैढ़न / कॉलेज मोड़) and subtotal >= threshold => FREE (₹0)
+  // - Otherwise charge exact area baseCharge (even if subtotal >= 499 when threshold is null/disabled)
+  const qualifiesByThreshold =
+    freeThresholdBase !== null && freeThresholdBase > 0 && subtotal >= freeThresholdBase;
+  const isFreeDelivery = deliveryMode === 'pickup' || qualifiesByThreshold;
   const deliveryCharge = subtotal <= 0 ? 0 : isFreeDelivery ? 0 : deliveryFeeBase;
   const subTotalWithDelivery = Math.round((subtotal + deliveryCharge) * 100) / 100;
 
@@ -180,24 +209,34 @@ export function calculateCartFinancials(
     Math.round((subTotalWithDelivery - couponDiscount) * 100) / 100
   );
 
-  // Single ₹499 Free Delivery milestone (no multi-tier free gifts)
+  // Area-aware milestone banner metadata
   const activeTierNumber = isFreeDelivery ? 1 : 0;
   const unlockedGifts: FreeGiftReward[] = [];
   const activeGift: FreeGiftReward | null = null;
-  const nextMilestoneAmount: number | null =
-    subtotal < freeThresholdBase ? freeThresholdBase : null;
-  const amountNeededForNext =
-    subtotal < freeThresholdBase
-      ? Math.max(0, Math.round((freeThresholdBase - subtotal) * 100) / 100)
-      : 0;
-  const bannerCopy =
-    subtotal < freeThresholdBase
-      ? `🚚 बैढ़न में ₹499 से ऊपर के ऑर्डर पर FREE डिलीवरी! बस ₹${Math.ceil(freeThresholdBase - subtotal)} का सामान और जोड़ें`
-      : `🎉 बधाई हो! बैढ़न में ₹499 से ऊपर के ऑर्डर पर FREE डिलीवरी अनलॉक हो गई है!`;
-  const progressPercent =
-    subtotal <= 0
-      ? 0
-      : Math.min(100, Math.round((subtotal / freeThresholdBase) * 100));
+
+  let nextMilestoneAmount: number | null = null;
+  let amountNeededForNext = 0;
+  let bannerCopy = `🚚 ${selectedAreaName} डिलीवरी चार्ज: ₹${deliveryFeeBase}`;
+  let progressPercent = 0;
+
+  if (deliveryMode === 'pickup') {
+    bannerCopy = '🏪 Store Pickup — डिलीवरी चार्ज ₹0 (FREE)';
+    progressPercent = 100;
+  } else if (freeThresholdBase !== null && freeThresholdBase > 0) {
+    nextMilestoneAmount = subtotal < freeThresholdBase ? freeThresholdBase : null;
+    amountNeededForNext =
+      subtotal < freeThresholdBase
+        ? Math.max(0, Math.round((freeThresholdBase - subtotal) * 100) / 100)
+        : 0;
+    bannerCopy =
+      subtotal < freeThresholdBase
+        ? `🚚 ${selectedAreaName} में ₹${freeThresholdBase} से ऊपर के ऑर्डर पर FREE डिलीवरी! बस ₹${Math.ceil(freeThresholdBase - subtotal)} का सामान और जोड़ें`
+        : `🎉 बधाई हो! ${selectedAreaName} में ₹${freeThresholdBase} से ऊपर के ऑर्डर पर FREE डिलीवरी अनलॉक हो गई है!`;
+    progressPercent =
+      subtotal <= 0
+        ? 0
+        : Math.min(100, Math.round((subtotal / freeThresholdBase) * 100));
+  }
 
   return {
     itemsCount: totalItemsCount,
@@ -210,6 +249,9 @@ export function calculateCartFinancials(
     totalSavings,
     isFreeDelivery,
     deliveryCharge,
+    baseDeliveryFee: deliveryFeeBase,
+    freeDeliveryThreshold: freeThresholdBase,
+    selectedAreaName,
     subTotalWithDelivery,
     totalPayable,
     unlockedGifts,

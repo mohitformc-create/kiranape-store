@@ -127,6 +127,13 @@ import { UPSELL_PRODUCTS } from './data/upsellCatalog';
 import { LaunchOfferModal } from './components/LaunchOfferModal';
 import { calculateCartFinancials } from './utils/rewardsEngine';
 import { ADMIN_SECRET_PIN, isMasterAdminPin } from './config/adminConfig';
+import {
+  DeliveryZone,
+  getDeliveryZones,
+  resolveSelectedDeliveryZone,
+  syncDeliveryZonesFromSupabase,
+  subscribeToDeliveryZones,
+} from './services/deliveryZonesService';
 
 export default function App() {
   // Navigation View: 'customer' (default) vs 'admin'
@@ -173,10 +180,11 @@ export default function App() {
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
-  // Cart & Checkout Slot / Coupon State
+  // Cart & Checkout Slot / Coupon / Delivery Zones State
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('delivery');
   const [confirmedDeliverySlot, setConfirmedDeliverySlot] = useState<ConfirmedDeliverySlot | null>(null);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(() => getDeliveryZones());
   const [cartSavedAddress, setCartSavedAddress] = useState<SavedCartAddress>(() => getSavedCartAddress());
   const supabaseProductsRef = useRef<Product[]>([]);
 
@@ -496,6 +504,20 @@ export default function App() {
       }
     }).catch(console.warn);
 
+    // 4.5. Hydrate & subscribe to live Delivery Zones (Supabase + localStorage)
+    syncDeliveryZonesFromSupabase()
+      .then((liveZones) => {
+        if (Array.isArray(liveZones) && liveZones.length > 0) {
+          setDeliveryZones(liveZones);
+        }
+      })
+      .catch(() => {});
+
+    const unsubscribeDeliveryZones = subscribeToDeliveryZones((updatedZones) => {
+      setDeliveryZones(updatedZones);
+      setCartSavedAddress(getSavedCartAddress());
+    });
+
     const handleOrdersUpdated = () => {
       setOrders(getOrders());
     };
@@ -506,6 +528,7 @@ export default function App() {
       unsubscribeStoreConfig();
       unsubscribeFirestoreProducts();
       unsubscribeFirestoreCategories();
+      unsubscribeDeliveryZones();
       window.removeEventListener('kiranape_orders_updated', handleOrdersUpdated);
     };
   }, []);
@@ -600,13 +623,19 @@ export default function App() {
     });
   }, [products, cartQuantities]);
 
+  const activeDeliveryZone = useMemo(
+    () => resolveSelectedDeliveryZone(deliveryZones, cartSavedAddress.locality),
+    [deliveryZones, cartSavedAddress.locality]
+  );
+
   const cartFinancials = useMemo(
     () =>
       calculateCartFinancials(cartItems, {
         deliveryMode,
         couponCode: appliedCouponCode,
+        deliveryZone: activeDeliveryZone,
       }),
-    [cartItems, deliveryMode, appliedCouponCode]
+    [cartItems, deliveryMode, appliedCouponCode, activeDeliveryZone]
   );
 
   const totalCartCount = useMemo(
@@ -747,6 +776,7 @@ export default function App() {
       fullName: string;
       phoneNumber: string;
       fullAddress: string;
+      deliveryLocation?: string;
       deliverySlot: DeliverySlot;
       deliveryMode?: DeliveryMode;
       couponCode?: string | null;
@@ -755,11 +785,16 @@ export default function App() {
         const effectiveMode = customerDetails.deliveryMode || deliveryMode;
         const effectiveCoupon =
           customerDetails.couponCode !== undefined ? customerDetails.couponCode : appliedCouponCode;
+        const resolvedZone = resolveSelectedDeliveryZone(
+          deliveryZones,
+          customerDetails.deliveryLocation || cartSavedAddress.locality || getCustomerSelectedLocation()
+        );
 
-        // Strict mathematical calculations via centralized rewardsEngine
+        // Strict mathematical calculations via centralized rewardsEngine using selected area zone
         const financials = calculateCartFinancials(cartItems, {
           deliveryMode: effectiveMode,
           couponCode: effectiveCoupon,
+          deliveryZone: resolvedZone,
         });
         const subtotal = Number(financials.subtotal) || 0;
         const subtotalOriginal = Number(financials.subtotalOriginalMRP) || subtotal;
@@ -810,7 +845,7 @@ export default function App() {
 
         // Generate the official unique Order ID
         const orderId = 'CK-' + Math.floor(1000 + Math.random() * 9000);
-        const selectedLoc = String(getCustomerSelectedLocation() || storeSettings.serviceArea || 'Waidhan, Singrauli');
+        const selectedLoc = resolvedZone.name;
 
         // 1. Instant Haptic Feedback & Audio Chime (0 milliseconds feedback)
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -862,6 +897,9 @@ export default function App() {
           customerName: sanitizedName,
           phone: sanitizedPhone,
           address: sanitizedAddress,
+          deliveryLocation: selectedLoc,
+          deliveryFee,
+          deliveryMode: effectiveMode,
           items: orderItems || [],
           total: finalPayableAmount || 0,
           orderType: 'cart',
@@ -915,7 +953,7 @@ export default function App() {
         throw orderErr;
       }
     },
-    [cartItems, storeSettings, deliveryMode, appliedCouponCode]
+    [cartItems, storeSettings, deliveryMode, appliedCouponCode, deliveryZones, cartSavedAddress.locality]
   );
 
   // Admin Operations with Cloud Firestore, Central Server, and Supabase synchronization
@@ -1612,6 +1650,10 @@ export default function App() {
         onCouponChange={setAppliedCouponCode}
         deliveryMode={deliveryMode}
         onDeliveryModeChange={setDeliveryMode}
+        deliveryZones={deliveryZones}
+        onSelectedAreaChange={(areaName) => {
+          setCartSavedAddress((prev) => ({ ...prev, locality: areaName }));
+        }}
       />
 
       {/* 4.5. Handwritten Grocery List / Parchi Photo Upload Modal */}
@@ -1651,6 +1693,10 @@ export default function App() {
         selectedDeliverySlot={confirmedDeliverySlot}
         deliveryMode={deliveryMode}
         appliedCouponCode={appliedCouponCode}
+        deliveryZones={deliveryZones}
+        onSelectedAreaChange={(areaName) => {
+          setCartSavedAddress((prev) => ({ ...prev, locality: areaName }));
+        }}
         onUpdateDeliverySlot={(slot) => {
           setConfirmedDeliverySlot(slot);
           setDeliveryMode(slot.mode);
@@ -1659,7 +1705,7 @@ export default function App() {
           fullName: cartSavedAddress.fullName || currentUser?.displayName || '',
           phoneNumber: cartSavedAddress.phoneNumber || currentUser?.phone || '',
           fullAddress: cartSavedAddress.fullAddress || currentUser?.address || '',
-          locality: cartSavedAddress.locality || '',
+          locality: cartSavedAddress.locality || activeDeliveryZone.name,
         }}
       />
 

@@ -58,6 +58,7 @@ import { AdminStoreSettings } from './AdminStoreSettings';
 import { AdminOffersAndSettings } from './AdminOffersAndSettings';
 import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
+import { AdminDeliveryZonesManager } from './AdminDeliveryZonesManager';
 import { AdminExcelUploader } from './AdminExcelUploader';
 import { AdminAutoImageModal } from './AdminAutoImageModal';
 import { BlinkitProductPlaceholder } from './BlinkitProductPlaceholder';
@@ -157,7 +158,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveBanners,
   onRefreshProducts,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'excel_uploader' | 'orders' | 'parchi_orders' | 'offers_settings' | 'categories' | 'settings'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'excel_uploader' | 'orders' | 'parchi_orders' | 'delivery_zones' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -893,8 +894,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
 
           <button
+            id="admin-delivery-zones-tab-btn"
+            onClick={() => setActiveTab('delivery_zones')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === 'delivery_zones'
+                ? 'bg-stone-100 text-stone-900 shadow-xs'
+                : 'text-amber-300 hover:text-white'
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-amber-400" />
+            <span>📍 एरिया और डिलीवरी चार्ज (Delivery Zones)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('offers_settings')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'offers_settings'
                 ? 'bg-stone-100 text-stone-900 shadow-xs'
                 : 'text-stone-400 hover:text-white'
@@ -2829,6 +2843,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               );
             })()}
           </div>
+        )}
+
+        {/* ================= TAB 2.5: DELIVERY ZONES MANAGER ================= */}
+        {activeTab === 'delivery_zones' && (
+          <AdminDeliveryZonesManager
+            onSavedNotice={(msg) => {
+              setCatalogSyncNotice(msg);
+              setTimeout(() => setCatalogSyncNotice(null), 5000);
+            }}
+          />
         )}
 
         {/* ================= TAB 3: DYNAMIC OFFERS, BANNERS & STORE RULES ================= */}

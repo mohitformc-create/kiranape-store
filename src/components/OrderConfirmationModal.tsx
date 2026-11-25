@@ -397,10 +397,12 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
               customerPhone: currentOrder.phone || currentOrder.customerPhone || '',
               deliveryAddress: currentOrder.address,
               deliveryLocation: currentOrder.deliveryLocation,
+              deliveryCharge,
+              deliveryMode: currentOrder.deliveryMode,
               deliverySlot: currentOrder.deliverySlot,
               orderType: (currentOrder.orderType as any) || 'cart',
               itemsCount: currentOrder.itemsCount || currentOrder.items?.length,
-              finalAmount: currentOrder.finalPayableAmount,
+              finalAmount: finalPayable,
               textDetails: (currentOrder.items || [])
                 .map((i) => `${i.name} (${i.unit}) x${i.quantity}`)
                 .join(', '),
