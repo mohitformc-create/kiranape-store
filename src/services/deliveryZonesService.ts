@@ -55,36 +55,28 @@ export const DEFAULT_DELIVERY_ZONES: DeliveryZone[] = [
     sortOrder: 4,
   },
   {
-    id: 'zone-vindhyanagar',
-    name: 'विंध्यनगर (Vindhyanagar)',
+    id: 'zone-navjeevan-vihar',
+    name: 'नवजीवन विहार (Navjeevan Vihar)',
     baseCharge: 39,
     freeDeliveryAbove: null,
     isActive: true,
     sortOrder: 5,
   },
   {
-    id: 'zone-navjeevan-vihar',
-    name: 'नवजीवन विहार (Navjeevan Vihar)',
+    id: 'zone-vindhyanagar',
+    name: 'विंध्यनगर (Vindhyanagar)',
     baseCharge: 39,
     freeDeliveryAbove: null,
     isActive: true,
     sortOrder: 6,
   },
   {
-    id: 'zone-jayant',
-    name: 'जयंत (Jayant)',
+    id: 'zone-navanagar',
+    name: 'नवानगर (Navanagar)',
     baseCharge: 49,
     freeDeliveryAbove: null,
     isActive: true,
     sortOrder: 7,
-  },
-  {
-    id: 'zone-dudhichua',
-    name: 'दुधीचुआ (Dudhichua)',
-    baseCharge: 49,
-    freeDeliveryAbove: null,
-    isActive: true,
-    sortOrder: 8,
   },
   {
     id: 'zone-amlohri',
@@ -92,11 +84,19 @@ export const DEFAULT_DELIVERY_ZONES: DeliveryZone[] = [
     baseCharge: 49,
     freeDeliveryAbove: null,
     isActive: true,
+    sortOrder: 8,
+  },
+  {
+    id: 'zone-jayant',
+    name: 'जयंत (Jayant)',
+    baseCharge: 49,
+    freeDeliveryAbove: null,
+    isActive: true,
     sortOrder: 9,
   },
   {
-    id: 'zone-navanagar',
-    name: 'नवानगर (Navanagar)',
+    id: 'zone-dudhichua',
+    name: 'दुधीचुआ (Dudhichua)',
     baseCharge: 49,
     freeDeliveryAbove: null,
     isActive: true,
@@ -207,13 +207,10 @@ export function resolveSelectedDeliveryZone(
 }
 
 /**
- * Formats a concise human-readable dropdown option label for a delivery zone.
+ * Returns the clean locality name only (delivery charges calculate silently in the background).
  */
 export function formatDeliveryZoneOption(zone: DeliveryZone): string {
-  if (zone.freeDeliveryAbove && zone.freeDeliveryAbove > 0) {
-    return `${zone.name} — ₹${zone.baseCharge} (₹${zone.freeDeliveryAbove}+ FREE)`;
-  }
-  return `${zone.name} — ₹${zone.baseCharge}`;
+  return zone.name;
 }
 
 /**

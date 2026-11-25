@@ -43,12 +43,12 @@ export const DEFAULT_DELIVERY_LOCATIONS: string[] = [
   'कॉलेज मोड़ (College Mod)',
   'माजन मोड़ (Majan Mod)',
   'ढोंटी (Dhonti)',
-  'विंध्यनगर (Vindhyanagar)',
   'नवजीवन विहार (Navjeevan Vihar)',
+  'विंध्यनगर (Vindhyanagar)',
+  'नवानगर (Navanagar)',
+  'अमलोरी (Amlohri)',
   'जयंत (Jayant)',
   'दुधीचुआ (Dudhichua)',
-  'अमलोरी (Amlohri)',
-  'नवानगर (Navanagar)',
 ];
 
 export function getDeviceUserId(): string {

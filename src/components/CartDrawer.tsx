@@ -248,6 +248,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const {
     itemsCount: totalCount,
     subtotal: cartValue,
+    eligibleNonOilTotal,
+    edibleOilTotal,
     productDiscount,
     couponCode: validAppliedCoupon,
     couponDiscount,
@@ -276,7 +278,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   };
 
   const handleApplyCouponCode = (rawCode: string) => {
-    const res = evaluateCoupon(rawCode, cartValue);
+    const res = evaluateCoupon(rawCode, eligibleNonOilTotal, {
+      totalCartValue: cartValue,
+      edibleOilTotal,
+    });
     if (res.valid) {
       setAppliedCouponCode(res.code);
       setCouponInput('');
@@ -972,6 +977,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </h4>
                   <p className="text-[11px] text-stone-500 tabular-nums">
                     Cart Value: ₹{cartValue.toFixed(0)}
+                    {edibleOilTotal > 0 && (
+                      <span className="text-amber-700 font-semibold">
+                        {' '}
+                        · Eligible (Non-Oil): ₹{eligibleNonOilTotal.toFixed(0)}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <button
@@ -987,6 +998,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
 
               <div className="p-4 space-y-4 overflow-y-auto">
+                {/* Edible oil exclusion disclosure banner when cart contains edible oil */}
+                {edibleOilTotal > 0 && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900 leading-relaxed tabular-nums">
+                    ℹ️ कूपन ऑफर्स केवल अन्य किराना सामान पर लागू हैं (खाने के तेल / Edible Oil ₹{edibleOilTotal.toFixed(0)} को छोड़कर योग्य राशि: ₹{eligibleNonOilTotal.toFixed(0)})।
+                  </div>
+                )}
+
                 {/* Manual Coupon Code Input */}
                 <form
                   onSubmit={(e) => {
@@ -1002,7 +1020,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       setCouponInput(e.target.value.toUpperCase());
                       setCouponFeedback(null);
                     }}
-                    placeholder="Enter coupon code (e.g. KIRANA50)"
+                    placeholder="Enter coupon code (e.g. FIRSTORDER)"
                     className="flex-1 px-3 py-2.5 text-xs font-bold uppercase tracking-wider bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-[#0c831f] focus:outline-none"
                   />
                   <button
@@ -1016,10 +1034,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                 {couponFeedback && (
                   <div
-                    className={`p-2.5 rounded-xl text-xs font-semibold ${
+                    className={`p-3 rounded-xl text-xs font-semibold leading-relaxed ${
                       couponFeedback.type === 'success'
                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'bg-amber-50 text-amber-900 border border-amber-300'
                     }`}
                   >
                     {couponFeedback.text}
@@ -1032,7 +1050,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     Available Store Coupons
                   </span>
                   {STORE_COUPONS.map((coupon) => {
-                    const evalRes = evaluateCoupon(coupon.code, cartValue);
+                    const evalRes = evaluateCoupon(coupon.code, eligibleNonOilTotal, {
+                      totalCartValue: cartValue,
+                      edibleOilTotal,
+                    });
                     const isApplied = validAppliedCoupon === coupon.code;
                     return (
                       <div
@@ -1059,16 +1080,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                             <p className="text-[11px] text-stone-500 mt-0.5 leading-snug">
                               {coupon.description}
                             </p>
-                            {!evalRes.valid && evalRes.shortfall && (
-                              <p className="text-[11px] font-semibold text-amber-700 mt-1 tabular-nums">
-                                Add ₹{evalRes.shortfall} more to unlock
+                            {!evalRes.valid && evalRes.shortfall !== undefined && (
+                              <p className="text-[11px] font-semibold text-amber-800 mt-1.5 leading-snug tabular-nums">
+                                ℹ️ कूपन के लिए तेल को छोड़कर ₹{evalRes.shortfall} का अन्य सामान और जोड़ें (न्यूनतम ₹{coupon.minOrder})
+                              </p>
+                            )}
+                            {evalRes.valid && evalRes.discount > 0 && (
+                              <p className="text-[11px] font-bold text-[#0c831f] mt-1 tabular-nums">
+                                Instant savings: ₹{evalRes.discount}
                               </p>
                             )}
                           </div>
 
                           <button
                             type="button"
-                            disabled={!evalRes.valid && !isApplied}
                             onClick={() =>
                               isApplied
                                 ? setAppliedCouponCode(null)
@@ -1079,7 +1104,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
                                 : evalRes.valid
                                 ? 'bg-[#0c831f] text-white hover:bg-[#0a731b]'
-                                : 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                                : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
                             }`}
                           >
                             {isApplied ? 'REMOVE' : 'APPLY'}

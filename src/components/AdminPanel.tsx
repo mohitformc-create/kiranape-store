@@ -50,6 +50,7 @@ import {
   Wand2,
   ClipboardPaste,
   FolderOpen,
+  Receipt,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -59,6 +60,7 @@ import { AdminOffersAndSettings } from './AdminOffersAndSettings';
 import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminDeliveryZonesManager } from './AdminDeliveryZonesManager';
+import { AdminPosBilling } from './AdminPosBilling';
 import { AdminExcelUploader } from './AdminExcelUploader';
 import { AdminAutoImageModal } from './AdminAutoImageModal';
 import { BlinkitProductPlaceholder } from './BlinkitProductPlaceholder';
@@ -158,7 +160,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveBanners,
   onRefreshProducts,
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'excel_uploader' | 'orders' | 'parchi_orders' | 'delivery_zones' | 'offers_settings' | 'categories' | 'settings'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'pos_billing' | 'excel_uploader' | 'orders' | 'parchi_orders' | 'delivery_zones' | 'offers_settings' | 'categories' | 'settings'>('inventory');
   const [inventoryLayoutMode, setInventoryLayoutMode] = useState<'visual' | 'table'>('visual');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -848,6 +850,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           >
             <Package className="w-4 h-4 text-amber-600" />
             <span>Product Inventory ({products.length})</span>
+          </button>
+
+          <button
+            id="admin-pos-billing-tab-btn"
+            onClick={() => setActiveTab('pos_billing')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-t-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === 'pos_billing'
+                ? 'bg-stone-100 text-stone-900 shadow-xs'
+                : 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/35 hover:text-white'
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-emerald-400" />
+            <span>🧾 काउंटर बिलिंग (POS / Receipt)</span>
           </button>
 
           <button
@@ -2843,6 +2858,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               );
             })()}
           </div>
+        )}
+
+        {/* ================= TAB 1.5: MALL-STYLE COUNTER POS & THERMAL RECEIPT ================= */}
+        {activeTab === 'pos_billing' && (
+          <AdminPosBilling
+            products={products}
+            storeSettings={storeSettings}
+            onSavedNotice={(msg) => {
+              setCatalogSyncNotice(msg);
+              setTimeout(() => setCatalogSyncNotice(null), 5000);
+            }}
+          />
         )}
 
         {/* ================= TAB 2.5: DELIVERY ZONES MANAGER ================= */}

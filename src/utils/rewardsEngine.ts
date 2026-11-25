@@ -5,7 +5,7 @@
  */
 
 import { CartItem } from '../types';
-import { evaluateCoupon } from './coupons';
+import { evaluateCoupon, calculateCouponEligibility } from './coupons';
 
 export const STANDARD_DELIVERY_FEE = 29; // ₹29 standard delivery charge (FREE above ₹499)
 export const FREE_DELIVERY_THRESHOLD = 499; // Free delivery milestone
@@ -85,6 +85,8 @@ export interface CartCalculationOptions {
 export interface CartCalculationResult {
   itemsCount: number;
   subtotal: number;
+  eligibleNonOilTotal: number;
+  edibleOilTotal: number;
   subtotalOriginalMRP: number;
   productDiscount: number;
   couponCode: string | null;
@@ -178,6 +180,9 @@ export function calculateCartFinancials(
 
   const productDiscount = Math.max(0, Math.round((subtotalOriginalMRP - subtotal) * 100) / 100);
 
+  // Split eligible non-oil total vs excluded edible oil total for coupon rules
+  const { eligibleNonOilTotal, edibleOilTotal } = calculateCouponEligibility(cartItems);
+
   // Delivery Rules:
   // - Store Pickup is ALWAYS ₹0 (FREE)
   // - If area has a freeDeliveryThreshold (e.g., ₹499 for बैढ़न / कॉलेज मोड़) and subtotal >= threshold => FREE (₹0)
@@ -188,12 +193,15 @@ export function calculateCartFinancials(
   const deliveryCharge = subtotal <= 0 ? 0 : isFreeDelivery ? 0 : deliveryFeeBase;
   const subTotalWithDelivery = Math.round((subtotal + deliveryCharge) * 100) / 100;
 
-  // Coupon evaluation
+  // Coupon evaluation strictly on eligibleNonOilTotal (edible oils excluded)
   let appliedCouponCode: string | null = null;
   let couponDiscount = 0;
   let couponMessage: string | null = null;
   if (options.couponCode && options.couponCode.trim()) {
-    const evalResult = evaluateCoupon(options.couponCode, subtotal);
+    const evalResult = evaluateCoupon(options.couponCode, eligibleNonOilTotal, {
+      totalCartValue: subtotal,
+      edibleOilTotal,
+    });
     if (evalResult.valid) {
       appliedCouponCode = evalResult.code;
       couponDiscount = evalResult.discount;
@@ -241,6 +249,8 @@ export function calculateCartFinancials(
   return {
     itemsCount: totalItemsCount,
     subtotal,
+    eligibleNonOilTotal,
+    edibleOilTotal,
     subtotalOriginalMRP,
     productDiscount,
     couponCode: appliedCouponCode,
