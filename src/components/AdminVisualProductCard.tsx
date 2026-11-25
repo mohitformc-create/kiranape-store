@@ -12,12 +12,22 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
+  Search,
+  ClipboardPaste,
+  FolderOpen,
 } from 'lucide-react';
 import { Product, ProductVariant } from '../types';
-import { getCategoryFallbackSvg, getValidImageUrl, getCategoryEmojiDataUrl } from '../utils/productImageUtils';
-import { compressImageFile, dataUrlToFile } from '../utils/imageUtils';
+import { getValidImageUrl } from '../utils/productImageUtils';
 import { calculateFinalPrice } from '../services/storageService';
-import { uploadProductImageToSupabase } from '../services/supabaseClient';
+import { BlinkitProductPlaceholder } from './BlinkitProductPlaceholder';
+import {
+  buildGoogleStudioSearchUrl,
+  extractClipboardImageOrUrl,
+  hasRealDisplayImage,
+  hasSupabaseStorageImage,
+  savePermanentImageToSupabaseProduct,
+  uploadStudioImageToSupabase,
+} from '../utils/studioImageUpload';
 
 interface AdminVisualProductCardProps {
   product: Product;
@@ -37,6 +47,16 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [studioPasteVal, setStudioPasteVal] = useState('');
+  const [studioUploadErr, setStudioUploadErr] = useState<string | null>(null);
+  const [studioDone, setStudioDone] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [product.imageUrl]);
+
+  const showRealImage = hasRealDisplayImage(product.imageUrl) && !imageError;
+  const isPermanentSupabasePhoto = hasSupabaseStorageImage(product.imageUrl);
 
   // Variant Selection State
   const hasVariants = Boolean(product.variants && product.variants.length > 0);
@@ -163,35 +183,49 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
     }
   };
 
-  // Tap on image to upload new photo from gallery/camera
-  const handleTriggerImageUpload = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    fileInputRef.current?.click();
+  const handleStudioSourceUpload = async (source: File | Blob | string) => {
+    try {
+      setIsUploadingImage(true);
+      setStudioUploadErr(null);
+      const permanentUrl = await uploadStudioImageToSupabase(source, product.name);
+      await savePermanentImageToSupabaseProduct({
+        productId: product.id,
+        name: product.name,
+        category: product.category,
+        unit: product.unit,
+        price: product.finalPrice,
+        originalPrice: product.originalPrice,
+        permanentUrl,
+      }).catch((err) => {
+        console.warn('Supabase products image_url sync warning:', err);
+      });
+      onUpdateProduct(product.id, { imageUrl: permanentUrl });
+      setImageError(false);
+      setStudioPasteVal('');
+      setStudioDone(true);
+    } catch (err: any) {
+      console.error('Failed to compress/upload studio image:', err);
+      setStudioUploadErr(err?.message || 'फोटो अपलोड नहीं हो सकी।');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    try {
-      setIsUploadingImage(true);
-      const compressedDataUrl = await compressImageFile(file, 800, 800, 0.75);
-      const cleanName = (product.name || 'product')
-        .replace(/\.[^/.]+$/, '')
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9_-]/g, '_');
-      const fileName = `${Date.now()}_${cleanName || 'item'}.jpg`;
-      const compressedFile = dataUrlToFile(compressedDataUrl, fileName);
+    await handleStudioSourceUpload(file);
+  };
 
-      const uploadRes = await uploadProductImageToSupabase(compressedFile, fileName);
-      const finalUrl = uploadRes.publicUrl || compressedDataUrl;
-      onUpdateProduct(product.id, { imageUrl: finalUrl });
-      setImageError(false);
-    } catch (err) {
-      console.error('Failed to compress/upload image:', err);
-    } finally {
-      setIsUploadingImage(false);
+  const handlePasteInStudioBox = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const extracted = extractClipboardImageOrUrl(e.clipboardData);
+    if (!extracted) return;
+    e.preventDefault();
+    if (typeof extracted === 'string') {
+      setStudioPasteVal(extracted);
     }
+    await handleStudioSourceUpload(extracted);
   };
 
   const handleStockChange = (delta: number) => {
@@ -229,24 +263,21 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
               <RefreshCw className="w-6 h-6 animate-spin" />
               <span className="text-[11px] font-bold">Uploading photo...</span>
             </div>
-          ) : (
+          ) : showRealImage ? (
             <img
-              src={
-                imageError
-                  ? getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice)
-                  : getValidImageUrl(product.imageUrl, product.category, product.name, product.unit, product.finalPrice)
-              }
+              src={getValidImageUrl(product.imageUrl, product.category, product.name, product.unit, product.finalPrice)}
               alt={product.name}
-              onError={(e) => {
-                setImageError(true);
-                const fallback = getCategoryFallbackSvg(product.category, product.name, product.unit, product.finalPrice);
-                if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                  (e.currentTarget as HTMLImageElement).src = fallback;
-                }
-              }}
+              referrerPolicy="no-referrer"
+              onError={() => setImageError(true)}
               loading="lazy"
               decoding="async"
               className="w-full h-full object-contain mix-blend-multiply group-hover/img:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <BlinkitProductPlaceholder
+              name={product.name}
+              category={product.category}
+              weight={displayUnit}
             />
           )}
         </div>
@@ -659,6 +690,85 @@ export const AdminVisualProductCard: React.FC<AdminVisualProductCardProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Fast Studio Photo Uploader Bar (shown for items without a supabase.co/storage image or newly marked Done) */}
+        {(!isPermanentSupabasePhoto || studioDone) && (
+          <div className="mt-2 pt-2 border-t border-stone-200 space-y-1.5">
+            {studioDone && isPermanentSupabasePhoto ? (
+              <div className="flex items-center justify-between text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">
+                <span>✅ Done (Supabase Saved)</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-1">
+                  <a
+                    href={buildGoogleStudioSearchUrl(product.name, displayUnit)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-h-[30px] inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 text-[10px] font-bold transition-colors truncate"
+                    title="Google पर फ्रेश पैक फोटो खोजें"
+                  >
+                    <Search className="w-3 h-3 text-amber-700 shrink-0" />
+                    <span className="truncate">🔍 फ्रेश पैक फोटो खोजें</span>
+                  </a>
+
+                  <div className="relative overflow-hidden rounded-lg cursor-pointer shrink-0">
+                    <button
+                      type="button"
+                      disabled={isUploadingImage}
+                      className="min-h-[30px] inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition-colors whitespace-nowrap"
+                    >
+                      <FolderOpen className="w-3 h-3 shrink-0" />
+                      <span>📁 गैलरी से चुनें</span>
+                    </button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingImage}
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      aria-label={`Upload photo for ${product.name}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="relative flex items-center gap-1">
+                  <ClipboardPaste className="w-3 h-3 text-stone-400 absolute left-2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={studioPasteVal}
+                    disabled={isUploadingImage}
+                    onChange={(e) => setStudioPasteVal(e.target.value)}
+                    onPaste={(e) => void handlePasteInStudioBox(e)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && studioPasteVal.trim()) {
+                        e.preventDefault();
+                        void handleStudioSourceUpload(studioPasteVal.trim());
+                      }
+                    }}
+                    placeholder="📋 फोटो / लिंक पेस्ट करें (Ctrl+V)"
+                    className="w-full min-h-[30px] pl-6 pr-2 py-1 bg-stone-50 border border-stone-200 rounded-lg text-[10px] font-medium text-stone-900 placeholder:text-stone-400 focus:bg-white focus:border-emerald-600 focus:outline-hidden"
+                  />
+                  {studioPasteVal.trim() && !isUploadingImage && (
+                    <button
+                      type="button"
+                      onClick={() => void handleStudioSourceUpload(studioPasteVal.trim())}
+                      className="min-h-[30px] px-2 rounded-lg bg-emerald-600 text-white text-[10px] font-bold cursor-pointer shrink-0"
+                    >
+                      सेव
+                    </button>
+                  )}
+                </div>
+
+                {studioUploadErr && (
+                  <p className="text-[10px] font-semibold text-rose-700 leading-tight">
+                    {studioUploadErr}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

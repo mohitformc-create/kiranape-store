@@ -62,6 +62,7 @@ import {
   updateProductInSupabase,
   deleteProductFromSupabase,
   wipeAllProductsFromSupabase,
+  syncProductsFromSupabase,
 } from './services/supabaseClient';
 import { dispatchOrderInBackground } from './services/orderQueueService';
 import { sendTelegramOrderNotification } from './services/telegramNotificationService';
@@ -100,8 +101,10 @@ import { CategoryTileGrid } from './components/CategoryTileGrid';
 import { CategoriesScreen } from './components/CategoriesScreen';
 import { CategoryDetailView } from './components/CategoryDetailView';
 import { BottomNavBar } from './components/BottomNavBar';
-import { CartDrawer } from './components/CartDrawer';
+import { CartDrawer, SavedCartAddress, getSavedCartAddress } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
+import { ConfirmedDeliverySlot, DeliveryMode } from './components/DeliverySlotModal';
+import { NewArrivalsShelf } from './components/NewArrivalsShelf';
 import { OrderConfirmationModal } from './components/OrderConfirmationModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
@@ -169,6 +172,13 @@ export default function App() {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
+
+  // Cart & Checkout Slot / Coupon State
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('delivery');
+  const [confirmedDeliverySlot, setConfirmedDeliverySlot] = useState<ConfirmedDeliverySlot | null>(null);
+  const [cartSavedAddress, setCartSavedAddress] = useState<SavedCartAddress>(() => getSavedCartAddress());
+  const supabaseProductsRef = useRef<Product[]>([]);
 
   // Admin PIN verification and Direct Link (#admin) state
   const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
@@ -420,12 +430,58 @@ export default function App() {
       setBanners(newBanners);
     });
 
+    // Helper to merge live Supabase products & Firestore products without losing categories or timestamps
+    const mergeCatalogSources = (firestoreList: Product[], supabaseList: Product[]): Product[] => {
+      if (!supabaseList || supabaseList.length === 0) return firestoreList;
+      if (!firestoreList || firestoreList.length === 0) return supabaseList;
+
+      const byKey = new Map<string, Product>();
+      const makeKey = (p: Product) =>
+        `${(p.name || '').trim().toLowerCase()}::${(p.unit || '').trim().toLowerCase()}`;
+
+      // Seed with Supabase live rows first (authoritative for Excel uploads, categories & createdAt)
+      for (const sp of supabaseList) {
+        byKey.set(makeKey(sp), sp);
+      }
+
+      // Overlay Firestore items only if missing in Supabase (or to carry richer fields like variants)
+      for (const fp of firestoreList) {
+        const key = makeKey(fp);
+        const existing = byKey.get(key);
+        if (!existing) {
+          byKey.set(key, fp);
+        } else {
+          byKey.set(key, {
+            ...fp,
+            ...existing,
+            variants: existing.variants && existing.variants.length > 0 ? existing.variants : fp.variants,
+            isCartRecommended: Boolean(existing.isCartRecommended || fp.isCartRecommended),
+          });
+        }
+      }
+
+      return Array.from(byKey.values());
+    };
+
     // 3. Real-Time Cloud Firestore products and categories listeners across all devices
     const unsubscribeFirestoreProducts = subscribeToFirestoreProducts((liveProducts) => {
       if (Array.isArray(liveProducts)) {
-        setProducts(liveProducts);
+        const merged = mergeCatalogSources(liveProducts, supabaseProductsRef.current);
+        setProducts(merged);
       }
     });
+
+    // 3.5. Hydrate live Supabase 'products' table so ALL dynamic categories & New Arrivals are always up-to-date
+    syncProductsFromSupabase()
+      .then((sbProducts) => {
+        if (Array.isArray(sbProducts) && sbProducts.length > 0) {
+          supabaseProductsRef.current = sbProducts as Product[];
+          setProducts((prev) => mergeCatalogSources(prev, sbProducts as Product[]));
+        }
+      })
+      .catch((err) => {
+        console.warn('[App] Live Supabase products sync warning:', err);
+      });
 
     const unsubscribeFirestoreCategories = subscribeToFirestoreCategories((liveCategories) => {
       if (Array.isArray(liveCategories) && liveCategories.length > 0) {
@@ -545,8 +601,12 @@ export default function App() {
   }, [products, cartQuantities]);
 
   const cartFinancials = useMemo(
-    () => calculateCartFinancials(cartItems),
-    [cartItems]
+    () =>
+      calculateCartFinancials(cartItems, {
+        deliveryMode,
+        couponCode: appliedCouponCode,
+      }),
+    [cartItems, deliveryMode, appliedCouponCode]
   );
 
   const totalCartCount = useMemo(
@@ -688,15 +748,28 @@ export default function App() {
       phoneNumber: string;
       fullAddress: string;
       deliverySlot: DeliverySlot;
+      deliveryMode?: DeliveryMode;
+      couponCode?: string | null;
     }) => {
       try {
+        const effectiveMode = customerDetails.deliveryMode || deliveryMode;
+        const effectiveCoupon =
+          customerDetails.couponCode !== undefined ? customerDetails.couponCode : appliedCouponCode;
+
         // Strict mathematical calculations via centralized rewardsEngine
-        const financials = calculateCartFinancials(cartItems);
+        const financials = calculateCartFinancials(cartItems, {
+          deliveryMode: effectiveMode,
+          couponCode: effectiveCoupon,
+        });
         const subtotal = Number(financials.subtotal) || 0;
         const subtotalOriginal = Number(financials.subtotalOriginalMRP) || subtotal;
         const totalSavings = Number(financials.totalSavings) || 0;
         const deliveryFee = Number(financials.deliveryCharge) || 0;
-        const finalPayableAmount = Number(financials.totalPayable) || (subtotal + deliveryFee);
+        const couponDiscount = Number(financials.couponDiscount) || 0;
+        const finalPayableAmount =
+          Number(financials.totalPayable) >= 0
+            ? Number(financials.totalPayable)
+            : Math.max(0, subtotal + deliveryFee - couponDiscount);
 
         // Sanitize customer details with string fallbacks
         const sanitizedName = String(customerDetails?.fullName || '').trim() || 'Valued Customer';
@@ -756,7 +829,10 @@ export default function App() {
           phone: sanitizedPhone,
           address: sanitizedAddress,
           deliverySlot: sanitizedSlot,
+          deliveryMode: effectiveMode,
           deliveryLocation: selectedLoc,
+          couponCode: financials.couponCode || undefined,
+          couponDiscount: couponDiscount || undefined,
           items: orderItems,
           itemsCount: orderItems.length,
           subtotal: subtotal,
@@ -770,8 +846,11 @@ export default function App() {
           unlockedRewards: financials.activeGift ? [financials.activeGift.name] : [],
         });
 
-        // 3. OPTIMISTIC CONFIRMATION: Instantly clear Cart, close checkout modal, and display the Order Placed Successfully screen (0ms)
+        // 3. OPTIMISTIC CONFIRMATION: Instantly clear Cart, reset coupon/slot, close checkout modal, and show Order Placed screen
         setCartQuantities({});
+        setAppliedCouponCode(null);
+        setConfirmedDeliverySlot(null);
+        setDeliveryMode('delivery');
         setIsCheckoutOpen(false);
         setIsCartOpen(false);
         setPlacedOrder(localOrder);
@@ -836,7 +915,7 @@ export default function App() {
         throw orderErr;
       }
     },
-    [cartItems, storeSettings]
+    [cartItems, storeSettings, deliveryMode, appliedCouponCode]
   );
 
   // Admin Operations with Cloud Firestore, Central Server, and Supabase synchronization
@@ -1091,6 +1170,7 @@ export default function App() {
             )}
             storeSettings={storeSettings}
             categories={customCategories}
+            products={products}
             onOpenParchiModal={() => setIsParchiModalOpen(true)}
             onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
             onOpenDigitalParchiModal={() => setIsDigitalParchiOpen(true)}
@@ -1281,6 +1361,16 @@ export default function App() {
                 }}
               />
             </div>
+
+            {/* 4.5. "🆕 नया स्टॉक (New Arrivals)" Horizontal Scrollable Shelf */}
+            <NewArrivalsShelf
+              products={products}
+              cartQuantities={cartQuantities}
+              onAddToCart={handleAddToCart}
+              onUpdateQuantity={handleUpdateQuantity}
+              isAdmin={isAdminAuthenticated}
+              onQuickEdit={handleOpenQuickEdit}
+            />
 
             {/* 5. "Taaza Samaan & Daily Essentials" Horizontal Product Tray */}
             <div id="daily-essentials-section">
@@ -1502,7 +1592,13 @@ export default function App() {
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onClearCart={handleClearCart}
-        onProceedToCheckout={() => {
+        onProceedToCheckout={(ctx) => {
+          if (ctx) {
+            setConfirmedDeliverySlot(ctx.deliverySlot);
+            setDeliveryMode(ctx.deliverySlot.mode);
+            setAppliedCouponCode(ctx.couponCode);
+            setCartSavedAddress(ctx.savedAddress);
+          }
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
@@ -1512,6 +1608,10 @@ export default function App() {
         onAddStayfreeReward={handleAddStayfreeReward}
         onAddToCart={handleAddToCart}
         catalogProducts={products}
+        appliedCouponCode={appliedCouponCode}
+        onCouponChange={setAppliedCouponCode}
+        deliveryMode={deliveryMode}
+        onDeliveryModeChange={setDeliveryMode}
       />
 
       {/* 4.5. Handwritten Grocery List / Parchi Photo Upload Modal */}
@@ -1537,7 +1637,7 @@ export default function App() {
         storeSettings={storeSettings}
       />
 
-      {/* 5. Checkout Modal with initial customer info if signed in */}
+      {/* 5. Checkout Modal with confirmed slot, coupon, and saved customer details */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
@@ -1548,15 +1648,19 @@ export default function App() {
         onAddToCart={handleAddToCart}
         onUpdateQuantity={handleUpdateQuantity}
         catalogProducts={products}
-        initialCustomer={
-          currentUser
-            ? {
-                fullName: currentUser.displayName || '',
-                phoneNumber: currentUser.phone || '',
-                fullAddress: currentUser.address || '',
-              }
-            : undefined
-        }
+        selectedDeliverySlot={confirmedDeliverySlot}
+        deliveryMode={deliveryMode}
+        appliedCouponCode={appliedCouponCode}
+        onUpdateDeliverySlot={(slot) => {
+          setConfirmedDeliverySlot(slot);
+          setDeliveryMode(slot.mode);
+        }}
+        initialCustomer={{
+          fullName: cartSavedAddress.fullName || currentUser?.displayName || '',
+          phoneNumber: cartSavedAddress.phoneNumber || currentUser?.phone || '',
+          fullAddress: cartSavedAddress.fullAddress || currentUser?.address || '',
+          locality: cartSavedAddress.locality || '',
+        }}
       />
 
       {/* 6. Order Confirmation Modal with Live Firestore Status Tracking */}

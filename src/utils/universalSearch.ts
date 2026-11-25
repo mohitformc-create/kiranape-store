@@ -289,8 +289,11 @@ export function filterProductsUniversally(
   }
 
   return products.filter((product) => {
-    // 1. Category check
-    if (hasCategoryFilter && product.category !== selectedCategory) {
+    // 1. Category check (case-insensitive & trimmed for dynamic Supabase categories)
+    if (
+      hasCategoryFilter &&
+      (product.category || '').trim().toLowerCase() !== selectedCategory.trim().toLowerCase()
+    ) {
       return false;
     }
 

@@ -11,8 +11,63 @@
  * @param maxHeight Maximum height in pixels (defaults to 800)
  * @param quality JPEG compression quality (0.0 to 1.0, defaults to 0.82)
  */
+export function compressImageDataUrl(
+  dataUrl: string,
+  maxWidth = 800,
+  maxHeight = 800,
+  quality = 0.82
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!dataUrl || typeof dataUrl !== 'string') {
+      reject(new Error('No image data URL provided'));
+      return;
+    }
+
+    const img = new Image();
+    img.onerror = () => reject(new Error('Could not decode image'));
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width / height > maxWidth / maxHeight) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, width);
+      canvas.height = Math.max(1, height);
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+
+      // Fill background with crisp studio white in case of transparent PNG converted to JPEG
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressedDataUrl);
+    };
+
+    img.src = dataUrl;
+  });
+}
+
 export function compressImageFile(
-  file: File,
+  file: File | Blob,
   maxWidth = 1200,
   maxHeight = 1200,
   quality = 0.7
@@ -23,14 +78,14 @@ export function compressImageFile(
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (file.type && !file.type.startsWith('image/') && file.type !== 'application/octet-stream') {
       reject(new Error('Selected file must be an image (JPEG, PNG, WEBP, etc.)'));
       return;
     }
 
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Failed to read image file from device'));
-    
+
     reader.onload = () => {
       const result = reader.result;
       if (typeof result !== 'string') {
@@ -38,50 +93,9 @@ export function compressImageFile(
         return;
       }
 
-      const img = new Image();
-      img.onerror = () => reject(new Error('Could not decode image'));
-      
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        // Calculate aspect ratio bounded by maxWidth & maxHeight
-        if (width > maxWidth || height > maxHeight) {
-          if (width / height > maxWidth / maxHeight) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          } else {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, width);
-        canvas.height = Math.max(1, height);
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-          // If canvas context fails, return original data URL
-          resolve(result);
-          return;
-        }
-
-        // Fill background with white in case of transparent PNG converted to JPEG
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw image smoothly with high quality
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        // Convert to compact JPEG data URL
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
-      };
-
-      img.src = result;
+      compressImageDataUrl(result, maxWidth, maxHeight, quality)
+        .then(resolve)
+        .catch(reject);
     };
 
     reader.readAsDataURL(file);

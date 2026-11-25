@@ -142,7 +142,11 @@ export async function uploadProductImageToSupabase(
   try {
     const { error: uploadError } = await supabase.storage
       .from(PRODUCT_IMAGES_BUCKET)
-      .upload(fileName, file, { cacheControl: '3600', upsert: true });
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: (file instanceof File || file instanceof Blob) && file.type ? file.type : 'image/jpeg',
+      });
 
     if (uploadError) {
       console.warn('[Supabase Storage] Upload error:', uploadError.message);
@@ -267,20 +271,27 @@ export async function syncProductsFromSupabase(): Promise<any[] | null> {
         ? Math.round(((origPrice - sellPrice) / origPrice) * 100)
         : 0;
 
+      const parsedCreatedTs = item.created_at ? new Date(item.created_at).getTime() : 0;
+      const rawImg = typeof item.image_url === 'string' ? item.image_url.trim() : '';
+      const resolvedImg = rawImg
+        ? resolveSupabaseImageUrl(rawImg, item.category, item.name, item.unit, sellPrice)
+        : '';
+
       return {
-        id: item.id,
-        name: item.name,
-        hindiName: item.hindi_name || item.name,
-        category: item.category || 'General Grocery',
+        id: String(item.id),
+        name: item.name || '',
+        hindiName: item.hindi_name || '',
+        category: (item.category || 'General Grocery').trim(),
         department: item.department || 'grocery',
         unit: item.unit || '1 piece',
         originalPrice: origPrice,
         finalPrice: sellPrice,
         discountPercent: discount,
-        imageUrl: resolveSupabaseImageUrl(item.image_url, item.category, item.name, item.unit, sellPrice),
+        imageUrl: resolvedImg,
         stock: Number(item.stock ?? 50),
         isAvailable: item.in_stock !== false,
         createdAt: item.created_at,
+        updatedAt: Number.isFinite(parsedCreatedTs) && parsedCreatedTs > 0 ? parsedCreatedTs : Date.now(),
       };
     });
 

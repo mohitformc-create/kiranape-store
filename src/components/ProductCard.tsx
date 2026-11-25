@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Minus, X, Pencil } from 'lucide-react';
 import { Product, ProductVariant } from '../types';
-import { getCategoryFallbackSvg, getValidImageUrl } from '../utils/productImageUtils';
+import { getValidImageUrl } from '../utils/productImageUtils';
+import { hasRealDisplayImage } from '../utils/studioImageUpload';
+import { BlinkitProductPlaceholder } from './BlinkitProductPlaceholder';
 
 interface ProductCardProps {
   product: Product;
@@ -27,6 +29,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [imageError, setImageError] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [showPackSizeModal, setShowPackSizeModal] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [product.imageUrl]);
+
+  const showRealImage = hasRealDisplayImage(product.imageUrl) && !imageError;
 
   // Variant State Management
   const hasVariants = Boolean(product.variants && product.variants.length > 0);
@@ -142,42 +150,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             )}
           </div>
 
-          {/* Center aligned, aspect-ratio locked product packshot */}
-          <div className="w-full h-28 flex items-center justify-center p-2">
-            <img
-              src={
-                imageError
-                  ? getCategoryFallbackSvg(
-                      product.category,
-                      product.name,
-                      displayUnit,
-                      displayPrice
-                    )
-                  : getValidImageUrl(
-                      product.imageUrl,
-                      product.category,
-                      product.name,
-                      displayUnit,
-                      displayPrice
-                    )
-              }
-              alt={product.name}
-              onError={(e) => {
-                setImageError(true);
-                const fallback = getCategoryFallbackSvg(
+          {/* Center aligned, aspect-ratio locked product packshot or clean Blinkit-style placeholder */}
+          <div className="w-full h-28 flex items-center justify-center p-1.5">
+            {showRealImage ? (
+              <img
+                src={getValidImageUrl(
+                  product.imageUrl,
                   product.category,
                   product.name,
                   displayUnit,
                   displayPrice
-                );
-                if ((e.currentTarget as HTMLImageElement).src !== fallback) {
-                  (e.currentTarget as HTMLImageElement).src = fallback;
-                }
-              }}
-              loading="lazy"
-              decoding="async"
-              className="object-contain h-28 w-full group-hover:scale-105 transition-transform duration-200"
-            />
+                )}
+                alt={product.name}
+                referrerPolicy="no-referrer"
+                onError={() => setImageError(true)}
+                loading="lazy"
+                decoding="async"
+                className="object-contain h-full w-full group-hover:scale-105 transition-transform duration-200"
+              />
+            ) : (
+              <BlinkitProductPlaceholder
+                name={product.name}
+                category={product.category}
+                weight={displayUnit || '1 pack'}
+              />
+            )}
           </div>
 
           {/* Out of stock overlay */}

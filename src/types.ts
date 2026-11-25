@@ -34,6 +34,7 @@ export interface Product {
   sku?: string;
   variants?: ProductVariant[];
   updatedAt: number;
+  createdAt?: string | number;
   isRewardItem?: boolean;
   martBasePrice?: number;
   isMartItem?: boolean;
@@ -106,7 +107,10 @@ export interface Order {
   address: string;
   deliveryAddress?: string;
   deliverySlot?: string;
+  deliveryMode?: 'delivery' | 'pickup';
   deliveryLocation?: string;
+  couponCode?: string;
+  couponDiscount?: number;
   items: OrderItemSummary[];
   itemsCount: number;
   subtotal?: number;

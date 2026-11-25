@@ -48,6 +48,8 @@ import {
   Pencil,
   Lock,
   Wand2,
+  ClipboardPaste,
+  FolderOpen,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, StoreSettings, PromoBanner, ProductVariant, CustomCategory, ParchiOrder } from '../types';
 import { CATEGORIES, STORE_DEFAULTS } from '../data/initialProducts';
@@ -58,6 +60,7 @@ import { AdminVisualProductCard } from './AdminVisualProductCard';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminExcelUploader } from './AdminExcelUploader';
 import { AdminAutoImageModal } from './AdminAutoImageModal';
+import { BlinkitProductPlaceholder } from './BlinkitProductPlaceholder';
 import { ProductQuickEditModal } from './ProductQuickEditModal';
 import { PrintOrderSlipModal } from './PrintOrderSlipModal';
 import { AdminBackupRestore } from './AdminBackupRestore';
@@ -65,6 +68,14 @@ import { CreatorCredits } from './CreatorCredits';
 import { getWhatsAppBillUrl, generateWhatsAppBillMessage } from '../utils/orderUtils';
 import { playAdminNotificationChime } from '../utils/sound';
 import { getCategoryFallbackSvg } from '../utils/productImageUtils';
+import {
+  buildGoogleStudioSearchUrl,
+  extractClipboardImageOrUrl,
+  hasRealDisplayImage,
+  hasSupabaseStorageImage,
+  savePermanentImageToSupabaseProduct,
+  uploadStudioImageToSupabase,
+} from '../utils/studioImageUpload';
 import { exportAllStoreProductsToExcel } from '../utils/excelExportUtils';
 import { API_BASE_URL } from '../config/api';
 import { matchesUniversalSearch } from '../utils/universalSearch';
@@ -400,6 +411,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
   const [isAutoImageModalOpen, setIsAutoImageModalOpen] = useState(false);
+  const [showOnlyMissingSupabaseImages, setShowOnlyMissingSupabaseImages] = useState(false);
+  const [tablePasteValues, setTablePasteValues] = useState<Record<string, string>>({});
+  const [tableUploadingIds, setTableUploadingIds] = useState<Record<string, boolean>>({});
+  const [tableDoneIds, setTableDoneIds] = useState<Record<string, boolean>>({});
+  const [tableUploadErrors, setTableUploadErrors] = useState<Record<string, string>>({});
+
+  const handleTableStudioUpload = async (product: Product, source: File | Blob | string) => {
+    setTableUploadingIds((prev) => ({ ...prev, [product.id]: true }));
+    setTableUploadErrors((prev) => {
+      const next = { ...prev };
+      delete next[product.id];
+      return next;
+    });
+
+    try {
+      const permanentUrl = await uploadStudioImageToSupabase(source, product.name);
+      await savePermanentImageToSupabaseProduct({
+        productId: product.id,
+        name: product.name,
+        category: product.category,
+        unit: product.unit,
+        price: product.finalPrice,
+        originalPrice: product.originalPrice,
+        permanentUrl,
+      }).catch((err) => {
+        console.warn('Supabase table studio sync warning:', err);
+      });
+      onUpdateProduct(product.id, { imageUrl: permanentUrl });
+      setTablePasteValues((prev) => ({ ...prev, [product.id]: '' }));
+      setTableDoneIds((prev) => ({ ...prev, [product.id]: true }));
+    } catch (err: any) {
+      setTableUploadErrors((prev) => ({
+        ...prev,
+        [product.id]: err?.message || 'फोटो अपलोड नहीं हो सकी।',
+      }));
+    } finally {
+      setTableUploadingIds((prev) => ({ ...prev, [product.id]: false }));
+    }
+  };
+
+  const handleTablePaste = async (e: React.ClipboardEvent<HTMLInputElement>, product: Product) => {
+    const extracted = extractClipboardImageOrUrl(e.clipboardData);
+    if (!extracted) return;
+    e.preventDefault();
+    if (typeof extracted === 'string') {
+      setTablePasteValues((prev) => ({ ...prev, [product.id]: extracted }));
+    }
+    await handleTableStudioUpload(product, extracted);
+  };
 
   const handleExportAllStoreProducts = async () => {
     if (isExportingExcel) return;
@@ -566,9 +626,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateProduct(prod.id, { stock: newStock });
   };
 
+  const missingSupabasePhotoCount = useMemo(
+    () => products.filter((item) => !hasSupabaseStorageImage(item.imageUrl)).length,
+    [products]
+  );
+
   // Memoized Universal Search & Category Filter for 1,000+ items without freezing DOM
   const filteredProducts = useMemo(() => {
     return products.filter((item) => {
+      if (showOnlyMissingSupabaseImages && hasSupabaseStorageImage(item.imageUrl)) {
+        return false;
+      }
+
       const q = searchQuery.trim();
       const matchesSearch = !q || matchesUniversalSearch(item, q);
 
@@ -605,7 +674,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       return matchesSearch && matchesCategory;
     });
-  }, [products, searchQuery, selectedCategory]);
+  }, [products, searchQuery, selectedCategory, showOnlyMissingSupabaseImages]);
 
   // Catalog Pagination (Zero DOM Freeze for 1,000+ items)
   const [catalogPage, setCatalogPage] = useState<number>(1);
@@ -614,7 +683,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Reset catalog page to 1 when search or category changes
   React.useEffect(() => {
     setCatalogPage(1);
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, showOnlyMissingSupabaseImages]);
 
   const totalCatalogPages = catalogPerPage === 0 ? 1 : Math.max(1, Math.ceil(filteredProducts.length / catalogPerPage));
   const safeCatalogPage = Math.min(catalogPage, totalCatalogPages);
@@ -980,10 +1049,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     id="admin-toolbar-auto-images-btn"
                     onClick={() => setIsAutoImageModalOpen(true)}
                     className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-heading font-black shadow-sm transition-all cursor-pointer whitespace-nowrap"
-                    title="🪄 ऑटो-फोटो भरें (Auto-Fill Missing Images)"
+                    title="🧹 बाहरी फोटो हटाएँ और Blinkit/Amazon स्टूडियो फोटो अपलोड करें"
                   >
                     <Wand2 className="w-4 h-4 text-violet-100 shrink-0" />
-                    <span>🪄 ऑटो-फोटो भरें</span>
+                    <span>🧹 फोटो क्लीन व स्टूडियो अपलोड</span>
                   </button>
 
                   <button
@@ -1124,8 +1193,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     )}
                   </div>
 
-                  {/* View Mode Switcher & Item Count right above the product list */}
-                  <div className="flex items-center gap-3 text-xs text-stone-500 justify-between sm:justify-end flex-wrap">
+                  {/* View Mode Switcher, Missing Photo Filter & Item Count */}
+                  <div className="flex items-center gap-2.5 text-xs text-stone-500 justify-between sm:justify-end flex-wrap">
+                    <button
+                      type="button"
+                      id="admin-filter-missing-supabase-btn"
+                      onClick={() => setShowOnlyMissingSupabaseImages((v) => !v)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                        showOnlyMissingSupabaseImages
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-950 border-amber-300'
+                      }`}
+                      title="केवल वे प्रोडक्ट्स देखें जिनमें अभी Supabase Storage फोटो नहीं है"
+                    >
+                      📸 बिना Supabase फोटो ({missingSupabasePhotoCount})
+                    </button>
+
                     <span className="tabular-nums">
                       Showing <strong>{filteredProducts.length}</strong> of <strong>{products.length}</strong> items
                     </span>
@@ -1300,21 +1383,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <tr className="hover:bg-amber-50/30 transition-colors group">
                               {/* Item Thumbnail & Bilingual Name */}
                               <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-lg bg-stone-50 border border-stone-200 p-1 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                    <img
-                                      src={product.imageUrl || getCategoryFallbackSvg(product.category, product.name)}
-                                      alt={product.name}
-                                      loading="lazy"
-                                      decoding="async"
-                                      onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(
-                                          product.category,
-                                          product.name
-                                        );
-                                      }}
-                                      className="w-full h-full object-contain mix-blend-multiply"
-                                    />
+                                <div className="flex items-start gap-3">
+                                  <div className="w-11 h-11 rounded-lg bg-stone-50 border border-stone-200 p-0.5 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                    {hasRealDisplayImage(product.imageUrl) ? (
+                                      <img
+                                        src={product.imageUrl}
+                                        alt={product.name}
+                                        referrerPolicy="no-referrer"
+                                        loading="lazy"
+                                        decoding="async"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).src = getCategoryFallbackSvg(
+                                            product.category,
+                                            product.name
+                                          );
+                                        }}
+                                        className="w-full h-full object-contain mix-blend-multiply"
+                                      />
+                                    ) : (
+                                      <BlinkitProductPlaceholder
+                                        name={product.name}
+                                        category={product.category}
+                                        weight={product.unit}
+                                        compact
+                                      />
+                                    )}
                                   </div>
                                   <div className="min-w-0">
                                     <span className="font-semibold text-stone-900 block line-clamp-1 max-w-xs">
@@ -1344,6 +1437,102 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                           }`}
                                         />
                                       </button>
+                                    )}
+
+                                    {/* Studio Photo Quick Bar for table rows without supabase.co/storage image */}
+                                    {(!hasSupabaseStorageImage(product.imageUrl) || tableDoneIds[product.id]) && (
+                                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                        {tableDoneIds[product.id] && hasSupabaseStorageImage(product.imageUrl) ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                                            ✅ Done
+                                          </span>
+                                        ) : (
+                                          <>
+                                            <a
+                                              href={buildGoogleStudioSearchUrl(product.name, product.unit)}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 text-[10px] font-bold whitespace-nowrap"
+                                            >
+                                              <Search className="w-2.5 h-2.5 text-amber-700" />
+                                              <span>🔍 फ्रेश पैक फोटो खोजें</span>
+                                            </a>
+
+                                            <div className="relative flex items-center gap-1">
+                                              <ClipboardPaste className="w-2.5 h-2.5 text-stone-400 absolute left-2 pointer-events-none" />
+                                              <input
+                                                type="text"
+                                                value={tablePasteValues[product.id] || ''}
+                                                disabled={Boolean(tableUploadingIds[product.id])}
+                                                onChange={(e) =>
+                                                  setTablePasteValues((prev) => ({
+                                                    ...prev,
+                                                    [product.id]: e.target.value,
+                                                  }))
+                                                }
+                                                onPaste={(e) => void handleTablePaste(e, product)}
+                                                onKeyDown={(e) => {
+                                                  const v = (tablePasteValues[product.id] || '').trim();
+                                                  if (e.key === 'Enter' && v) {
+                                                    e.preventDefault();
+                                                    void handleTableStudioUpload(product, v);
+                                                  }
+                                                }}
+                                                placeholder="📋 फोटो / लिंक पेस्ट करें (Ctrl+V)"
+                                                className="w-44 pl-6 pr-2 py-1 bg-white border border-stone-300 rounded-lg text-[10px] font-medium text-stone-900 focus:border-emerald-600 focus:outline-hidden"
+                                              />
+                                              {(tablePasteValues[product.id] || '').trim() &&
+                                                !tableUploadingIds[product.id] && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      void handleTableStudioUpload(
+                                                        product,
+                                                        (tablePasteValues[product.id] || '').trim()
+                                                      )
+                                                    }
+                                                    className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold cursor-pointer"
+                                                  >
+                                                    सेव
+                                                  </button>
+                                                )}
+                                            </div>
+
+                                            <div className="relative overflow-hidden rounded-lg cursor-pointer">
+                                              <button
+                                                type="button"
+                                                disabled={Boolean(tableUploadingIds[product.id])}
+                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold whitespace-nowrap"
+                                              >
+                                                <FolderOpen className="w-2.5 h-2.5" />
+                                                <span>
+                                                  {tableUploadingIds[product.id]
+                                                    ? 'अपलोड...'
+                                                    : '📁 गैलरी से चुनें'}
+                                                </span>
+                                              </button>
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                disabled={Boolean(tableUploadingIds[product.id])}
+                                                onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  e.target.value = '';
+                                                  if (file) {
+                                                    void handleTableStudioUpload(product, file);
+                                                  }
+                                                }}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                              />
+                                            </div>
+                                          </>
+                                        )}
+                                        {tableUploadErrors[product.id] && (
+                                          <span className="text-[10px] text-rose-700 font-semibold">
+                                            {tableUploadErrors[product.id]}
+                                          </span>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </div>

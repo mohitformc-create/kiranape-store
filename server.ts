@@ -309,6 +309,81 @@ app.post('/api/upload-image', (req, res) => {
   }
 });
 
+// POST /api/proxy-image: Server-side image fetcher to bypass CORS when admin pastes an external product image URL
+app.post('/api/proxy-image', async (req, res) => {
+  try {
+    const rawUrl = String(req.body?.url || '').trim();
+    if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+      return res.status(400).json({ success: false, error: 'Valid http/https image URL is required.' });
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid URL format.' });
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host.startsWith('169.254.') ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    ) {
+      return res.status(400).json({ success: false, error: 'Restricted host.' });
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+    let response: Response;
+    try {
+      response = await fetch(parsed.toString(), {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!response.ok) {
+      return res.status(400).json({ success: false, error: `Could not download image (HTTP ${response.status}).` });
+    }
+
+    const arrayBuf = await response.arrayBuffer();
+    if (arrayBuf.byteLength === 0 || arrayBuf.byteLength > 10 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: 'Image is empty or exceeds 10MB limit.' });
+    }
+
+    const buf = Buffer.from(arrayBuf);
+    const contentTypeHeader = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    let mime = contentTypeHeader.startsWith('image/') ? contentTypeHeader : '';
+
+    if (!mime) {
+      if (buf[0] === 0xff && buf[1] === 0xd8) mime = 'image/jpeg';
+      else if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) mime = 'image/png';
+      else if (buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP') mime = 'image/webp';
+      else if (buf.slice(0, 3).toString('ascii') === 'GIF') mime = 'image/gif';
+    }
+
+    if (!mime || mime === 'image/svg+xml') {
+      return res.status(400).json({ success: false, error: 'URL did not return a valid raster photo (JPG/PNG/WEBP).' });
+    }
+
+    const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+    return res.json({ success: true, dataUrl });
+  } catch (err: any) {
+    console.warn('[Proxy Image] Error fetching image URL:', err?.message || err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to fetch image from URL.' });
+  }
+});
+
 // ==========================================
 // SMART GEMINI AI PARCHI (GROCERY SLIP) PARSER
 // ==========================================

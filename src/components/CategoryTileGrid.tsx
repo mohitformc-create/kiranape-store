@@ -16,10 +16,11 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
   onSelectCategory,
   onViewAllClick,
 }) => {
-  const [showAll, setShowAll] = useState(false);
+  const [showAllInline, setShowAllInline] = useState(false);
   const { categories: unifiedCategories } = useCategories(products);
 
   const displayCategories = unifiedCategories.length > 0 ? unifiedCategories : CATEGORIES_DATA;
+  const visibleCategories = showAllInline ? displayCategories : displayCategories.slice(0, 9);
 
   const handleTileClick = (target: ProductCategory | string) => {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -34,14 +35,14 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
 
   return (
     <section id="browse-categories-section" className="mb-6 w-full">
-      {/* Section Header: "Browse Categories" with a green "View all" link on the right */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div>
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-3 px-1 gap-2">
+        <div className="min-w-0">
           <h3 className="font-heading font-black text-base sm:text-lg text-stone-900 tracking-tight">
             Browse Categories
           </h3>
           <p className="text-xs text-stone-500 font-medium">
-            3D Quick-Commerce • Fresh & Daily Superstore
+            {displayCategories.length} Categories · Fresh & Daily Superstore
           </p>
         </div>
 
@@ -51,19 +52,19 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
             if (onViewAllClick) {
               onViewAllClick();
             } else {
-              setShowAll((prev) => !prev);
+              setShowAllInline((prev) => !prev);
             }
           }}
-          className="text-xs font-bold text-[#0c831f] hover:text-[#0a731b] active:scale-95 flex items-center gap-0.5 cursor-pointer transition-all"
+          className="text-xs font-bold text-[#0c831f] hover:text-[#0a731b] active:scale-95 flex items-center gap-0.5 cursor-pointer transition-all whitespace-nowrap shrink-0"
         >
-          <span>View all</span>
+          <span>View All ({displayCategories.length})</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Grid Layout: 3-column responsive grid (grid grid-cols-3 gap-2.5 sm:gap-3.5) */}
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
-        {(showAll ? displayCategories : displayCategories.slice(0, 6)).map((tile) => {
+      {/* Responsive Dynamic Category Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3">
+        {visibleCategories.map((tile) => {
           const mainImage = tile.imageUrl || tile.primaryImage || tile.fallbackSvg;
 
           return (
@@ -78,24 +79,28 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
                   handleTileClick(tile.categoryTarget);
                 }
               }}
-              className={`bg-gradient-to-b ${tile.gradient} rounded-3xl border p-2.5 flex flex-col justify-between relative overflow-hidden shadow-sm transition-all duration-200 active:scale-95 hover:shadow-md cursor-pointer group select-none min-h-[165px] sm:min-h-[185px]`}
+              className={`bg-gradient-to-b ${tile.gradient} rounded-2xl border p-2.5 flex flex-col justify-between relative overflow-hidden shadow-2xs transition-all duration-200 active:scale-95 hover:shadow-md hover:-translate-y-0.5 cursor-pointer group select-none min-h-[155px] sm:min-h-[170px]`}
               title={`Browse ${tile.name}`}
             >
-              {/* Floating micro-badge at top-right corner */}
-              <div className="flex justify-end w-full relative z-10">
-                <span className="bg-white/85 backdrop-blur-sm text-[10px] font-bold text-neutral-800 px-2 py-0.5 rounded-full border border-neutral-200/60 shadow-xs leading-none whitespace-nowrap">
-                  {tile.badge}
+              {/* Top Row: Category icon + clean item count */}
+              <div className="flex items-center justify-between w-full relative z-10 text-[10px] font-semibold text-stone-600">
+                <span className="text-sm leading-none" aria-hidden="true">
+                  {tile.icon}
+                </span>
+                <span className="tabular-nums font-bold text-stone-700 whitespace-nowrap">
+                  {tile.itemCount > 0 ? `${tile.itemCount} items` : tile.badge}
                 </span>
               </div>
 
-              {/* 3D Multi-pack Cluster Image Showcase (65% Height) */}
-              <div className="w-full h-24 sm:h-28 flex items-center justify-center p-1 relative my-auto">
+              {/* Packshot / Category Image */}
+              <div className="w-full h-20 sm:h-24 flex items-center justify-center p-1 relative my-auto">
                 {tile.secondaryImage && (
                   <img
                     src={tile.secondaryImage}
                     alt=""
                     aria-hidden="true"
-                    className="w-12 h-12 sm:w-14 sm:h-14 object-contain filter drop-shadow-sm absolute right-1 bottom-1 opacity-70 transform translate-x-1 translate-y-1 scale-90 pointer-events-none transition-transform duration-300 group-hover:scale-95"
+                    referrerPolicy="no-referrer"
+                    className="w-11 h-11 sm:w-12 sm:h-12 object-contain filter drop-shadow-sm absolute right-0.5 bottom-0.5 opacity-65 transform translate-x-0.5 translate-y-0.5 scale-90 pointer-events-none transition-transform duration-300 group-hover:scale-95"
                     loading="lazy"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -105,8 +110,9 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
                 <img
                   src={mainImage}
                   alt={tile.name}
+                  referrerPolicy="no-referrer"
                   loading="lazy"
-                  className="w-full h-full object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105 relative z-1"
+                  className="w-full h-full object-contain filter drop-shadow-sm transition-transform duration-300 group-hover:scale-105 relative z-1"
                   onError={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
                     if (target.src !== tile.fallbackSvg) {
@@ -116,24 +122,41 @@ export const CategoryTileGrid: React.FC<CategoryTileGridProps> = ({
                 />
               </div>
 
-              {/* Text & Chevron Footer */}
+              {/* Category Name & Chevron */}
               <div className="pt-1.5 border-t border-black/5 mt-1 flex items-end justify-between gap-1 relative z-10">
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-xs font-bold text-neutral-900 leading-tight line-clamp-1 group-hover:text-emerald-900 transition-colors">
+                  <h4 className="text-xs font-bold text-stone-900 leading-tight line-clamp-2 group-hover:text-emerald-900 transition-colors">
                     {tile.name}
                   </h4>
-                  <p className="text-[11px] font-medium text-neutral-600 line-clamp-1 mt-0.5">
-                    {tile.hindiName}
-                  </p>
                 </div>
-                <div className="w-5 h-5 rounded-full bg-white/70 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-colors flex-shrink-0 shadow-2xs">
-                  <ChevronRight className="w-3 h-3 text-neutral-500 group-hover:text-white transition-colors" />
+                <div className="w-5 h-5 rounded-full bg-white/80 group-hover:bg-[#0c831f] group-hover:text-white flex items-center justify-center transition-colors flex-shrink-0 shadow-2xs">
+                  <ChevronRight className="w-3 h-3 text-stone-500 group-hover:text-white transition-colors" />
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Expand / View All Button if more categories exist beyond first 9 */}
+      {displayCategories.length > 9 && !showAllInline && (
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (onViewAllClick) {
+                onViewAllClick();
+              } else {
+                setShowAllInline(true);
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-stone-200 hover:border-emerald-300 text-xs font-bold text-[#0c831f] shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+          >
+            <span>सभी {displayCategories.length} कैटेगरी देखें (View All Categories)</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </section>
   );
 };

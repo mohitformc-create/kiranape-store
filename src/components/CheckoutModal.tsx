@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
-import { X, User, Phone, MapPin, Banknote, ShieldCheck, CheckCircle2, ArrowRight, Clock, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  User,
+  Phone,
+  MapPin,
+  Banknote,
+  ShieldCheck,
+  CheckCircle2,
+  ArrowRight,
+  Clock,
+  Store,
+  Truck,
+  Tag,
+} from 'lucide-react';
 import { CartItem, DeliverySlot, StoreSettings, Product } from '../types';
 import { STORE_DEFAULTS } from '../data/initialProducts';
 import { getCustomerSelectedLocation } from '../services/storageService';
 import { CreatorCredits } from './CreatorCredits';
 import { CartBumperProgressBar } from './CartBumperProgressBar';
-import { UpsellCarousel } from './UpsellCarousel';
-import { calculateCartFinancials, STANDARD_DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '../utils/rewardsEngine';
+import {
+  calculateCartFinancials,
+  STANDARD_DELIVERY_FEE,
+  FREE_DELIVERY_THRESHOLD,
+} from '../utils/rewardsEngine';
+import { ConfirmedDeliverySlot, DeliveryMode, DeliverySlotModal } from './DeliverySlotModal';
+import { saveCartAddress, getSavedCartAddress } from './CartDrawer';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -16,12 +34,19 @@ interface CheckoutModalProps {
     fullName?: string;
     phoneNumber?: string;
     fullAddress?: string;
+    locality?: string;
   };
+  selectedDeliverySlot?: ConfirmedDeliverySlot | null;
+  deliveryMode?: DeliveryMode;
+  appliedCouponCode?: string | null;
+  onUpdateDeliverySlot?: (slot: ConfirmedDeliverySlot) => void;
   onSubmitOrder: (customerDetails: {
     fullName: string;
     phoneNumber: string;
     fullAddress: string;
     deliverySlot: DeliverySlot;
+    deliveryMode?: DeliveryMode;
+    couponCode?: string | null;
   }) => Promise<void> | void;
   storeSettings?: StoreSettings;
   onAddStayfreeReward?: () => void;
@@ -30,65 +55,77 @@ interface CheckoutModalProps {
   catalogProducts?: Product[];
 }
 
-const DELIVERY_SLOT_OPTIONS: { id: DeliverySlot; label: string; timeRange: string; desc: string }[] = [
-  {
-    id: 'Morning (10:00 AM - 2:00 PM)',
-    label: 'Morning Slot',
-    timeRange: '10:00 AM - 2:00 PM',
-    desc: 'Fresh daytime staples & groceries',
-  },
-  {
-    id: 'Evening (7:00 PM - 9:00 PM)',
-    label: 'Evening Slot',
-    timeRange: '7:00 PM - 9:00 PM',
-    desc: 'Convenient post-work dinner delivery',
-  },
-];
-
-const getInitialDeliverySlot = (): DeliverySlot => {
-  const currentHour = new Date().getHours();
-  return currentHour < 13 ? 'Morning (10:00 AM - 2:00 PM)' : 'Evening (7:00 PM - 9:00 PM)';
-};
-
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   cartItems,
   initialCustomer,
+  selectedDeliverySlot,
+  deliveryMode = 'delivery',
+  appliedCouponCode = null,
+  onUpdateDeliverySlot,
   onSubmitOrder,
   storeSettings = STORE_DEFAULTS,
-  onAddStayfreeReward,
-  onAddToCart,
-  onUpdateQuantity,
-  catalogProducts = [],
 }) => {
   const [fullName, setFullName] = useState(initialCustomer?.fullName || '');
   const [phoneNumber, setPhoneNumber] = useState(initialCustomer?.phoneNumber || '');
   const [fullAddress, setFullAddress] = useState(initialCustomer?.fullAddress || '');
-  const [deliverySlot, setDeliverySlot] = useState<DeliverySlot>(() => getInitialDeliverySlot());
+  const [activeSlot, setActiveSlot] = useState<ConfirmedDeliverySlot | null>(
+    selectedDeliverySlot || null
+  );
+  const [activeMode, setActiveMode] = useState<DeliveryMode>(
+    selectedDeliverySlot?.mode || deliveryMode
+  );
+  const [isSlotPickerOpen, setIsSlotPickerOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedLocation = getCustomerSelectedLocation() || storeSettings.serviceArea || 'Waidhan, Singrauli';
+  useEffect(() => {
+    if (isOpen) {
+      const saved = getSavedCartAddress();
+      setFullName((prev) => initialCustomer?.fullName || saved.fullName || prev);
+      setPhoneNumber((prev) => initialCustomer?.phoneNumber || saved.phoneNumber || prev);
+      setFullAddress((prev) => initialCustomer?.fullAddress || saved.fullAddress || prev);
+      if (selectedDeliverySlot) {
+        setActiveSlot(selectedDeliverySlot);
+        setActiveMode(selectedDeliverySlot.mode);
+      } else {
+        setActiveMode(deliveryMode);
+      }
+      setErrors({});
+      setSubmitError(null);
+    }
+  }, [isOpen, initialCustomer, selectedDeliverySlot, deliveryMode]);
+
+  const selectedLocation =
+    initialCustomer?.locality ||
+    getCustomerSelectedLocation() ||
+    storeSettings.serviceArea ||
+    'बैढ़न, सिंगरौली';
 
   if (!isOpen) return null;
 
-  // Strict numeric calculations from centralized rewardsEngine
-  const financials = calculateCartFinancials(cartItems);
+  const financials = calculateCartFinancials(cartItems, {
+    deliveryMode: activeMode,
+    couponCode: appliedCouponCode,
+  });
+
   const {
-    itemsCount,
     subtotal,
-    subtotalOriginalMRP,
-    totalSavings,
+    couponCode: validCoupon,
+    couponDiscount,
     isFreeDelivery,
     deliveryCharge,
+    subTotalWithDelivery,
     totalPayable: finalPayable,
-    unlockedGifts,
-    amountNeededForNext,
   } = financials;
-  const minFree = FREE_DELIVERY_THRESHOLD;
-  const standardFee = STANDARD_DELIVERY_FEE;
+
+  const effectiveSlotLabel: DeliverySlot =
+    activeSlot?.slotLabel ||
+    (activeMode === 'pickup'
+      ? 'Pickup From Store • Scheduled Slot'
+      : 'Home Delivery • Scheduled Slot');
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -106,10 +143,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       errs.phoneNumber = 'Please enter a valid 10-digit mobile number';
     }
 
-    if (!fullAddress.trim()) {
-      errs.fullAddress = 'Please enter your complete delivery address';
-    } else if (fullAddress.trim().length < 6) {
-      errs.fullAddress = 'Please include house/flat no., street, and area';
+    if (activeMode !== 'pickup') {
+      if (!fullAddress.trim()) {
+        errs.fullAddress = 'Please enter your complete delivery address';
+      } else if (fullAddress.trim().length < 6) {
+        errs.fullAddress = 'Please include house/flat no., street, and area';
+      }
     }
 
     setErrors(errs);
@@ -121,18 +160,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!validate()) return;
     setSubmitError(null);
 
+    const finalAddress =
+      activeMode === 'pickup'
+        ? fullAddress.trim() || 'Chaurasia Kirana Store: बस स्टैंड, बैढ़न'
+        : fullAddress.trim() || selectedLocation;
+
+    // Persist customer details for future carts
+    saveCartAddress({
+      fullName: fullName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      fullAddress: activeMode === 'pickup' ? fullAddress.trim() : finalAddress,
+      locality: selectedLocation,
+    });
+
     setIsSubmitting(true);
     try {
       await onSubmitOrder({
-        fullName: (fullName || '').trim() || 'Customer',
-        phoneNumber: (phoneNumber || '').trim() || '9424316081',
-        fullAddress: (fullAddress || '').trim() || 'Waidhan, Singrauli',
-        deliverySlot: deliverySlot || 'Bharosemand Doorstep Delivery',
+        fullName: fullName.trim() || 'Customer',
+        phoneNumber: phoneNumber.trim() || '9424316081',
+        fullAddress: finalAddress,
+        deliverySlot: effectiveSlotLabel,
+        deliveryMode: activeMode,
+        couponCode: validCoupon,
       });
-      // The parent will dismiss modal and display the Order Placed Successfully screen
     } catch (err: unknown) {
       console.error('Error placing order:', err);
-      const msg = err instanceof Error ? err.message : 'Unable to complete order. Please try again.';
+      const msg =
+        err instanceof Error ? err.message : 'Unable to complete order. Please try again.';
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
@@ -141,7 +195,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
     >
@@ -149,39 +203,61 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Header */}
         <div className="bg-stone-900 text-white px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-[#0c831f] text-white flex items-center justify-center font-bold">
               <Banknote className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-heading font-bold text-base leading-tight">
-                Complete Your Delivery Order
+                Confirm & Place Order
               </h3>
               <p className="text-xs text-stone-300">
-                No login required • Cash on Delivery ONLY
+                No login required · Cash on Delivery
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors"
+            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
             title="Cancel"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form body */}
+        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 flex-1 overflow-y-auto space-y-4">
-          {/* Reassurance Notice */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-emerald-950">
-              <strong>Zero prepayment required:</strong> Chaurasia Kirana delivers right to your doorstep.
-              Hand over cash or scan delivery agent UPI upon arrival.
+          {/* Confirmed Delivery Mode & Slot Summary */}
+          <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between gap-2.5">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-[#0c831f] text-white flex items-center justify-center shrink-0">
+                {activeMode === 'pickup' ? (
+                  <Store className="w-4 h-4" />
+                ) : (
+                  <Truck className="w-4 h-4" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
+                  <Clock className="w-3 h-3" />
+                  <span>
+                    {activeMode === 'pickup' ? 'Pickup From Store' : 'Home Delivery Slot'}
+                  </span>
+                </div>
+                <p className="font-heading font-black text-xs sm:text-sm text-stone-900 mt-0.5 leading-snug">
+                  {effectiveSlotLabel}
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsSlotPickerOpen(true)}
+              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-100 text-[#0c831f] border border-emerald-300 text-xs font-bold shrink-0 cursor-pointer transition-colors"
+            >
+              Change
+            </button>
           </div>
 
-          {/* Dynamic Bumper Offer Progress Bar (Gamification: ₹999 & ₹1999) */}
           <CartBumperProgressBar currentSubtotal={subtotal} />
 
           {/* Field 1: Full Name */}
@@ -210,7 +286,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     ? 'border-rose-400 bg-rose-50/30 focus:ring-2 focus:ring-rose-200'
                     : 'border-stone-200 focus:bg-white focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600'
                 }`}
-                autoFocus
               />
             </div>
             {errors.fullName && (
@@ -250,213 +325,149 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <p className="mt-1 text-xs text-rose-600 font-medium">{errors.phoneNumber}</p>
             ) : (
               <p className="mt-1 text-[11px] text-stone-500">
-                Delivery partner will call this number when arriving at your location.
+                {activeMode === 'pickup'
+                  ? 'We will call/SMS when your store pickup order is packed.'
+                  : 'Delivery partner will call this number when arriving at your location.'}
               </p>
             )}
           </div>
 
-          {/* Field 3: Full Address */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor="customer-full-address"
-                className="text-xs font-bold text-stone-800 uppercase tracking-wider"
-              >
-                3. Full Delivery Address <span className="text-rose-600">*</span>
-              </label>
-              <div className="flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
-                <MapPin className="w-3 h-3 text-amber-700" />
-                <span className="truncate max-w-[140px] sm:max-w-[200px]">{selectedLocation}</span>
+          {/* Field 3: Full Delivery Address (or Store Pickup Info) */}
+          {activeMode === 'pickup' ? (
+            <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 text-xs text-stone-700 space-y-1">
+              <div className="font-bold text-stone-900 flex items-center gap-1.5">
+                <Store className="w-4 h-4 text-[#0c831f]" />
+                <span>Store Pickup Location</span>
               </div>
+              <p className="font-semibold text-stone-800">
+                Chaurasia Kirana Store: बस स्टैंड, बैढ़न
+              </p>
+              <p className="text-[11px] text-emerald-700 font-semibold">
+                Zero delivery fee — Pay Cash or UPI at the store counter.
+              </p>
             </div>
-            <div className="relative">
-              <div className="absolute top-3 left-3.5 pointer-events-none text-stone-400">
-                <MapPin className="w-4 h-4" />
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="customer-full-address"
+                  className="text-xs font-bold text-stone-800 uppercase tracking-wider"
+                >
+                  3. Full Delivery Address <span className="text-rose-600">*</span>
+                </label>
+                <span className="text-[11px] font-semibold text-stone-500 truncate max-w-[160px]">
+                  {selectedLocation}
+                </span>
               </div>
-              <textarea
-                id="customer-full-address"
-                rows={3}
-                value={fullAddress}
-                onChange={(e) => {
-                  setFullAddress(e.target.value);
-                  if (errors.fullAddress) setErrors({ ...errors, fullAddress: '' });
-                }}
-                placeholder="Flat / House No., Floor, Building Name, Street, Landmark, Colony / Area..."
-                className={`w-full pl-10 pr-3.5 py-2.5 bg-stone-50 text-stone-900 placeholder:text-stone-400 text-sm rounded-xl border transition-all resize-none ${
-                  errors.fullAddress
-                    ? 'border-rose-400 bg-rose-50/30 focus:ring-2 focus:ring-rose-200'
-                    : 'border-stone-200 focus:bg-white focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600'
-                }`}
-              />
+              <div className="relative">
+                <div className="absolute top-3 left-3.5 pointer-events-none text-stone-400">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <textarea
+                  id="customer-full-address"
+                  rows={3}
+                  value={fullAddress}
+                  onChange={(e) => {
+                    setFullAddress(e.target.value);
+                    if (errors.fullAddress) setErrors({ ...errors, fullAddress: '' });
+                  }}
+                  placeholder="Flat / House No., Floor, Street, Landmark, Colony / Area..."
+                  className={`w-full pl-10 pr-3.5 py-2.5 bg-stone-50 text-stone-900 placeholder:text-stone-400 text-sm rounded-xl border transition-all resize-none ${
+                    errors.fullAddress
+                      ? 'border-rose-400 bg-rose-50/30 focus:ring-2 focus:ring-rose-200'
+                      : 'border-stone-200 focus:bg-white focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600'
+                  }`}
+                />
+              </div>
+              {errors.fullAddress && (
+                <p className="mt-1 text-xs text-rose-600 font-medium">{errors.fullAddress}</p>
+              )}
             </div>
-            {errors.fullAddress && (
-              <p className="mt-1 text-xs text-rose-600 font-medium">{errors.fullAddress}</p>
-            )}
-          </div>
+          )}
 
-          {/* Field 4: Preferred Delivery Slot */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                4. Preferred Delivery Slot <span className="text-rose-600">*</span>
-              </label>
-              <span className="text-[10px] font-bold text-stone-500 uppercase">2 Daily Slots</span>
-            </div>
-
-            {/* Note on daily delivery slots */}
-            <div className="p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl text-[11px] text-amber-950 font-medium mb-2.5 flex items-start gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <span>
-                We currently deliver in 2 convenient daily slots: <strong>Morning (10AM-2PM)</strong> and <strong>Evening (7PM-9PM)</strong>.
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {DELIVERY_SLOT_OPTIONS.map((slot) => {
-                const isSelected = deliverySlot === slot.id;
-                return (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    onClick={() => setDeliverySlot(slot.id)}
-                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-emerald-600 bg-emerald-50/90 ring-2 ring-emerald-600/30 text-emerald-950 shadow-xs'
-                        : 'border-stone-200 bg-stone-50 hover:bg-white text-stone-700 hover:border-stone-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-black leading-tight text-stone-900">
-                        {slot.label}
-                      </span>
-                      <span
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ml-1.5 ${
-                          isSelected
-                            ? 'border-emerald-600 bg-emerald-600'
-                            : 'border-stone-300 bg-white'
-                        }`}
-                      >
-                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/70 inline-block px-1.5 py-0.5 rounded mb-1">
-                      {slot.timeRange}
-                    </div>
-                    <p className="text-[11px] text-stone-500 leading-snug">{slot.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Admin-Controlled 'You Might Also Like' Upsell Carousel */}
-          <UpsellCarousel
-            products={catalogProducts}
-            cartItems={cartItems}
-            onAddToCart={(prod) => {
-              if (onAddToCart) {
-                onAddToCart(prod);
-              } else if (onUpdateQuantity) {
-                onUpdateQuantity(prod.id, 1);
-              }
-            }}
-            onUpdateQuantity={onUpdateQuantity}
-            className="pt-1"
-          />
-
-          {/* Payment Method & Cost Breakdown */}
-          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/90 space-y-2.5 shadow-2xs">
-            <div className="flex items-center justify-between text-xs">
+          {/* Synchronized Bill Breakdown */}
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/90 space-y-2 shadow-2xs tabular-nums">
+            <div className="flex items-center justify-between text-xs pb-1.5 border-b border-stone-200/80">
               <span className="font-bold text-stone-700 uppercase tracking-wider">
-                Payment Method
+                Order Summary
               </span>
-              <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="text-emerald-800 font-bold text-[11px] flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#0c831f]" />
                 Cash on Delivery (COD)
               </span>
             </div>
 
-            <div className="pt-2 border-t border-stone-200/80 space-y-1.5 text-xs text-stone-600">
+            <div className="space-y-1.5 text-xs text-stone-600">
               <div className="flex items-center justify-between">
-                <span>Items Subtotal:</span>
-                <span className="font-bold text-stone-900">₹{subtotal}</span>
+                <span>Cart Value</span>
+                <span className="font-bold text-stone-900">₹{subtotal.toFixed(2)}</span>
               </div>
 
-              {/* Unlocked Free Gifts itemized at ₹0 with prominent green 'FREE GIFT' badge */}
-              {unlockedGifts.length > 0 && (
-                <div className="space-y-1 py-1.5 px-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl">
-                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-emerald-700" />
-                    <span>UNLOCKED FREE REWARDS</span>
-                  </div>
-                  {unlockedGifts.map((gift) => (
-                    <div key={gift.id} className="flex items-center justify-between text-[11px]">
-                      <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                        <span>{gift.icon}</span>
-                        <span className="font-bold text-emerald-950 truncate">{gift.name}</span>
-                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.5 rounded shadow-2xs">
-                          FREE GIFT
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[10px] text-stone-400 line-through">₹{gift.mrp}</span>
-                        <span className="font-black text-emerald-700">₹0</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Delivery Charge: Shows "FREE" ONLY when deliveryCharge === 0 (subtotal >= 499) */}
               <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-stone-700 font-medium">Delivery Charge:</span>
-                  {!isFreeDelivery && (
-                    <span className="text-[10px] text-amber-700 font-medium">
-                      Add ₹{499 - subtotal} more for FREE Delivery 🚚
+                <div>
+                  <span className="text-stone-700 font-medium">
+                    Delivery Charge{activeMode === 'pickup' ? ' (Pickup)' : ''}
+                  </span>
+                  {!isFreeDelivery && activeMode !== 'pickup' && (
+                    <span className="block text-[10px] text-amber-700 font-medium">
+                      Add ₹{Math.ceil(FREE_DELIVERY_THRESHOLD - subtotal)} more for FREE Delivery
                     </span>
                   )}
                 </div>
                 {isFreeDelivery ? (
-                  <span className="text-emerald-700 font-black flex items-center gap-1">
-                    <span className="text-[11px] text-stone-400 line-through">₹30</span>
+                  <span className="text-[#0c831f] font-black flex items-center gap-1">
+                    <span className="text-[11px] text-stone-400 line-through">
+                      ₹{STANDARD_DELIVERY_FEE.toFixed(2)}
+                    </span>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    FREE
+                    ₹0.00 (FREE)
                   </span>
                 ) : (
                   <span className="font-bold text-stone-900">
-                    ₹{deliveryCharge}
+                    ₹{deliveryCharge.toFixed(2)}
                   </span>
                 )}
               </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-stone-200/70">
+                <span>Sub Total</span>
+                <span className="font-bold text-stone-900">
+                  ₹{subTotalWithDelivery.toFixed(2)}
+                </span>
+              </div>
+
+              {couponDiscount > 0 && validCoupon && (
+                <div className="flex items-center justify-between text-[#0c831f] font-bold">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3" /> Coupon ({validCoupon})
+                  </span>
+                  <span>-₹{couponDiscount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
-            {/* Strict Mathematical Invariant: Items Subtotal + Delivery Charge === TOTAL PAYABLE (COD) */}
-            <div className="pt-2.5 border-t border-stone-200/80 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-stone-800 block">Total Cash to Pay:</span>
-                <span className="text-[10px] text-stone-400">Items Subtotal + Delivery Charge</span>
-              </div>
+            <div className="pt-2.5 border-t border-stone-200 flex items-center justify-between">
+              <span className="text-xs font-extrabold text-stone-900">
+                Total Amount Payable
+              </span>
               <span className="font-heading font-black text-xl text-emerald-950 font-mono">
-                ₹{finalPayable}
+                ₹{finalPayable.toFixed(2)}
               </span>
             </div>
           </div>
 
-          {/* Error Message */}
           {submitError && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium">
               {submitError}
             </div>
           )}
 
-          {/* Submit Action - Blinkit tactile emerald green */}
+          {/* Submit Action */}
           <button
             id="submit-order-btn"
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-70 text-white font-heading font-black text-sm sm:text-base rounded-2xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all cursor-pointer border border-emerald-500/40"
+            className="w-full py-4 px-4 bg-[#0c831f] hover:bg-[#0a731b] active:scale-[0.99] disabled:opacity-70 text-white font-heading font-black text-sm sm:text-base rounded-2xl shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             {isSubmitting ? (
               <span className="inline-flex items-center gap-2">
@@ -465,17 +476,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </span>
             ) : (
               <>
-                Place Order (Cash on Delivery) • ₹{finalPayable} <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                Place Order (COD) · ₹{Math.round(finalPayable)}{' '}
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
               </>
             )}
           </button>
 
-          {/* Official Creator & Branding Credits */}
           <div className="pt-2 border-t border-stone-100">
             <CreatorCredits />
           </div>
         </form>
       </div>
+
+      {/* Inline Slot Switcher */}
+      <DeliverySlotModal
+        isOpen={isSlotPickerOpen}
+        onClose={() => setIsSlotPickerOpen(false)}
+        subtotal={subtotal}
+        initialMode={activeMode}
+        initialSlotId={activeSlot?.slotId || null}
+        storeAddress={storeSettings.address || 'थाना रोड, बैढ़न (10:00 AM - 9:00 PM)'}
+        onConfirmSlot={(slot) => {
+          setActiveSlot(slot);
+          setActiveMode(slot.mode);
+          onUpdateDeliverySlot?.(slot);
+          setIsSlotPickerOpen(false);
+        }}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { Product, ProductVariant, CustomCategory } from '../types';
 import { ProductCard } from './ProductCard';
 import { ArrowLeft, Search, X, Sparkles, ShoppingBasket } from 'lucide-react';
 import { isMasterAdminPin } from '../config/adminConfig';
+import { useCategories } from '../data/categoriesData';
 
 interface CategoryDetailViewProps {
   categoryName: string;
@@ -20,7 +21,6 @@ interface CategoryDetailViewProps {
 
 export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   categoryName,
-  categories,
   products,
   cartQuantities,
   onBackToCategories,
@@ -34,20 +34,21 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   const [internalSearch, setInternalSearch] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Selectable categories excluding 'All'
-  const selectableCategories = useMemo(() => {
-    return categories.filter((c) => c.name !== 'All');
-  }, [categories]);
+  // Dynamically load ALL unique categories from live products
+  const { categories: dynamicCategories } = useCategories(products);
 
   // Current category metadata
   const currentCategoryMeta = useMemo(() => {
-    return categories.find((c) => c.name.toLowerCase() === categoryName.toLowerCase());
-  }, [categories, categoryName]);
+    return dynamicCategories.find(
+      (c) => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase()
+    );
+  }, [dynamicCategories, categoryName]);
 
   // Filter products for active category and in-category search query
   const categoryProducts = useMemo(() => {
+    const normalizedTarget = categoryName.trim().toLowerCase();
     const list = products.filter(
-      (p) => p.category.toLowerCase() === categoryName.toLowerCase()
+      (p) => (p.category || '').trim().toLowerCase() === normalizedTarget
     );
 
     if (!internalSearch.trim()) {
@@ -66,10 +67,10 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
 
   return (
     <div className="w-full pb-10">
-      {/* 1. TOP AMAZON FRESH STYLE HORIZONTAL CATEGORY TABS */}
+      {/* 1. TOP HORIZONTAL ALL-CATEGORIES TABS */}
       <div className="bg-white rounded-2xl border border-stone-200/90 shadow-xs p-2 sm:p-2.5 mb-3.5">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-none no-scrollbar touch-pan-x">
-          {/* All Categories Pill */}
+          {/* All Categories Button */}
           <button
             type="button"
             onClick={onBackToCategories}
@@ -79,28 +80,29 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
             <span>All Categories</span>
           </button>
 
-          {/* Individual Category Tabs */}
-          {selectableCategories.map((cat) => {
-            const isActive = cat.name.toLowerCase() === categoryName.toLowerCase();
+          {/* Dynamic Individual Category Tabs */}
+          {dynamicCategories.map((cat) => {
+            const isActive =
+              cat.name.trim().toLowerCase() === categoryName.trim().toLowerCase();
             return (
               <button
-                key={cat.id || cat.name}
+                key={cat.id}
                 type="button"
                 onClick={() => {
                   setInternalSearch('');
-                  onSelectCategory(cat.name);
+                  onSelectCategory(cat.categoryTarget);
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 active:scale-95 ${
                   isActive
-                    ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-500 font-extrabold shadow-xs'
+                    ? 'bg-emerald-50 text-emerald-900 border-2 border-emerald-600 font-extrabold shadow-xs'
                     : 'bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 shadow-2xs'
                 }`}
               >
                 <span className="text-base leading-none">{cat.icon || '🏷️'}</span>
                 <span>{cat.name}</span>
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 ml-0.5 animate-pulse" />
-                )}
+                <span className="text-[10px] font-semibold text-stone-400 tabular-nums">
+                  ({cat.itemCount})
+                </span>
               </button>
             );
           })}
